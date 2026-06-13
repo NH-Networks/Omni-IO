@@ -5,6 +5,7 @@
 #include "ESPAsyncWebServer.h" // Or WebServer.h if that's preferred for memory
 #include <AsyncJson.h>
 #include <algorithm>
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <LittleFS.h>
@@ -20,6 +21,7 @@
 #include <nvs_helpers.h>
 #include <oled_display.h>
 #if defined(SYSLOG)
+#include <WiFi.h>
 #include <syslog_helper.h>
 #endif
 #include <tokens.h>
@@ -394,6 +396,14 @@ void handleApiAction(AsyncWebServerRequest *request, JsonObject &doc, JsonObject
   root["message"] = msg;
 }
 
+void handleApiInfo(AsyncWebServerRequest *request, JsonObject &root) {
+#ifdef FIRMWARE_VERSION
+  root["version"] = FIRMWARE_VERSION;
+#else
+  root["version"] = "dev";
+#endif
+}
+
 void handleApiLogs(AsyncWebServerRequest *request, JsonArray &root) {
   auto logs = getLogMessages();
   for (const auto &msg : logs) {
@@ -440,7 +450,6 @@ static bool jsonToBool(JsonVariant variant, bool &value) {
 void handleApiDisplayGet(AsyncWebServerRequest *request, JsonObject &root) {
   const bool enabled = isDisplayEnabled();
   root["enabled"] = enabled;
-  Serial.printf("Display config requested: %s\n", enabled ? "enabled" : "disabled");
 }
 
 void handleApiDisplaySet(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
@@ -452,7 +461,6 @@ void handleApiDisplaySet(AsyncWebServerRequest *request, JsonObject &doc, JsonOb
   }
 
   setDisplayEnabled(enabled);
-  Serial.printf("Display config updated: %s\n", enabled ? "enabled" : "disabled");
 
   root["success"] = true;
   root["message"] = "Display configuration updated";
@@ -467,6 +475,7 @@ void handleApiSyslogGet(AsyncWebServerRequest *request, JsonObject &root) {
   root["enabled"] = syslog_enabled;
   root["server"] = syslog_server.c_str();
   root["port"] = syslog_port;
+  root["tag"] = syslog_tag.c_str();
 }
 
 void handleApiSyslogSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
@@ -522,6 +531,20 @@ void handleApiSyslogSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObj
     }
   }
 
+  if (doc["tag"].is<JsonVariant>()) {
+    String newTag = doc["tag"] | "";
+    // Sanitise: keep only alphanumeric and hyphen, truncate to 20 chars
+    String sanitised;
+    for (char c : newTag) {
+      if (isalnum(c) || c == '-') sanitised += c;
+      if (sanitised.length() >= 20) break;
+    }
+    if (sanitised != syslog_tag.c_str()) {
+      syslog_tag = sanitised.c_str();
+      nvs_write_string(NVS_KEY_SYSLOG_TAG, syslog_tag);
+    }
+  }
+
   if (enabledChanged || serverChanged || portChanged) {
     resetSyslog();
     if (syslog_enabled) {
@@ -534,6 +557,23 @@ void handleApiSyslogSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObj
   root["enabled"] = syslog_enabled;
   root["server"] = syslog_server.c_str();
   root["port"] = syslog_port;
+  root["tag"] = syslog_tag.c_str();
+}
+
+void handleApiSyslogTest(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
+  if (!syslog_enabled) {
+    root["success"] = false;
+    root["message"] = "Syslog is disabled";
+    return;
+  }
+  if (WiFi.status() != WL_CONNECTED) {
+    root["success"] = false;
+    root["message"] = "WiFi not connected";
+    return;
+  }
+  sendSyslog("Test message from web UI", 6);
+  root["success"] = true;
+  root["message"] = "Test message sent";
 }
 #endif
 
@@ -621,17 +661,20 @@ void handleFirmwareUpdate(AsyncWebServerRequest *request) {
   } else {
     request->send(200, "application/json",
                   "{\"message\":\"Firmware update successful, rebooting\"}");
-    xTaskCreate(
-      [](void *) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        ESP.restart();
-      },
-      "reboot",
-      2048,
-      nullptr,
-      1,
-      nullptr
-    );
+    static std::atomic<bool> rebootScheduled{false};
+    if (!rebootScheduled.exchange(true)) {
+      xTaskCreate(
+        [](void *) {
+          vTaskDelay(pdMS_TO_TICKS(1000));
+          ESP.restart();
+        },
+        "reboot",
+        2048,
+        nullptr,
+        5,
+        nullptr
+      );
+    }
   }
 }
 
@@ -664,17 +707,20 @@ void handleFilesystemUpdate(AsyncWebServerRequest *request) {
   } else {
     request->send(200, "application/json",
                   "{\"message\":\"Filesystem update successful, rebooting\"}");
-    xTaskCreate(
-      [](void *) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        ESP.restart();
-      },
-      "reboot",
-      2048,
-      nullptr,
-      1,
-      nullptr
-    );
+    static std::atomic<bool> rebootScheduled{false};
+    if (!rebootScheduled.exchange(true)) {
+      xTaskCreate(
+        [](void *) {
+          vTaskDelay(pdMS_TO_TICKS(1000));
+          ESP.restart();
+        },
+        "reboot",
+        2048,
+        nullptr,
+        5,
+        nullptr
+      );
+    }
   }
 }
 
@@ -715,6 +761,7 @@ void setupWebServer() {
   }
 
   // API Endpoints
+  server.on("/api/info", HTTP_GET, jsonGet(handleApiInfo));
   server.on("/api/devices", HTTP_GET, jsonGet(handleApiDevices));
   server.on("/api/remotes", HTTP_GET, jsonGet(handleApiRemotes));
   server.on("/api/logs", HTTP_GET, jsonGet(handleApiLogs));
@@ -737,6 +784,7 @@ void setupWebServer() {
   server.on("/api/mqtt", HTTP_POST, jsonPost(handleApiMqttSet));
 #endif
 #if defined(SYSLOG)
+  server.on("/api/syslog/test", HTTP_POST, jsonPost(handleApiSyslogTest));
   server.on("/api/syslog", HTTP_POST, jsonPost(handleApiSyslogSet));
 #endif
   server.on("/api/firmware", HTTP_POST, handleFirmwareUpdate,
