@@ -21,7 +21,12 @@
                 requestOptions.cache = "no-store";
             }
 
-            const response = await fetch(requestUrl, requestOptions);
+            let response;
+            try {
+                response = await fetch(requestUrl, requestOptions);
+            } catch (error) {
+                throw new Error("ESP niet bereikbaar. Controleer of het toestel online is of net herstart.");
+            }
             const data = await ensureJson(response);
             if (!response.ok) {
                 throw new Error(data.message || ("HTTP error " + response.status));
@@ -85,6 +90,9 @@
             mqttServerInput: document.getElementById("mqtt-server"),
             mqttUpdateButton: document.getElementById("mqtt-update"),
             mqttUserInput: document.getElementById("mqtt-user"),
+            settingsStatus: document.getElementById("settings-status"),
+            settingsStatusText: document.getElementById("settings-status-text"),
+            settingsStatusCloseButton: document.getElementById("settings-status-close"),
             displayEnabledInput: document.getElementById("display-enabled"),
             displayUpdateButton: document.getElementById("display-update"),
             displayStatus: document.getElementById("display-status"),
@@ -94,6 +102,34 @@
             syslogTagInput: document.getElementById("syslog-tag"),
             syslogUpdateButton: document.getElementById("syslog-update"),
             syslogTestButton: document.getElementById("syslog-test"),
+            twowStatus: document.getElementById("twow-status"),
+            twowLastTx: document.getElementById("twow-last-tx"),
+            twowLastResult: document.getElementById("twow-last-result"),
+            twowLastRx: document.getElementById("twow-last-rx"),
+            twowLastData: document.getElementById("twow-last-data"),
+            twowLog: document.getElementById("twow-log"),
+            twowPowerOnButton: document.getElementById("twow-poweron"),
+            twowMidnightButton: document.getElementById("twow-midnight"),
+            twowAssociateButton: document.getElementById("twow-associate"),
+            twowAckButton: document.getElementById("twow-ack"),
+            twowTempInput: document.getElementById("twow-temp"),
+            twowSetTempButton: document.getElementById("twow-settemp"),
+            twowModeInput: document.getElementById("twow-mode"),
+            twowSetModeButton: document.getElementById("twow-setmode"),
+            twowPresenceInput: document.getElementById("twow-presence"),
+            twowSetPresenceButton: document.getElementById("twow-setpresence"),
+            twowWindowInput: document.getElementById("twow-window"),
+            twowSetWindowButton: document.getElementById("twow-setwindow"),
+            twowPairButton: document.getElementById("twow-pair"),
+            twowListenButton: document.getElementById("twow-listen"),
+            twowListenSlowButton: document.getElementById("twow-listen-slow"),
+            twowDiscover28Button: document.getElementById("twow-discover28"),
+            twowDiscover2AButton: document.getElementById("twow-discover2a"),
+            twowFake0Button: document.getElementById("twow-fake0"),
+            twowCustomInput: document.getElementById("twow-custom"),
+            twowSendCustomButton: document.getElementById("twow-sendcustom"),
+            twowCustom60Input: document.getElementById("twow-custom60"),
+            twowSendCustom60Button: document.getElementById("twow-sendcustom60"),
             remotePopupButton: document.getElementById("remote-popup"),
             remotesFileInput: document.getElementById("remotes-file"),
             remotesUploadButton: document.getElementById("upload-remotes"),
@@ -115,6 +151,14 @@
     }
 
     function logStatus(app, message, isError) {
+        const now = Date.now();
+        if (app.state.lastStatusMessage === message && now - (app.state.lastStatusAt || 0) < 5000) {
+            app.state.lastStatusAt = now;
+            return;
+        }
+        app.state.lastStatusMessage = message;
+        app.state.lastStatusAt = now;
+
         const logEntry = document.createElement("p");
         logEntry.textContent = message;
         if (isError) {
@@ -201,6 +245,7 @@
     function initWebSocket(app) {
         const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
         const ws = new WebSocket(wsScheme + "://" + window.location.host + "/ws");
+        app.state.ws = ws;
 
         ws.onmessage = function (event) {
             const data = JSON.parse(event.data);
@@ -210,20 +255,26 @@
                 app.updateDeviceFill(data.id, data.position);
             } else if (data.type === "init") {
                 app.fetchAndDisplayDevices();
+            } else if (data.type === "twowstatus") {
+                app.applyTwoWStatus(data.status || {});
             } else if (data.type === "lastaddr") {
                 app.elements.lastAddrInput.value = data.address || "";
             }
         };
 
         ws.onopen = function () {
-            app.logStatus("WebSocket connected");
+            app.state.wsConnected = true;
         };
 
         ws.onclose = function () {
-            app.logStatus("WebSocket disconnected", true);
+            app.state.wsConnected = false;
+            if (!app.state.wsReconnectTimer) {
+                app.state.wsReconnectTimer = setTimeout(function () {
+                    app.state.wsReconnectTimer = null;
+                    initWebSocket(app);
+                }, 2000);
+            }
         };
-
-        app.state.ws = ws;
     }
 
     function bindEvents(app) {
@@ -241,6 +292,11 @@
         }
         if (app.elements.syslogTestButton) {
             app.elements.syslogTestButton.addEventListener("click", app.sendSyslogTest);
+        }
+        if (app.elements.settingsStatusCloseButton) {
+            app.elements.settingsStatusCloseButton.addEventListener("click", function () {
+                app.hideSettingsStatus();
+            });
         }
         if (app.elements.firmwareUploadButton) {
             app.elements.firmwareUploadButton.addEventListener("click", app.uploadFirmware);
@@ -294,6 +350,7 @@
         window.MiOpenPopup.init(app);
         window.MiOpenDevices.init(app);
         window.MiOpenRemotes.init(app);
+        window.MiOpenTwoW.init(app);
         window.MiOpenSettings.init(app);
         window.MiOpenApp = app;
 

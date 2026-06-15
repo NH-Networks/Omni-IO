@@ -1,4 +1,26 @@
 (function () {
+    function setSettingsStatus(app, message, isError) {
+        if (!app.elements.settingsStatus) {
+            return;
+        }
+
+        if (app.elements.settingsStatusText) {
+            app.elements.settingsStatusText.textContent = message;
+        } else {
+            app.elements.settingsStatus.textContent = message;
+        }
+        app.elements.settingsStatus.hidden = false;
+        app.elements.settingsStatus.classList.toggle("error", !!isError);
+    }
+
+    function hideSettingsStatus(app) {
+        if (!app.elements.settingsStatus) {
+            return;
+        }
+
+        app.elements.settingsStatus.hidden = true;
+    }
+
     function setDisplayStatus(app, message, isError) {
         if (!app.elements.displayStatus) {
             return;
@@ -31,6 +53,10 @@
     }
 
     async function updateMqttConfig(app) {
+        setSettingsStatus(
+            app,
+            app.i18nText("status.settings_saving", "Saving settings...")
+        );
         try {
             const result = await window.MiOpenApi.postJson("/api/mqtt", {
                 user: app.elements.mqttUserInput.value,
@@ -39,9 +65,18 @@
                 port: app.elements.mqttPortInput.value,
                 discovery: app.elements.mqttDiscoveryInput.value
             });
+            setSettingsStatus(
+                app,
+                app.i18nText("status.mqtt_saved", "MQTT settings saved")
+            );
             app.logStatus(result.message || "MQTT settings updated.");
         } catch (error) {
             console.error("Error updating MQTT config", error);
+            setSettingsStatus(
+                app,
+                app.i18nText("status.mqtt_save_error", "Saving MQTT settings failed"),
+                true
+            );
             app.logStatus("Error updating MQTT config", true);
         }
     }
@@ -100,6 +135,12 @@
             });
             const enabled = result.enabled !== false;
             app.elements.displayEnabledInput.checked = enabled;
+            setSettingsStatus(
+                app,
+                enabled
+                    ? app.i18nText("status.display_saved_enabled", "Saved: display enabled")
+                    : app.i18nText("status.display_saved_disabled", "Saved: display disabled")
+            );
             setDisplayStatus(
                 app,
                 enabled
@@ -110,6 +151,11 @@
         } catch (error) {
             console.error("Error updating display config", error);
             app.elements.displayEnabledInput.checked = !requestedEnabled;
+            setSettingsStatus(
+                app,
+                app.i18nText("status.display_save_error", "Saving display setting failed"),
+                true
+            );
             setDisplayStatus(
                 app,
                 app.i18nText("status.display_save_error", "Saving display setting failed"),
@@ -220,6 +266,9 @@
         };
         app.updateMqttConfig = function () {
             return updateMqttConfig(app);
+        };
+        app.hideSettingsStatus = function () {
+            hideSettingsStatus(app);
         };
         app.loadDisplayConfig = function () {
             return loadDisplayConfig(app);

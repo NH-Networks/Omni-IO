@@ -8,6 +8,7 @@
 #include <atomic>
 #include <functional>
 #include <memory>
+#include <vector>
 #include <LittleFS.h>
 #include <Update.h>
 #include <cstdlib>
@@ -33,6 +34,68 @@
 AsyncWebServer server(80); // Create AsyncWebServer object on port 80
 AsyncWebSocket ws("/ws");
 
+struct TwoWStatus {
+  String lastTxCommand = "";
+  String lastTxResult = "";
+  bool lastTxError = false;
+  String lastRxType = "";
+  String lastRxFrequency = "";
+  String lastRxFrom = "";
+  String lastRxTo = "";
+  String lastRxCmd = "";
+  String lastRxData = "";
+  uint32_t lastRxCounter = 0;
+};
+
+static TwoWStatus g_twoWStatus;
+
+struct TwoWFrameLog {
+  uint32_t counter = 0;
+  String type;
+  String frequency;
+  String from;
+  String to;
+  String cmd;
+  String data;
+};
+
+static std::vector<TwoWFrameLog> g_twoWFrameLog;
+static constexpr size_t TWO_W_FRAME_LOG_LIMIT = 30;
+
+static void fillTwoWStatus(JsonObject &obj) {
+  obj["lastTxCommand"] = g_twoWStatus.lastTxCommand;
+  obj["lastTxResult"] = g_twoWStatus.lastTxResult;
+  obj["lastTxError"] = g_twoWStatus.lastTxError;
+  obj["lastRxType"] = g_twoWStatus.lastRxType;
+  obj["lastRxFrequency"] = g_twoWStatus.lastRxFrequency;
+  obj["lastRxFrom"] = g_twoWStatus.lastRxFrom;
+  obj["lastRxTo"] = g_twoWStatus.lastRxTo;
+  obj["lastRxCmd"] = g_twoWStatus.lastRxCmd;
+  obj["lastRxData"] = g_twoWStatus.lastRxData;
+  obj["lastRxCounter"] = g_twoWStatus.lastRxCounter;
+  JsonArray frames = obj["frames"].to<JsonArray>();
+  for (const auto &frame : g_twoWFrameLog) {
+    JsonObject item = frames.add<JsonObject>();
+    item["counter"] = frame.counter;
+    item["type"] = frame.type;
+    item["frequency"] = frame.frequency;
+    item["from"] = frame.from;
+    item["to"] = frame.to;
+    item["cmd"] = frame.cmd;
+    item["data"] = frame.data;
+  }
+}
+
+static void broadcastTwoWStatus() {
+  JsonDocument doc;
+  doc["type"] = "twowstatus";
+  JsonObject status = doc["status"].to<JsonObject>();
+  fillTwoWStatus(status);
+  String payload;
+  serializeJson(doc, payload);
+  ws.textAll(payload);
+}
+
 static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
                       AwsEventType type, void *arg, uint8_t *data,
                       size_t len) {
@@ -57,16 +120,13 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     serializeJson(doc, payload);
     client->text(payload);
 
-    // Stream cached log messages individually to avoid a large JSON payload
-    auto logMsgs = getLogMessages();
-    for (const auto &m : logMsgs) {
-      JsonDocument logDoc;
-      logDoc["type"] = "log";
-      logDoc["message"] = m;
-      String logPayload;
-      serializeJson(logDoc, logPayload);
-      client->text(logPayload);
-    }
+    JsonDocument twoWDoc;
+    twoWDoc["type"] = "twowstatus";
+    JsonObject status = twoWDoc["status"].to<JsonObject>();
+    fillTwoWStatus(status);
+    String twoWPayload;
+    serializeJson(twoWDoc, twoWPayload);
+    client->text(twoWPayload);
   }
 }
 
@@ -96,6 +156,53 @@ void broadcastLastAddress(const String &addr) {
   String payload;
   serializeJson(doc, payload);
   ws.textAll(payload);
+}
+
+void updateTwoWTxStatus(const String &command, const String &result, bool isError) {
+  g_twoWStatus.lastTxCommand = command;
+  g_twoWStatus.lastTxResult = result;
+  g_twoWStatus.lastTxError = isError;
+  broadcastTwoWStatus();
+}
+
+void updateTwoWRxStatus(const String &packetType, const String &from,
+                        const String &to, const String &cmd,
+                        const String &data, const String &frequency) {
+  const bool isRawDebug = packetType.startsWith("RAW");
+  static uint32_t lastRawDebugMs = 0;
+  const uint32_t nowMs = millis();
+  if (isRawDebug && nowMs - lastRawDebugMs < 1000) {
+    return;
+  }
+  if (isRawDebug) {
+    lastRawDebugMs = nowMs;
+  }
+
+  String safeData = data;
+  if (safeData.length() > 180) {
+    safeData = safeData.substring(0, 180) + "...";
+  }
+
+  g_twoWStatus.lastRxType = packetType;
+  g_twoWStatus.lastRxFrequency = frequency;
+  g_twoWStatus.lastRxFrom = from;
+  g_twoWStatus.lastRxTo = to;
+  g_twoWStatus.lastRxCmd = cmd;
+  g_twoWStatus.lastRxData = safeData;
+  g_twoWStatus.lastRxCounter++;
+  TwoWFrameLog frame;
+  frame.counter = g_twoWStatus.lastRxCounter;
+  frame.type = packetType;
+  frame.frequency = frequency;
+  frame.from = from;
+  frame.to = to;
+  frame.cmd = cmd;
+  frame.data = safeData;
+  g_twoWFrameLog.push_back(frame);
+  while (g_twoWFrameLog.size() > TWO_W_FRAME_LOG_LIMIT) {
+    g_twoWFrameLog.erase(g_twoWFrameLog.begin());
+  }
+  broadcastTwoWStatus();
 }
 
 // Structure describing a device entry returned to the web UI
@@ -288,6 +395,10 @@ void handleUploadRemotesFile(AsyncWebServerRequest *request, String filename,
   }
 }
 
+void handleApiTwoWStatus(AsyncWebServerRequest *request, JsonObject &root) {
+  fillTwoWStatus(root);
+}
+
 void handleApiCommand(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
   String deviceId = doc["deviceId"] | "";
   String command = doc["command"] | "";
@@ -323,6 +434,12 @@ void handleApiCommand(AsyncWebServerRequest *request, JsonObject &doc, JsonObjec
 
   bool success = false;
   String message;
+  const bool isTwoWCommand =
+      segments[0] == "powerOn" || segments[0] == "setTemp" || segments[0] == "setMode" ||
+      segments[0] == "setPresence" || segments[0] == "setWindow" || segments[0] == "midnight" ||
+      segments[0] == "associate" || segments[0] == "ack" || segments[0] == "discover28" ||
+      segments[0] == "discover2A" || segments[0] == "pair2W" || segments[0] == "listen2W" || segments[0] == "listen2Wslow" || segments[0] == "fake0" || segments[0] == "custom" ||
+      segments[0] == "custom60";
   for (uint8_t idx = 0; idx <= lastEntry; ++idx) {
     if (_cmdHandler[idx] == nullptr)
       continue;
@@ -339,6 +456,9 @@ void handleApiCommand(AsyncWebServerRequest *request, JsonObject &doc, JsonObjec
     message = "Unknown command";
 
   addLogMessage(message);
+  if (isTwoWCommand) {
+    updateTwoWTxStatus(command, message, !success);
+  }
 
   root["success"] = success;
   root["message"] = message;
@@ -766,6 +886,7 @@ void setupWebServer() {
   server.on("/api/remotes", HTTP_GET, jsonGet(handleApiRemotes));
   server.on("/api/logs", HTTP_GET, jsonGet(handleApiLogs));
   server.on("/api/lastaddr", HTTP_GET, jsonGet(handleApiLastAddr));
+  server.on("/api/2w/status", HTTP_GET, jsonGet(handleApiTwoWStatus));
 #if defined(SSD1306_DISPLAY)
   server.on("/api/display", HTTP_GET, jsonGet(handleApiDisplayGet));
 #endif

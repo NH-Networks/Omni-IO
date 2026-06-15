@@ -86,7 +86,7 @@ namespace IOHC {
         packet->payload.packet.header.CtrlByte2.asByte = 0;
         packet->payload.packet.header.CtrlByte2.asStruct.LPM = 1;
         // Broadcast Target
-        uint16_t bcast = (typn << 6) + 0b111111; 
+        uint16_t bcast = (typn << 6) + 0b111111;
         packet->payload.packet.header.target[0] = 0x00;
         packet->payload.packet.header.target[1] = bcast >> 8;
         packet->payload.packet.header.target[2] = bcast & 0x00ff;
@@ -95,7 +95,7 @@ namespace IOHC {
         packet->repeatTime = 40; //40ms
         packet->repeat = 4;
         packet->lock = false;
-        
+
     }
 
     std::vector<uint8_t> frame;
@@ -655,9 +655,9 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
         }
 
         fs::File f = LittleFS.open(IOHC_1W_REMOTE, "r");
-        JsonDocument doc; 
+        JsonDocument doc;
 
-        DeserializationError error = deserializeJson(doc, f); 
+        DeserializationError error = deserializeJson(doc, f);
 
         if (error) {
             Serial.print("Failed to parse JSON: ");
@@ -672,18 +672,33 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
         std::vector<remote> loadedRemotes;
         for (JsonPair kv: doc.as<JsonObject>()) {
             remote r;
-            // hexStringToBytes(kv.key().c_str(), _node);
-            hexStringToBytes(kv.key().c_str(), r.node);
-            // Serial.printf("%s\n", kv.key().c_str());
-
             auto jobj = kv.value().as<JsonObject>();
-            // hexStringToBytes(jobj["key"].as<const char *>(), _key);
-            hexStringToBytes(jobj["key"].as<const char *>(), r.key);
+            const std::string entryId = kv.key().c_str();
 
-            uint8_t btmp[2];
-            hexStringToBytes(jobj["sequence"].as<const char *>(), btmp);
-            uint16_t file_seq = (btmp[0] << 8) + btmp[1];
-            r.sequence = file_seq;
+            if (hexStringToBytes(entryId, r.node) != sizeof(r.node)) {
+                Serial.printf("Skipping 1W remote '%s': invalid id\n", entryId.c_str());
+                continue;
+            }
+
+            const char *keyText = nullptr;
+            if (jobj["key"].is<const char *>()) {
+                keyText = jobj["key"].as<const char *>();
+            }
+            if (!keyText || hexStringToBytes(keyText, r.key) != sizeof(r.key)) {
+                Serial.printf("Skipping 1W remote '%s': invalid key\n", entryId.c_str());
+                continue;
+            }
+
+            const char *sequenceText = nullptr;
+            if (jobj["sequence"].is<const char *>()) {
+                sequenceText = jobj["sequence"].as<const char *>();
+            }
+            uint8_t btmp[2] = {0, 0};
+            if (!sequenceText || hexStringToBytes(sequenceText, btmp) != sizeof(btmp)) {
+                Serial.printf("Skipping 1W remote '%s': invalid sequence\n", entryId.c_str());
+                continue;
+            }
+            r.sequence = static_cast<uint16_t>((btmp[0] << 8) + btmp[1]);
 
             uint16_t nvs_seq;
             if (nvs_read_sequence(r.node, &nvs_seq)) {
@@ -694,7 +709,11 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
             }
             // Persist the highest value back to NVS
             nvs_write_sequence(r.node, r.sequence);
-            JsonArray jarr = jobj["type"];
+            JsonArray jarr = jobj["type"].as<JsonArray>();
+            if (jarr.isNull()) {
+                Serial.printf("Skipping 1W remote '%s': missing type array\n", entryId.c_str());
+                continue;
+            }
             // Réservez de l'espace dans le vecteur pour éviter les allocations inutiles
 
             //_type.reserve(jarr.size());
@@ -706,16 +725,24 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
             //_type.push_back(i.as<uint16_t>());
                 r.type.push_back(i.as<uint8_t>());
             }
-                       
+
             // _type = jobj["type"].as<u_int16_t>();
 //            r.type = jobj["type"].as<u_int16_t>();
 
             // _manufacturer = jobj["manufacturer_id"].as<uint8_t>();
             r.manufacturer = jobj["manufacturer_id"].as<uint8_t>();
-            r.description = jobj["description"].as<std::string>();
+            if (jobj["description"].is<const char *>()) {
+                r.description = jobj["description"].as<const char *>();
+            } else if (jobj["description"].is<std::string>()) {
+                r.description = jobj["description"].as<std::string>();
+            } else {
+                r.description = entryId;
+                updateFile = true;
+            }
 
-
-            if (jobj["name"].is<std::string>()) {
+            if (jobj["name"].is<const char *>()) {
+                r.name = jobj["name"].as<const char *>();
+            } else if (jobj["name"].is<std::string>()) {
                 r.name = jobj["name"].as<std::string>();
             } else {
                 r.name = r.description;
@@ -738,12 +765,16 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
                 r.repeatOnNoResponse = jobj["repeatOnNoResponse"].as<bool>();
             } else {
                 r.repeatOnNoResponse = false;
+                updateFile = true;
             }
             r.positionTracker.setTravelTime(r.travelTime);
 
             loadedRemotes.push_back(r);
         }
 
+        if (loadedRemotes.empty()) {
+            Serial.printf("No valid 1W remotes loaded from %s\n", IOHC_1W_REMOTE);
+        }
         remotes = loadedRemotes;
         Serial.printf("Loaded %d x 1W remotes\n", remotes.size()); // _type.size());
         // Ensure JSON reflects the latest sequence values and persist defaults
@@ -773,7 +804,7 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
             btmp[0] = r.sequence >> 8;
 
             jobj["sequence"] = bytesToHexString(btmp, sizeof(btmp));
-            
+
             // JsonArray jarr = jobj.createNestedArray("type");
             auto jarr = jobj["type"].to<JsonArray>();
             for (uint8_t i : r.type) {

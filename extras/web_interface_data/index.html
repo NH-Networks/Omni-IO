@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title data-i18n="page.title">MiOpen.IO - Device Control</title>
     <link rel="icon" href="img/logo.png">
-    <link rel="stylesheet" href="css/style.css?v=20260526b">
+    <link rel="stylesheet" href="css/style.css?v=20260601a">
 </head>
 
 <body>
@@ -15,6 +15,7 @@
         <h1 data-i18n="header.title">Device Control</h1>
         <nav>
             <a onclick="showPage('devices')" class="items" data-i18n="nav.devices">Devices</a>
+            <a onclick="showPage('twow')" class="items" data-i18n="nav.twow">2W</a>
             <a onclick="showPage('help')" class="items" data-i18n="nav.help">Log</a>
             <a onclick="showPage('settings')" class="items" data-i18n="nav.settings">Settings</a>
             <select class="items" id="lang" onchange="setLang(this.value)">
@@ -25,10 +26,14 @@
             </select>
             <a class="items"id="toggle-theme"></a>
         </nav>
-        
+
     </header>
 
     <main>
+        <div id="settings-status" class="settings-statusbar" role="status" aria-live="polite" hidden>
+                <span id="settings-status-text"></span>
+                <button id="settings-status-close" type="button" class="settings-statusbar-close" aria-label="Sluiten">x</button>
+        </div>
         <div id="devices-page">
             <div class="left">
                 <section id="device-list-section">
@@ -108,6 +113,89 @@
                 </section>
             </div>
         </div>
+        <div id="twow-page" style="display:none;">
+            <div class="left">
+                <section id="twow-cozy-section">
+                    <div class="title">
+                        <h2 data-i18n="section.twow_cozy">2W Cozy</h2>
+                    </div>
+                    <div class="card control-card">
+                        <p id="twow-status" class="setting-status" data-i18n="status.twow_ready">Klaar om 2W commando's te sturen</p>
+                        <div id="twow-state" class="twow-state">
+                            <p><strong data-i18n="label.twow_last_tx">Laatste TX</strong>: <span id="twow-last-tx">-</span></p>
+                            <p><strong data-i18n="label.twow_last_result">Laatste resultaat</strong>: <span id="twow-last-result">-</span></p>
+                            <p><strong data-i18n="label.twow_last_rx">Laatste RX</strong>: <span id="twow-last-rx">-</span></p>
+                            <p><strong data-i18n="label.twow_last_data">Laatste data</strong>: <span id="twow-last-data">-</span></p>
+                        </div>
+                        <div class="twow-grid">
+                            <button id="twow-poweron" data-i18n="button.twow_poweron">Power on</button>
+                            <button id="twow-midnight" data-i18n="button.twow_midnight">Midnight</button>
+                            <button id="twow-associate" data-i18n="button.twow_associate">Associate</button>
+                            <button id="twow-ack" data-i18n="button.twow_ack">ACK</button>
+                        </div>
+                        <div class="control-row">
+                            <label for="twow-temp" data-i18n="label.twow_temp">Temperatuur</label>
+                            <input type="text" id="twow-temp" value="21.0">
+                            <button id="twow-settemp" data-i18n="button.twow_settemp">Set temp</button>
+                        </div>
+                        <div class="control-row">
+                            <label for="twow-mode" data-i18n="label.twow_mode">Mode</label>
+                            <select id="twow-mode">
+                                <option value="auto">auto</option>
+                                <option value="prog">prog</option>
+                                <option value="manual">manual</option>
+                                <option value="off">off</option>
+                            </select>
+                            <button id="twow-setmode" data-i18n="button.twow_setmode">Set mode</button>
+                        </div>
+                        <div class="control-row">
+                            <label for="twow-presence" data-i18n="label.twow_presence">Presence</label>
+                            <select id="twow-presence">
+                                <option value="on">on</option>
+                                <option value="off">off</option>
+                            </select>
+                            <button id="twow-setpresence" data-i18n="button.twow_setpresence">Set presence</button>
+                        </div>
+                        <div class="control-row">
+                            <label for="twow-window" data-i18n="label.twow_window">Window</label>
+                            <select id="twow-window">
+                                <option value="open">open</option>
+                                <option value="close">close</option>
+                            </select>
+                            <button id="twow-setwindow" data-i18n="button.twow_setwindow">Set window</button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+            <div class="right">
+                <section id="twow-other-section">
+                    <div class="title">
+                        <h2 data-i18n="section.twow_other">2W Extra</h2>
+                    </div>
+                    <div class="card control-card">
+                        <div class="twow-grid">
+                            <button id="twow-pair" data-i18n="button.twow_pair">Pair 2W</button>
+                            <button id="twow-listen" data-i18n="button.twow_listen">Listen 2W</button>
+                            <button id="twow-listen-slow" data-i18n="button.twow_listen_slow">Listen slow</button>
+                            <button id="twow-discover28" data-i18n="button.twow_discover28">Discover 28</button>
+                            <button id="twow-discover2a" data-i18n="button.twow_discover2a">Discover 2A</button>
+                            <button id="twow-fake0" data-i18n="button.twow_fake0">Fake0</button>
+                        </div>
+                        <div class="control-row">
+                            <label for="twow-custom" data-i18n="label.twow_custom">Custom</label>
+                            <input type="text" id="twow-custom" placeholder="01 02 03">
+                            <button id="twow-sendcustom" data-i18n="button.twow_sendcustom">Send custom</button>
+                        </div>
+                        <div class="control-row">
+                            <label for="twow-custom60" data-i18n="label.twow_custom60">Custom 60</label>
+                            <input type="text" id="twow-custom60" placeholder="01 02 03">
+                            <button id="twow-sendcustom60" data-i18n="button.twow_sendcustom60">Send custom60</button>
+                        </div>
+                        <div class="twow-log" id="twow-log"></div>
+                    </div>
+                </section>
+            </div>
+        </div>
         <div id="settings-page" style="display:none;">
             <div class="left">
                 <section id="mqtt-settings-section">
@@ -178,7 +266,7 @@
                         <button id="upload-filesystem" data-i18n="button.upload_filesystem">Upload Filesystem</button></div>
                         <label for="devices-file" data-i18n="label.devices">Devices:</label>
                         <div class="devices-line">
-                            <input type="file" id="devices-file" accept=".json"> 
+                            <input type="file" id="devices-file" accept=".json">
                             <button id="upload-devices" data-i18n="button.upload_devices">Upload Devices</button>
                             <button id="download-devices" data-i18n="button.download_devices">Download Devices</button>
                         </div>
@@ -224,7 +312,7 @@
                     <label for="select-device" class="device-popup-label" data-i18n="popup.device_select">device-select:</label>
                     <select id="popup-device-select" class="device-popup">
                         <!-- Options will be populated by JavaScript -->
-                    </select>  
+                    </select>
                     <button id="popup-save" class="save" data-i18n="button.save">Save</button>
                     <p id="delete-info" style="display:none; color:red; font-weight:bold;"></p>
                     <p id="pair-label" data-i18n="popup.pair_label_default">Pair / Unpair the device to the physical screen</p>
@@ -240,21 +328,23 @@
                     <p id="popup-content">
                         <!-- Dynamic content will be populated by JavaScript -->
                     </p>
-                    
-                </div>                
+
+                </div>
             </div>
         </div>
     </div>
-    <script src="js/i18n.js?v=20260526b"></script>
-    <script src="js/api.js?v=20260526b"></script>
-    <script src="js/popup.js?v=20260526b"></script>
-    <script src="js/devices.js?v=20260526b"></script>
-    <script src="js/remotes.js?v=20260526b"></script>
-    <script src="js/settings.js?v=20260526b"></script>
-    <script src="js/app.js?v=20260526b"></script>
+    <script src="js/i18n.js?v=20260530a"></script>
+    <script src="js/api.js?v=20260530a"></script>
+    <script src="js/popup.js?v=20260530a"></script>
+    <script src="js/devices.js?v=20260530a"></script>
+    <script src="js/remotes.js?v=20260530a"></script>
+    <script src="js/twow.js?v=20260602b"></script>
+    <script src="js/settings.js?v=20260601a"></script>
+    <script src="js/app.js?v=20260602a"></script>
     <script>
         function showPage(page) {
             document.getElementById('devices-page').style.display = (page === 'devices') ? 'grid' : 'none';
+            document.getElementById('twow-page').style.display = (page === 'twow') ? 'grid' : 'none';
             document.getElementById('settings-page').style.display = (page === 'settings') ? 'grid' : 'none';
             document.getElementById('help-page').style.display = (page === 'help') ? 'grid' : 'none';
         }

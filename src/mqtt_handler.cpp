@@ -9,6 +9,9 @@
 #include <interact.h>
 #include <log_buffer.h>
 #include <oled_display.h>
+#if defined(WEBSERVER)
+#include <web_server_handler.h>
+#endif
 #include <cstring>
 #include <cstdlib>
 #include <WiFi.h>
@@ -35,15 +38,33 @@ static void publishIohcFrameDiscovery();
 static void publishFreeMemDiscovery();
 static void publishIpAddressDiscovery();
 static void publishWifiStrengthDiscovery();
-static void onMqttConnect(bool sessionPresent);
-static void onMqttDisconnect(AsyncMqttClientDisconnectReason reason);
-static void onMqttMessage(char *topic, char *payload,
+void onMqttConnect(bool sessionPresent);
+void onMqttDisconnect(AsyncMqttClientDisconnectReason reason);
+void onMqttMessage(char *topic, char *payload,
                    AsyncMqttClientMessageProperties properties,
                    size_t len, size_t index, size_t total);
-static void publishHeartbeat();
-static void mqttFuncHandler(const char *cmd);
+void publishHeartbeat();
+void mqttFuncHandler(const char *cmd);
 static void mqttPostConnectTask(void*);
 static void handleMqttConnectImpl();
+
+static void populateGatewayDevice(JsonVariant variant) {
+    JsonObject device = variant.to<JsonObject>();
+    device["identifiers"] = GATEWAY_ID;
+    device["name"] = "My Open IO Gateway";
+    device["manufacturer"] = "Somfy";
+    device["model"] = "IO Blind Bridge";
+    device["sw_version"] = "1.0.0";
+}
+
+static void syncWebPosition(const std::string &id, int position) {
+#if defined(WEBSERVER)
+    broadcastDevicePosition(id.c_str(), position);
+#else
+    (void)id;
+    (void)position;
+#endif
+}
 
 static void startHeartbeat() {
     s_heartbeatEnabled.store(true);
@@ -259,6 +280,7 @@ void publishCoverPosition(const std::string &id, float position) {
     snprintf(buf, sizeof(buf), "%.0f", position);
     std::string topic = "iown/" + id + "/position";
     mqttClient.publish(topic.c_str(), 0, true, buf);
+    syncWebPosition(id, static_cast<int>(position));
 }
 
 // ==== BELANGRIJK: scheduler die het zware werk in een eigen task zet ====
@@ -420,7 +442,7 @@ static void publishFreeMemDiscovery() {
     configDoc["device_class"] = "data_size";
     configDoc["entity_category"] = "diagnostic";
     configDoc["icon"] = "mdi:memory";
-    configDoc["device"] = createDeviceObject(GATEWAY_ID, "My Open IO Gateway");
+    populateGatewayDevice(configDoc["device"]);
 
     std::string cfg;
     size_t cfgLen = serializeJson(configDoc, cfg);
@@ -436,7 +458,7 @@ static void publishIpAddressDiscovery() {
     configDoc["native_value"] = "str";
     configDoc["entity_category"] = "diagnostic";
     configDoc["icon"] = "mdi:ip-network";
-    configDoc["device"] = createDeviceObject(GATEWAY_ID, "My Open IO Gateway");
+    populateGatewayDevice(configDoc["device"]);
 
     std::string cfg;
     size_t cfgLen = serializeJson(configDoc, cfg);
@@ -453,7 +475,7 @@ static void publishWifiStrengthDiscovery() {
     configDoc["device_class"] = "signal_strength";
     configDoc["entity_category"] = "diagnostic";
     configDoc["icon"] = "mdi:wifi";
-    configDoc["device"] = createDeviceObject(GATEWAY_ID, "My Open IO Gateway");
+    populateGatewayDevice(configDoc["device"]);
 
     std::string cfg;
     size_t cfgLen = serializeJson(configDoc, cfg);
@@ -534,6 +556,7 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
             std::string posTopic = "iown/" + id + "/position";
             std::string openStr = std::to_string(openVal);
             mqttClient.publish(posTopic.c_str(), 0, true, openStr.c_str());
+            syncWebPosition(id, openVal);
             mqttClient.publish(topicStr.c_str(), 0, true, "", 0);
         }
         return;
@@ -559,6 +582,7 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
             std::string posTopic = "iown/" + id + "/position";
             std::string openStr = std::to_string(openVal);
             mqttClient.publish(posTopic.c_str(), 0, true, openStr.c_str());
+            syncWebPosition(id, openVal);
             mqttClient.publish(topicStr.c_str(), 0, true, "", 0);
         }
         return;
@@ -581,12 +605,15 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
             if (payloadStr == "open") {
                 IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Open, &t);
                 mqttClient.publish(stateTopic.c_str(), 0, true, "OPEN");
+                syncWebPosition(id, static_cast<int>(it->positionTracker.getPosition()));
             } else if (payloadStr == "close") {
                 IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Close, &t);
                 mqttClient.publish(stateTopic.c_str(), 0, true, "CLOSE");
+                syncWebPosition(id, static_cast<int>(it->positionTracker.getPosition()));
             } else if (payloadStr == "stop") {
                 IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Stop, &t);
                 mqttClient.publish(stateTopic.c_str(), 0, true, "STOP");
+                syncWebPosition(id, static_cast<int>(it->positionTracker.getPosition()));
             } else if (payloadStr == "vent") {
                 IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Vent, &t);
             } else if (payloadStr == "force") {

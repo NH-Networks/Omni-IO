@@ -122,7 +122,7 @@ void setPreambleLength(uint16_t preambleLen) {
 /**
  * The `initRegisters` function initializes various registers of a radio module for both transmission
  * and reception in a C++ program.
- * 
+ *
  * @param maxPayloadLength The `maxPayloadLength` parameter in the `initRegisters` function is used to
  * set the maximum payload length for the radio communication. In this function, it is set to a default
  * value of `0xff` (255 in decimal). This parameter is used to configure the radio module to handle
@@ -156,21 +156,14 @@ void setPreambleLength(uint16_t preambleLen) {
         //0x51); // 0x91); // TODOVERIFY 0x92
         //RF_SYNCCONFIG_AUTORESTARTRXMODE_WAITPLL_ON | RF_SYNCCONFIG_PREAMBLEPOLARITY_AA | RF_SYNCCONFIG_SYNC_ON);
 
-        // Set Sync word to 0xff33 both for rx and tx
+        // IO-homecontrol sync word used by the working SX1276 reference.
         writeByte(REG_SYNCVALUE1, SYNC_BYTE_1);
         writeByte(REG_SYNCVALUE2, SYNC_BYTE_2);
 
-        // Mapping of pins DIO0 to DIO3
-        // DIO0: PayloadReady|PacketSent    DIO1: FIFO empty    DIO2: Sync   | DIO3: TxReady
-        // Mapping of pins DIO4 and DIO5
-        // DIO4: PreambleDetect  DIO5: Data
-        // DIO Mapping Data Packet Table 30 Page 69
-        writeByte(
-            REG_DIOMAPPING1,
-            RF_DIOMAPPING1_DIO0_00 | RF_DIOMAPPING1_DIO1_01 | RF_DIOMAPPING1_DIO2_11 | RF_DIOMAPPING1_DIO3_01); // Org
-        //        writeByte(REG_DIOMAPPING1, RF_DIOMAPPING1_DIO0_00 | RF_DIOMAPPING1_DIO1_01 | RF_DIOMAPPING1_DIO2_10 | RF_DIOMAPPING1_DIO3_01); // timeout on DIO2 for test
-        writeByte(REG_DIOMAPPING2, RF_DIOMAPPING2_MAP_PREAMBLEDETECT | RF_DIOMAPPING2_DIO4_11 | RF_DIOMAPPING2_DIO5_10);
-        // Preamble on DIO4
+        // Match CyrilOpenSource/iown-homecontrol-esp32sx1276 SX1276 mapping.
+        // DIO0: PayloadReady/PacketSent, DIO2: Sync/Preamble line.
+        writeByte(REG_DIOMAPPING1, 0x3D);
+        writeByte(REG_DIOMAPPING2, 0xF1);
 
         // Enable Fast Hoping (frequency change) // Not needed all the time
         // Not using that, as it miss a lot of frames
@@ -184,32 +177,38 @@ void setPreambleLength(uint16_t preambleLen) {
         // writeByte(REG_PADAC, 0x87); // turn 20dBm mode on
 
         // PA Ramp: No Shaping, Ramp up/down 15us
-        writeByte(REG_PARAMP, RF_PARAMP_MODULATIONSHAPING_00 | RF_PARAMP_0012_US); //_0015_US); //_0031_US); //
+        writeByte(REG_PARAMP, RF_PARAMP_MODULATIONSHAPING_00 | RF_PARAMP_0015_US); //_0012_US); //_0031_US); //
         // Setting Preamble Length
         writeByte(REG_PREAMBLEMSB, PREAMBLE_MSB);
         writeByte(REG_PREAMBLELSB, PREAMBLE_LSB);
         // FIFO Threshold - currently useless
-        writeByte(REG_FIFOTHRESH, RF_FIFOTHRESH_TXSTARTCONDITION_FIFONOTEMPTY);
+        writeByte(REG_FIFOTHRESH, 0x88);
 
         // ---------------- RX Register init section ----------------
         // Set lenght checking if passed as parameter
         // The use of maxPayloadLength is not working. Prevents generating PayloadReady signal
         writeByte(REG_PAYLOADLENGTH, 0xff);
         // RSSI precision +-2dBm
-        writeByte(REG_RSSICONFIG, RF_RSSICONFIG_SMOOTHING_8); // 8->0.512 ms // _128); // _32); //_256); //
-        // Activates Timeout interrupt on Preamble
-        writeByte(REG_RXCONFIG, RF_RXCONFIG_AFCAUTO_ON | RF_RXCONFIG_AGCAUTO_ON | RF_RXCONFIG_RXTRIGER_PREAMBLEDETECT | RF_RXCONFIG_RESTARTRXONCOLLISION_ON);
-        // 250KHz BW with AFC
-        writeByte(REG_AFCBW, RF_AFCBW_MANTAFC_16 | RF_AFCBW_EXPAFC_1);
+        writeByte(REG_RSSICONFIG, RF_RSSICONFIG_SMOOTHING_4);
+        // Reference setup: RSSI+preamble trigger and no AFC auto while FHSS hopping.
+        writeByte(REG_RXCONFIG,
+                  RF_RXCONFIG_AFCAUTO_OFF |
+                  RF_RXCONFIG_AGCAUTO_ON |
+                  RF_RXCONFIG_RXTRIGER_RSSI_PREAMBLEDETECT |
+                  RF_RXCONFIG_RESTARTRXONCOLLISION_ON |
+                  RF_RXCONFIG_RESTARTRXWITHOUTPLLLOCK);
+        writeByte(REG_AFCBW, 0x10);
 
         writeByte(REG_AFCFEI, 0x01);
         // if AGC_AUTO_ON, RF_LNA_GAIN_XX do nothing
-        writeByte(REG_LNA, RF_LNA_BOOST_ON | RF_LNA_GAIN_G1); // 0xC3) ;
+        writeByte(REG_LNA, 0xC3);
 
         // Enables Preamble Detect, 2 bytes
         writeByte(
             REG_PREAMBLEDETECT,
             RF_PREAMBLEDETECT_DETECTOR_ON | RF_PREAMBLEDETECT_DETECTORSIZE_2 | RF_PREAMBLEDETECT_DETECTORTOL_10);
+
+        writeByte(REG_RSSITHRESH, RF_RSSITHRESH_THRESHOLD);
 
         // PA boost maximum power
         writeByte(REG_PACONFIG, RF_PACONFIG_PASELECT_MASK | RF_PACONFIG_PASELECT_PABOOST);
@@ -290,20 +289,24 @@ void setPreambleLength(uint16_t preambleLen) {
     }
 
     void IRAM_ATTR setTx() {
-        // Uncommon and incompatible settings
-        // Enabling Sync word - Size must be set to SYNCSIZE_2 (0x01 in header file)
-        writeByte(REG_SYNCCONFIG, (readByte(REG_SYNCCONFIG) & RF_SYNCCONFIG_SYNCSIZE_MASK) | RF_SYNCCONFIG_SYNCSIZE_2);
-        writeByte(REG_OPMODE, (readByte(REG_OPMODE) & RF_OPMODE_MASK) | RF_OPMODE_TRANSMITTER);
-
-        TxReady;
+        // Reference setup: TX uses 2-byte sync FF 33.
+        writeByte(REG_SYNCCONFIG, 0x51);
+        writeByte(REG_OPMODE, 0x03);
     }
 
     void IRAM_ATTR setRx() {
-        // Uncommon and incompatible settings
-        writeByte(REG_SYNCCONFIG, (readByte(REG_SYNCCONFIG) & RF_SYNCCONFIG_SYNCSIZE_MASK) | RF_SYNCCONFIG_SYNCSIZE_3);
-        writeByte(REG_OPMODE, (readByte(REG_OPMODE) & RF_OPMODE_MASK) | RF_OPMODE_RECEIVER);
-
-        RxReady;
+        // Reference setup: RX uses sync-size 3 while keeping FF 33 in the first sync bytes.
+        writeByte(REG_SYNCCONFIG, 0x52);
+        writeByte(REG_OPMODE, 0x05);
+        const uint32_t started = micros();
+        while ((micros() - started) < 5000) {
+            const uint8_t opMode = readByte(REG_OPMODE) & ~RF_OPMODE_MASK;
+            const uint8_t irq1 = readByte(REG_IRQFLAGS1);
+            if (opMode == RF_OPMODE_RECEIVER && (irq1 & RF_IRQFLAGS1_RXREADY)) {
+                break;
+            }
+            delayMicroseconds(50);
+        }
         /*
                 // Start Sequencer
                 writeByte(REG_OPMODE, (readByte(REG_OPMODE) & RF_OPMODE_MASK) | RF_OPMODE_RECEIVER);
@@ -343,7 +346,7 @@ void setPreambleLength(uint16_t preambleLen) {
     // }
     void IRAM_ATTR clearFlags() {
         uint16_t flags = readWord(REG_IRQFLAGS1);
-        flags &= ~0xFFFF; // Efface tous les drapeaux
+        // SX1276 FSK IRQ flags are cleared by writing back the latched 1 bits.
         writeWord(REG_IRQFLAGS1, flags);
     }
 

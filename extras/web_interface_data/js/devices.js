@@ -199,7 +199,6 @@
                 deviceSelect.appendChild(option);
             });
 
-            app.logStatus("Device list updated.");
         } catch (error) {
             app.logStatus("Error fetching devices: " + error.message, true);
             console.error("Error fetching devices:", error);

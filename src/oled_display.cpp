@@ -26,6 +26,8 @@
 #include <nvs_helpers.h>
 #include <atomic>
 #include <chrono>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include <freertos/semphr.h>
 
 
@@ -33,7 +35,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RST);
 DisplayBuffer displayBuffer;
 SemaphoreHandle_t displayBufferMutex = xSemaphoreCreateMutex();
 
-TimerHandle_t displayUpdateTimer;
+TaskHandle_t displayTaskHandle = nullptr;
 std::chrono::time_point<std::chrono::system_clock> startTime;
 std::atomic<int64_t> lastDataTime = 0;
 std::atomic<bool> displayEnabled = true;
@@ -41,8 +43,7 @@ void displayTask(void *);
 
 const int MILLIS_BETWEEN_DISPLAY_UPDATE_SLOW = 30000;
 const int MILLIS_BETWEEN_DISPLAY_UPDATE_FAST = 100;
-const uint32_t MILLIS_BEFORE_IDLE_SCREEN = 60000;
-uint32_t lastDisplayActivityMs = 0;
+const int SECONDS_BEFORE_SCREENSAVER = 60;
 
 const uint8_t PROGMEM miopenioLogo[] =
 {
@@ -144,9 +145,6 @@ static void notifyDisplayTask() {
 }
 
 void setTimerSpeed(bool needsFast) {
-    if (!displayUpdateTimer) {
-        return;
-    }
     if (needsFast != timerIsFast) {
         timerIsFast = needsFast;
         notifyDisplayTask();
@@ -164,20 +162,10 @@ bool initDisplay() {
         return false;
     }
 
-    startTime = std::chrono::system_clock::now();
-    timeSinceNoData = startTime;
-    lastDisplayActivityMs = millis();
-    displayUpdateTimer = xTimerCreate(
-        "displayTimer",
-        pdMS_TO_TICKS(MILLIS_BETWEEN_DISPLAY_UPDATE_FAST),
-        pdTRUE,
-        nullptr,
-        handleTimerTick
-    );
-    if (displayUpdateTimer) {
-        xTimerStart(displayUpdateTimer, 0);
-    } else {
-        Serial.println("Failed to create display update timer");
+    if (xTaskCreatePinnedToCore(displayTask, "DisplayTask", 4096, nullptr, 1,
+                                &displayTaskHandle, tskNO_AFFINITY) != pdPASS) {
+        Serial.println("Failed to create display task");
+        return false;
     }
 
     startTime = std::chrono::system_clock::now();
@@ -209,22 +197,22 @@ const char* getRemoteName(const uint8_t *remote, const char *name) {
 }
 
 void display1WAction(const uint8_t *remote, const char *action, const char *dir, const char *name) {
-
-    xSemaphoreTake(displayBufferMutex, portMAX_DELAY);
-    displayBuffer.addLine(format("%s: %s", dir, getRemoteName(remote, name)), action);
-    xSemaphoreGive(displayBufferMutex);
-
-    lastDisplayActivityMs = millis();
-    setTimerSpeed(fast);
+    displayCustomMessage(format("%s: %s", dir, getRemoteName(remote, name)).c_str(), action);
 }
 
 void display1WPosition(const uint8_t *remote, float position, const char *name) {
-    xSemaphoreTake(displayBufferMutex, portMAX_DELAY);
-    displayBuffer.addLine(getRemoteName(remote, name), format("%d%%", static_cast<int>(position)));
+    displayCustomMessage(getRemoteName(remote, name), format("%d%%", static_cast<int>(position)).c_str());
+}
 
+void displayCustomMessage(const char* message, const char* status) {
+    if (!displayEnabled.load()) {
+        return;
+    }
+
+    xSemaphoreTake(displayBufferMutex, portMAX_DELAY);
+    displayBuffer.addLine(message, status ? status : "");
     xSemaphoreGive(displayBufferMutex);
 
-    lastDisplayActivityMs = millis();
     setTimerSpeed(fast);
     notifyDisplayTask();
 }
@@ -240,7 +228,10 @@ void clearDisplayMessages() {
 
 
 void updateDisplayStatus() {
-    lastDisplayActivityMs = millis();
+    if (!displayEnabled.load()) {
+        return;
+    }
+
     setTimerSpeed(fast);
     notifyDisplayTask();
 }
@@ -264,6 +255,7 @@ void setDisplayEnabled(bool enabled) {
         lastDataTime.store(esp_timer_get_time());
         setTimerSpeed(slow);
     } else {
+        display.ssd1306_command(SSD1306_DISPLAYON);
         lastDataTime.store(esp_timer_get_time());
         setTimerSpeed(fast);
     }
@@ -276,21 +268,6 @@ void drawLogo(int x, int y) {
     display.drawBitmap(x+1, y+1, miopenioLogo, 16, 10, SSD1306_WHITE);
     display.setCursor(x+20, y+4);
     display.print("MiOpen.IO");
-}
-
-void drawIdleScreen() {
-    constexpr int logoWidth = 74;
-    constexpr int logoHeight = 12;
-    drawLogo((SCREEN_WIDTH - logoWidth) / 2, (SCREEN_HEIGHT - logoHeight) / 2);
-}
-
-void enterIdleScreen() {
-    xSemaphoreTake(displayBufferMutex, portMAX_DELAY);
-    displayBuffer.clear();
-    xSemaphoreGive(displayBufferMutex);
-
-    drawIdleScreen();
-    setTimerSpeed(slow);
 }
 
 void drawHeader() {
@@ -339,24 +316,36 @@ void drawData() {
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
 
-    if (millis() - lastDisplayActivityMs >= MILLIS_BEFORE_IDLE_SCREEN) {
-        enterIdleScreen();
-        return;
-    }
-
     drawHeader();
 
     display.setCursor(0, 20);
     const bool hasData = drawContents();
 
-    if (hasData) {
-        timeSinceNoData = std::chrono::system_clock::now();
-        drawFooter();
-    } else {
-        enterIdleScreen();
-        return;
+    if (!hasData) {
+        setTimerSpeed(slow);
     }
 
+    drawFooter();
+}
+
+void drawLogo() {
+    const int x = 50.0 * std::rand() / RAND_MAX;
+    const int y = 48.0 * std::rand() / RAND_MAX;
+    drawLogo(x, y);
+}
+
+void displayTask(void *) {
+    while (true) {
+        const TickType_t waitTicks = pdMS_TO_TICKS(timerIsFast ? MILLIS_BETWEEN_DISPLAY_UPDATE_FAST
+                                                               : MILLIS_BETWEEN_DISPLAY_UPDATE_SLOW);
+        ulTaskNotifyTake(pdTRUE, waitTicks);
+
+        if (!displayEnabled.load()) {
+            display.clearDisplay();
+            display.display();
+            display.ssd1306_command(SSD1306_DISPLAYOFF);
+            continue;
+        }
 
         display.clearDisplay();
 

@@ -103,30 +103,28 @@ namespace {
 void initSyslog() {
     ensureConfigLoaded();
 
-    ESP_LOGD(TAG, "Init syslog: enabled=%d server='%s' port=%u",
-             syslog_enabled ? 1 : 0, syslog_server.c_str(), syslog_port);
-
     if (!syslog_enabled) {
-        ESP_LOGD(TAG, "Syslog disabled - not initializing");
         resetSyslog();
         return;
     }
 
     if (syslog_server.empty()) {
-        ESP_LOGD(TAG, "Syslog server not set");
         resetSyslog();
         return;
     }
 
     if (syslog_port == 0 || syslog_port > 65535) {
-        ESP_LOGD(TAG, "Invalid syslog port: %u", syslog_port);
+        resetSyslog();
+        return;
+    }
+
+    if (WiFi.status() != WL_CONNECTED) {
         resetSyslog();
         return;
     }
 
     if (!syslogIP.fromString(syslog_server.c_str())) {
         if (WiFi.hostByName(syslog_server.c_str(), syslogIP) != 1) {
-            ESP_LOGD(TAG, "Unable to resolve syslog server: %s", syslog_server.c_str());
             resetSyslog();
             return;
         }
@@ -136,8 +134,6 @@ void initSyslog() {
         syslogUdp.begin(0);
         syslogReady = true;
     }
-
-    ESP_LOGD(TAG, "Syslog initialized with IP: %s", syslogIP.toString().c_str());
 }
 
 // Real sender with RFC header
@@ -150,11 +146,9 @@ void sendSyslog(const String &msg, int severity) {
         return;
     }
     if (!syslogReady) {
-        ESP_LOGD(TAG, "Syslog not ready, initializing");
         initSyslog();
     }
     if (!syslog_enabled || !syslogReady) {
-        ESP_LOGD(TAG, "Syslog initialization failed");
         return;
     }
 
@@ -167,11 +161,9 @@ void sendSyslog(const String &msg, int severity) {
     const String header = "<" + String(p) + ">" + ho + " " + SYSLOG_APP + ": ";
     const String wire   = header + "[" SYSLOG_SECRET "] " + msg;
 
-    ESP_LOGD(TAG, "Sending syslog (len=%u): %s", wire.length(), wire.c_str());
     syslogUdp.beginPacket(syslogIP, syslog_port);
     syslogUdp.write(reinterpret_cast<const uint8_t*>(wire.c_str()), wire.length());
-    int result = syslogUdp.endPacket();
-    ESP_LOGD(TAG, "Message send result: %d", result);
+    syslogUdp.endPacket();
 }
 
 // Legacy overload without severity (defaults to info)

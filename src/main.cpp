@@ -15,6 +15,7 @@
  */
 
 #include "esp_log.h"
+#include "esp_system.h"
 #include <board-config.h>
 #include <user_config.h>
 
@@ -85,20 +86,40 @@ constexpr uint8_t kNumScanFrequencies =
 
 using namespace IOHC;
 
+static const char *resetReasonName(esp_reset_reason_t reason) {
+    switch (reason) {
+        case ESP_RST_POWERON: return "poweron";
+        case ESP_RST_EXT: return "external";
+        case ESP_RST_SW: return "software";
+        case ESP_RST_PANIC: return "panic";
+        case ESP_RST_INT_WDT: return "interrupt_wdt";
+        case ESP_RST_TASK_WDT: return "task_wdt";
+        case ESP_RST_WDT: return "watchdog";
+        case ESP_RST_DEEPSLEEP: return "deepsleep";
+        case ESP_RST_BROWNOUT: return "brownout";
+        case ESP_RST_SDIO: return "sdio";
+        default: return "unknown";
+    }
+}
+
 // Custom log vprintf that also stores to buffer
 int log_to_buffer_and_serial(const char *format, va_list args) {
     char buf[256];
     vsnprintf(buf, sizeof(buf), format, args); // Format naar buffer
-    addLogMessage(String(buf));                // In je logbuffer
-    return Serial.printf("%s", buf);           // Ook naar Serial
+    return Serial.printf("%s", buf);
 }
 
 void setup() {
 
     Serial.begin(115200);       //Start serial connection for debug and manual input
     esp_log_set_vprintf(log_to_buffer_and_serial);
-    esp_log_level_set("*", ESP_LOG_DEBUG);    // Or VERBOSE for ESP_LOGV
-
+    esp_log_level_set("*", ESP_LOG_WARN);
+    ESP_LOGW("SETUP", "START OF SETUP");
+    addLogMessage(String("Boot reset reason: ") + resetReasonName(esp_reset_reason()));
+    const String crashMarker = getCrashMarker();
+    if (!crashMarker.isEmpty()) {
+        addLogMessage("Last crash marker: " + crashMarker);
+    }
 
     initDisplay(); // Init OLED display
 
@@ -151,14 +172,14 @@ void setup() {
 /**
  * The function `forgePacket` modifies a given `iohcPacket` structure with specific values and
  * settings.
- * 
+ *
  * @param packet The `packet` parameter is a pointer to an `iohcPacket` struct.
  * @param toSend The `vector` parameter in the `forgePacket` function is a `std::vector<uint8_t>` type,
  * which is a standard C++ container that stores a sequence of elements of type `uint8_t` (unsigned
  * 8-bit integer). In this function, the size of the `
  */
 /**
-* @brief Creates a iohcPacket with the given data to send. 
+* @brief Creates a iohcPacket with the given data to send.
 * @param packet * The packet you want to forge
 * @param toSend The data that will be added to the packet
 */
@@ -187,9 +208,125 @@ void IRAM_ATTR forgePacket(iohcPacket* packet, const std::vector<uint8_t> &toSen
 bool msgRcvd(IOHC::iohcPacket *iohc) {
     JsonDocument doc;
     doc["type"] = "Unk";
+#if defined(WEBSERVER)
+    if (!iohc || iohc->buffer_length < sizeof(_header) || iohc->buffer_length > MAX_FRAME_LEN) {
+        const uint8_t safeLen = iohc ? std::min<uint8_t>(iohc->buffer_length, MAX_FRAME_LEN) : 0;
+        const uint8_t expectedLength = (iohc && safeLen > 0)
+                                           ? iohc->payload.packet.header.CtrlByte1.asStruct.MsgLen + 1
+                                           : 0;
+        updateTwoWRxStatus(
+            "RAW rejected",
+            "-",
+            "-",
+            "-",
+            "len=" + String(iohc ? iohc->buffer_length : 0) +
+                " expected=" + String(expectedLength) +
+                " raw=" + String(iohc ? bytesToHexString(iohc->payload.buffer, safeLen).c_str() : ""),
+            iohc ? String(iohc->frequency) : ""
+        );
+        return true;
+    }
+#else
+    if (!iohc || iohc->buffer_length < sizeof(_header) || iohc->buffer_length > MAX_FRAME_LEN) {
+        return true;
+    }
+#endif
     memcpy(IOHC::lastFromAddress, iohc->payload.packet.header.source, sizeof(IOHC::lastFromAddress));
 #if defined(WEBSERVER)
     broadcastLastAddress(bytesToHexString(IOHC::lastFromAddress, sizeof(IOHC::lastFromAddress)).c_str());
+    if (iohc->payload.packet.header.CtrlByte1.asStruct.Protocol == 0) {
+        const uint8_t twoWExpectedLength = iohc->payload.packet.header.CtrlByte1.asStruct.MsgLen + 1;
+        if (iohc->buffer_length < sizeof(_header) ||
+            iohc->buffer_length > MAX_FRAME_LEN ||
+            twoWExpectedLength < sizeof(_header) ||
+            twoWExpectedLength > MAX_FRAME_LEN ||
+            iohc->buffer_length != twoWExpectedLength) {
+            updateTwoWRxStatus(
+                "RAW rejected",
+                "-",
+                "-",
+                "-",
+                "len=" + String(iohc->buffer_length) +
+                    " expected=" + String(twoWExpectedLength) +
+                    " raw=" + String(bytesToHexString(iohc->payload.buffer, MAX_FRAME_LEN).c_str()),
+                String(iohc->frequency)
+            );
+            return true;
+        } else {
+            const String twoWFrom = bytesToHexString(iohc->payload.packet.header.source, 3).c_str();
+            const String twoWTo = bytesToHexString(iohc->payload.packet.header.target, 3).c_str();
+            const String twoWCmd = to_hex_str(iohc->payload.packet.header.cmd).c_str();
+            const uint8_t twoWDataLength = iohc->buffer_length > sizeof(_header) ? iohc->buffer_length - sizeof(_header) : 0;
+            const uint8_t *twoWPayload = iohc->payload.buffer + sizeof(_header);
+            const String twoWData = bytesToHexString(twoWPayload, twoWDataLength).c_str();
+            const String twoWRaw = bytesToHexString(iohc->payload.buffer, iohc->buffer_length).c_str();
+            const String twoWFullData = "len=" + String(iohc->buffer_length) +
+                                        " payload=" + twoWData +
+                                        " raw=" + twoWRaw;
+            const uint8_t twoWGateway[3] = {0xba, 0x11, 0xad};
+            if (memcmp(iohc->payload.packet.header.source, twoWGateway, sizeof(twoWGateway)) == 0) {
+                updateTwoWRxStatus(
+                    "2W self",
+                    twoWFrom,
+                    twoWTo,
+                    twoWCmd,
+                    twoWFullData,
+                    String(iohc->frequency)
+                );
+                addLogMessage("2W self packet ignored cmd=" + twoWCmd + " to=" + twoWTo +
+                              " data=" + twoWData + " raw=" + twoWRaw);
+            } else {
+                String twoWDecoded;
+                if (iohc->payload.packet.header.cmd == IOHC::iohcDevice::RECEIVED_WRITE_PRIVATE_0x20 &&
+                    twoWDataLength >= 5) {
+                    const uint8_t twoWField = twoWPayload[3];
+                    const uint8_t twoWValue = twoWPayload[4];
+                    twoWDecoded = " origin=" + String(bytesToHexString(twoWPayload, 1).c_str()) +
+                                  " acei=" + String(bytesToHexString(twoWPayload + 1, 1).c_str()) +
+                                  " main=" + String(bytesToHexString(twoWPayload + 2, 1).c_str()) +
+                                  " fp1=" + String(bytesToHexString(twoWPayload + 3, 1).c_str()) +
+                                  " fp2=" + String(bytesToHexString(twoWPayload + 4, 1).c_str());
+                    if (twoWPayload[0] == 0x0c &&
+                        twoWPayload[1] == 0x61 &&
+                        twoWPayload[2] == 0x01) {
+                        switch (twoWField) {
+                            case 0x00: {
+                                const char *mode = "unknown";
+                                if (twoWValue == 0x00) mode = "auto";
+                                else if (twoWValue == 0x01) mode = "manual";
+                                else if (twoWValue == 0x02) mode = "prog";
+                                else if (twoWValue == 0x04) mode = "off";
+                                twoWDecoded += " mode=" + String(mode);
+                                break;
+                            }
+                            case 0x03:
+                                twoWDecoded += " temp=" + String(twoWValue / 10.0f, 1);
+                                break;
+                            case 0x0e:
+                                twoWDecoded += " window=" + String(twoWValue == 0x01 ? "open" : "closed");
+                                break;
+                            case 0x10:
+                                twoWDecoded += " presence=" + String(twoWValue == 0x01 ? "on" : "off");
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                }
+                updateTwoWRxStatus(
+                    "2W",
+                    twoWFrom,
+                    twoWTo,
+                    twoWCmd,
+                    twoWDecoded.isEmpty() ? twoWFullData : twoWFullData + twoWDecoded,
+                    String(iohc->frequency)
+                );
+                addLogMessage("2W RX cmd=" + twoWCmd + " from=" + twoWFrom +
+                              " to=" + twoWTo + " data=" + twoWData +
+                              " raw=" + twoWRaw + twoWDecoded);
+            }
+        }
+    }
 #endif
     String deviceId =
         bytesToHexString(iohc->payload.packet.header.source,
@@ -215,6 +352,7 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
         case iohcDevice::RECEIVED_DISCOVER_0x28: {
             printf("2W Pairing Asked\n");
             if (!Cmd::pairMode) break;
+            addLogMessage("2W pair step: received 0x28 discover; sending 0x29 discover answer");
 
             // 0x0b OverKiz 0x0c Atlantic
             std::vector<uint8_t> toSend = {0xff, 0xc0, 0xba, 0x11, 0xad, 0x0b, 0xcc, 0x00, 0x00};
@@ -223,7 +361,7 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
             forgePacket(packet, toSend);
 
             packet->payload.packet.header.cmd = IOHC::iohcDevice::SEND_DISCOVER_ANSWER_0x29;
- 
+
             /* Swap */
             memcpy(packet->payload.packet.header.source, cozyDevice2W->gateway, 3);
             memcpy(packet->payload.packet.header.target, iohc->payload.packet.header.source, 3);
@@ -238,6 +376,7 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
         case iohcDevice::RECEIVED_DISCOVER_ANSWER_0x29: {
             printf("2W Device want to be paired\n");
             if (!Cmd::pairMode) break;
+            addLogMessage("2W pair step: received 0x29 discover answer; sending 0x2C actuator discover");
 
             std::vector<uint8_t> deviceAsked;
             deviceAsked.assign(iohc->payload.buffer + 9, iohc->payload.buffer + 18);
@@ -279,6 +418,7 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
         case iohcDevice::RECEIVED_DISCOVER_ACTUATOR_0x2C: {
             printf("2W Actuator Ack Asked\n");
             if (!Cmd::pairMode) break;
+            addLogMessage("2W pair step: received 0x2C actuator discover; sending 0x2D ack");
 
             std::vector<uint8_t> toSend = {};
 
@@ -301,6 +441,7 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
         case iohcDevice::RECEIVED_LAUNCH_KEY_TRANSFERT_0x38: {
             printf("2W Key Transfert Asked after Command %2.2X\n", iohc->payload.packet.header.cmd);
             if (!Cmd::pairMode) break;
+            addLogMessage("2W pair step: received 0x38 key transfer request; sending 0x32 key transfer");
 
             std::vector<uint8_t> key_transfert;
             key_transfert.assign(iohc->payload.buffer + 9, iohc->payload.buffer + 15);
@@ -483,7 +624,7 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
             // MY_GATEWAY 4d595f47415445574159
             std::vector<uint8_t> toSend = {0x4d, 0x59, 0x5f, 0x47, 0x41, 0x54, 0x45, 0x57, 0x41, 0x59};
             toSend.resize(16);
-            
+
             auto* packet = new iohcPacket;
 
             forgePacket(packet, toSend);
@@ -568,10 +709,8 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
         case 0x48:
         case 0x49:
         case 0x4A:
-        case 0X05: break;
+        case 0X05:
         default:
-            printf("Received Unknown command %02X ", iohc->payload.packet.header.cmd);
-            return false;
             break;
     }
 
@@ -582,11 +721,11 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
 /**
  * The function creates a JSON message from an `iohcPacket` object and publishes it using
  * MQTT if enabled.
- * 
+ *
  * @param iohc The `iohc` parameter is a pointer to an object of type `IOHC::iohcPacket`. The function
  * `publishMsg` takes this pointer as input and processes the data within the `iohc` object to create a
  * JSON message and publish it using MQTT if the conditions are met.
- * 
+ *
  * @return The function `publishMsg` is returning `false`.
  */
 bool publishMsg(IOHC::iohcPacket *iohc) {
@@ -596,7 +735,12 @@ bool publishMsg(IOHC::iohcPacket *iohc) {
     doc["from"] = bytesToHexString(iohc->payload.packet.header.target, 3);
     doc["to"] = bytesToHexString(iohc->payload.packet.header.source, 3);
     doc["cmd"] = to_hex_str(iohc->payload.packet.header.cmd).c_str();
-    doc["_data"] = bytesToHexString(iohc->payload.buffer + 9, iohc->buffer_length - 9);
+    const uint8_t publishDataLen = iohc->buffer_length >= sizeof(_header)
+                                       ? iohc->buffer_length - sizeof(_header)
+                                       : 0;
+    doc["_data"] = publishDataLen
+                       ? bytesToHexString(iohc->payload.buffer + sizeof(_header), publishDataLen)
+                       : "";
     if (remoteMap) {
         if (const auto *map = remoteMap->find(iohc->payload.packet.header.source)) {
             doc["remote"] = map->name;
@@ -634,11 +778,11 @@ bool publishMsg(IOHC::iohcPacket *iohc) {
  * @deprecated
  * The function copies data from one `iohcPacket` object to another and stores it in an
  * array, returning true if successful and false if there are not enough buffers available.
- * 
+ *
  * @param iohc The `iohc` parameter in the `msgArchive` function is a pointer to an object of type
  * `IOHC::iohcPacket`. This object contains information such as buffer length, frequency, RSSI
  * (Received Signal Strength Indication), and payload data. The function `msgArchive` is
- * 
+ *
  * @return The function `msgArchive` returns a boolean value - `true` if the operation is successful
  * and `false` if there is a failure condition detected during the execution of the function.
  */
@@ -676,11 +820,11 @@ bool msgArchive(IOHC::iohcPacket *iohc) {
  * @deprecated
  * The function `txUserBuffer` sends a packet using a radio instance based on the input command and
  * frequency.
- * 
+ *
  * @param cmd The `cmd` parameter is a pointer to a `Tokens` object. It seems like the `Tokens` class
  * has a method `size()` that returns the size of the object, and an `at()` method that retrieves a
  * specific element at a given index. The function `txUserBuffer`
- * 
+ *
  * @return In the provided code snippet, the `txUserBuffer` function returns `void`, which means it
  * does not return any value. Instead, it performs certain operations and then exits the function
  * without returning any specific value.

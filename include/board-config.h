@@ -86,7 +86,7 @@
 #endif
 
 // OK LilyGo Wifi ESP32 Lora v2.1.6
-// https://github.com/LilyGO/ESP32-Paxcounter/blob/master/src/hal/ttgov2.h 
+// https://github.com/LilyGO/ESP32-Paxcounter/blob/master/src/hal/ttgov2.h
 
 
 #if defined(ESP32)
@@ -127,7 +127,8 @@
 #define PREAMBLE_LSB                                52  // 0x34: 12ms to have receiver up and running (52 0x55 bytes - 13,54mS)
 
 #define SYNC_BYTE_1                                 0xff
-#define SYNC_BYTE_2                                 0x33    // Sync word - Size must be set to 2; first byte 0xff then 0x33 size-1 times
+#define SYNC_BYTE_2                                 0x33    // IO-homecontrol sync word used by CyrilOpenSource SX1276 reference
+#define SYNC_BYTE_3                                 0x01    // Kept for RX sync-size 3 compatibility with the reference radio setup
 
 //#define SYNC_BYTE_2_ENC                             0xB3    // Sync word Inverted + Encoded with start & stop bits
 
@@ -135,8 +136,8 @@
 #define CHANNEL2  868950000 //1W 2W
 #define CHANNEL3  869850000 //2W
 
-#define FREQS2SCAN              {CHANNEL2, CHANNEL1, CHANNEL3}
-#define MAX_FREQS                1       // Number of Frequencies to scan through Fast Hopping set to 1 to disable FHSS
+#define FREQS2SCAN              {CHANNEL2, CHANNEL3, CHANNEL1}
+#define MAX_FREQS                3       // Number of Frequencies to scan through (set to 1 to disable FHSS)
 
 // #if defined(HELTEC)
 #define SCAN_LED                  BOARD_LED_PIN //              22

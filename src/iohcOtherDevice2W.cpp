@@ -45,10 +45,11 @@ namespace IOHC {
         IOHC::relStamp = esp_timer_get_time();
 
         packet->payload.packet.header.CtrlByte1.asStruct.MsgLen = sizeof(_header) - 1;
-
+        packet->payload.packet.header.CtrlByte1.asStruct.Protocol = 0;
+        packet->payload.packet.header.CtrlByte1.asStruct.StartFrame = 1;
+        packet->payload.packet.header.CtrlByte1.asStruct.EndFrame = 0;
         packet->payload.packet.header.cmd = 0x2A; //0x28; //typn;
         // Common Flags
-        packet->payload.packet.header.CtrlByte1.asStruct.EndFrame = 0;
         packet->payload.packet.header.CtrlByte2.asByte = 0;
         packet->payload.packet.header.CtrlByte2.asStruct.Prio = 1;
         packet->payload.packet.header.CtrlByte2.asStruct.LPM = 0;
@@ -212,7 +213,7 @@ namespace IOHC {
                 //            hexStringToBytes(dat, broadcast);
                 size_t i = 0;
                 std::vector<iohcPacket *> packets2send;
-                for (i = 0; i < 10; i++) {
+                for (i = 0; i < 1; i++) {
                     auto *packet = new iohcPacket;
                     packets2send.push_back(packet);
                     forgePacket(packet, toSend);
@@ -231,6 +232,7 @@ namespace IOHC {
                     memcpy(packet->payload.packet.header.target, broadcast, 3);
 
                     packet->delayed = 250; // Give enough time for the answer
+                    packet->repeatTime = 50;
                 }
                 digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
                 _radioInstance->send(packets2send);
@@ -251,7 +253,7 @@ namespace IOHC {
                 address from = {0x08, 0x42, 0xe3};
                 address real = {0x5c, 0xd6, 0x8f};
                 address realcopy = { 0xEF,0x37,0x12};
-               
+
                 address broadcast_3b = {0x00, 0x00, 0x3b};
                 address broadcast_3f = {0x00, 0x00, 0x3f};
 

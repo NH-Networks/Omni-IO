@@ -130,13 +130,13 @@ static void handleWifiDisconnected() {
 static void applyAdvancedWiFiSettings() {
     wifi_config_t config;
     if (esp_wifi_get_config(WIFI_IF_STA, &config) == ESP_OK) {
-        config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;   
-#ifdef REQUIRE_MINIMUM_WPA2_PSK  
+        config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
+#ifdef REQUIRE_MINIMUM_WPA2_PSK
         // This is necessary to prevent the device from Evil Twin attacks, where an attacker creates an additional network with the same
-        // SSID as the one selected. WPA2_PSK will detect that and even prevent sending the password. 
+        // SSID as the one selected. WPA2_PSK will detect that and even prevent sending the password.
 
         // Enable minimal WPA2_PSK level (also allows WPA3 or other more secure modes)
-        config.sta.threshold.authmode = WIFI_AUTH_WPA_PSK; 
+        config.sta.threshold.authmode = WIFI_AUTH_WPA_PSK;
 #endif // REQUIRE_MINIMUM_WPA2_PSK
         esp_wifi_set_config(WIFI_IF_STA, &config);
     }
@@ -154,8 +154,8 @@ static std::string getConfiguredSSID() {
 static void triggerWiFiReconnect() {
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("WiFi: Trigger WiFi reconnect...");
-        applyAdvancedWiFiSettings(); 
-        WiFi.mode(WIFI_STA); 
+        applyAdvancedWiFiSettings();
+        WiFi.mode(WIFI_STA);
         WiFi.begin();
     }
 }
@@ -239,7 +239,11 @@ static void wifiWorker(void * pvParameters) {
         runConfigPortal(ssid, hasWifiConfiguration);
     }
 
-    if (WiFi.status() != WL_CONNECTED) {
+    if (WiFi.status() == WL_CONNECTED) {
+        // If the initial connection succeeds before the event callback is
+        // registered or processed, bootstrap the connected state here.
+        handleWifiConnected();
+    } else {
         configureWifiDisconnected();
     }
 
@@ -271,7 +275,7 @@ static void onWiFiEvent(WiFiEvent_t event) {
         case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
             notifyWiFiWorker(WIFI_NOTIFY_DISCONNECTED);
             break;
-            
+
         default:
             break;
     }
@@ -287,10 +291,11 @@ void initWifi() {
     // including after auto-reconnects where the connect task never runs.
     WiFi.setHostname("MiOpenIO");
 
-    xTaskCreatePinnedToCore(wifiWorker, "WiFi_Worker", 8192, NULL, 3, &wifiWorkerTaskHandle, 1);
-
     WiFi.onEvent(onWiFiEvent);
     WiFi.setAutoReconnect(true);
+    WiFi.setSleep(false);
+
+    xTaskCreatePinnedToCore(wifiWorker, "WiFi_Worker", 8192, NULL, 3, &wifiWorkerTaskHandle, 1);
 
     Serial.printf("WiFi MAC: %s\n", WiFi.macAddress().c_str());
 }
