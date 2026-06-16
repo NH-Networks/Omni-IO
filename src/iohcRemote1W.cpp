@@ -76,7 +76,7 @@ namespace IOHC {
     }
 
     void iohcRemote1W::forgePacket(iohcPacket* packet, uint16_t typn) {
-        IOHC::relStamp = esp_timer_get_time();
+        IOHC::relStamp.store(esp_timer_get_time());
         digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
 
         packet->payload.packet.header.CtrlByte1.asStruct.MsgLen = sizeof(_header) - 1;

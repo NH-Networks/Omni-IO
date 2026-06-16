@@ -83,10 +83,44 @@ static void startTwoWPairingWindow(uint32_t windowMs) {
     }
 }
 
+static void startTwoWPairingWindowAlt(uint32_t windowMs) {
+    setCrashMarker("pair2Walt: open pairing window");
+    pairMode = true;
+    addLogMessage("2W alternate pairing window opened");
+    setCrashMarker("pair2Walt: start 2W scan");
+    addLogMessage("2W alt pair trace: starting scan");
+    IOHC::iohcRadio::getInstance()->startTwoWScan(windowMs, TWOW_SLOW_SCAN_INTERVAL_US);
+
+    setCrashMarker("pair2Walt: send discover28");
+    addLogMessage("2W alt pair trace: sending discover28");
+    IOHC::iohcOtherDevice2W::getInstance()->cmd(IOHC::Other2WButton::discover28, nullptr);
+
+    vTaskDelay(pdMS_TO_TICKS(1200));
+    setCrashMarker("pair2Walt: send discover2A");
+    addLogMessage("2W alt pair trace: sending discover2A");
+    IOHC::iohcOtherDevice2W::getInstance()->cmd(IOHC::Other2WButton::discover2A, nullptr);
+
+    if (!twoWPairTimer) {
+        twoWPairTimer = xTimerCreate("twoWPair", pdMS_TO_TICKS(windowMs), pdFALSE, nullptr, twoWPairTimeout);
+    }
+    if (twoWPairTimer) {
+        xTimerStop(twoWPairTimer, 0);
+        xTimerChangePeriod(twoWPairTimer, pdMS_TO_TICKS(windowMs), 0);
+        xTimerStart(twoWPairTimer, 0);
+    }
+}
+
 static void startTwoWPairingTask(void *param) {
     const uint32_t windowMs = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(param));
     vTaskDelay(pdMS_TO_TICKS(100));
     startTwoWPairingWindow(windowMs);
+    vTaskDelete(nullptr);
+}
+
+static void startTwoWPairingAltTask(void *param) {
+    const uint32_t windowMs = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(param));
+    vTaskDelay(pdMS_TO_TICKS(100));
+    startTwoWPairingWindowAlt(windowMs);
     vTaskDelete(nullptr);
 }
 
@@ -344,6 +378,31 @@ void createCommands() {
             startTwoWPairingWindow(windowMs);
         } else {
             addLogMessage("2W pair trace: scheduled");
+        }
+    });
+
+    Cmd::addHandler((char *) "pair2Walt", (char *) "Start alternate 2W pairing window", [](Tokens *cmd)-> void {
+        setCrashMarker("command: pair2Walt");
+        uint32_t windowMs = 45000;
+        if (cmd && cmd->size() > 1) {
+            const uint32_t seconds = strtoul(cmd->at(1).c_str(), nullptr, 10);
+            if (seconds >= 10 && seconds <= 180) {
+                windowMs = seconds * 1000UL;
+            }
+        }
+        BaseType_t taskCreated = xTaskCreate(
+            startTwoWPairingAltTask,
+            "pair2Walt",
+            4096,
+            reinterpret_cast<void *>(static_cast<uintptr_t>(windowMs)),
+            1,
+            nullptr
+        );
+        if (taskCreated != pdPASS) {
+            addLogMessage("2W alt pair trace: task create failed, running inline");
+            startTwoWPairingWindowAlt(windowMs);
+        } else {
+            addLogMessage("2W alt pair trace: scheduled");
         }
     });
 

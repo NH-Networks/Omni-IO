@@ -79,6 +79,7 @@ IOHC::iohcRemote1W *remote1W;
 IOHC::iohcCozyDevice2W *cozyDevice2W;
 IOHC::iohcOtherDevice2W *otherDevice2W;
 IOHC::iohcRemoteMap *remoteMap;
+static uint32_t lastTwoWLearnDiscoverMs = 0;
 
 uint32_t frequencies[] = FREQS2SCAN;
 constexpr uint8_t kNumScanFrequencies =
@@ -185,7 +186,7 @@ void setup() {
 */
 void IRAM_ATTR forgePacket(iohcPacket* packet, const std::vector<uint8_t> &toSend) {
     digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
-    IOHC::packetStamp = esp_timer_get_time();
+    IOHC::packetStamp.store(esp_timer_get_time());
 
     // Common Flags
     // 8 if protocol version is 0 else 10
@@ -231,9 +232,11 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
         return true;
     }
 #endif
-    memcpy(IOHC::lastFromAddress, iohc->payload.packet.header.source, sizeof(IOHC::lastFromAddress));
+    IOHC::Address3 lastFrom{};
+    memcpy(lastFrom.b, iohc->payload.packet.header.source, sizeof(lastFrom.b));
+    IOHC::lastFromAddress.store(lastFrom);
 #if defined(WEBSERVER)
-    broadcastLastAddress(bytesToHexString(IOHC::lastFromAddress, sizeof(IOHC::lastFromAddress)).c_str());
+    broadcastLastAddress(bytesToHexString(lastFrom.b, sizeof(lastFrom.b)).c_str());
     if (iohc->payload.packet.header.CtrlByte1.asStruct.Protocol == 0) {
         const uint8_t twoWExpectedLength = iohc->payload.packet.header.CtrlByte1.asStruct.MsgLen + 1;
         if (iohc->buffer_length < sizeof(_header) ||
@@ -492,7 +495,7 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
         }
         case iohcDevice::RECEIVED_WRITE_PRIVATE_0x20:  {
             cozyDevice2W->memorizeSend.memorizedCmd = iohc->payload.packet.header.cmd;
-            IOHC::lastSendCmd = iohc->payload.packet.header.cmd;
+            IOHC::lastSendCmd.store(iohc->payload.packet.header.cmd);
             break;
         }
         case iohcDevice::RECEIVED_PRIVATE_ACK_0x21: {
@@ -523,11 +526,12 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
                 std::vector<uint8_t> challengeAsked;
                 //                    challengeAsked.assign(iohc->payload.packet.msg.variableData.data, iohc->payload.packet.msg.variableData.data + iohc->payload.packet.msg.variableData.size);
                 challengeAsked.assign(iohc->payload.buffer + 9, iohc->payload.buffer + 15);
-                printf("Challenge asked after LastSend Command %2.2X\n", IOHC::lastSendCmd);
+                const auto lastSendCmd = IOHC::lastSendCmd.load();
+                printf("Challenge asked after LastSend Command %2.2X\n", static_cast<unsigned>(lastSendCmd));
                 printf("Challenge asked after Memorized Command %2.2X\n", cozyDevice2W->memorizeSend.memorizedCmd);
 
                 if (Cmd::scanMode) {
-                    otherDevice2W->mapValid[IOHC::lastSendCmd] = iohcDevice::RECEIVED_CHALLENGE_REQUEST_0x3C;
+                    otherDevice2W->mapValid[lastSendCmd] = iohcDevice::RECEIVED_CHALLENGE_REQUEST_0x3C;
                     break;
                 }
 
@@ -666,7 +670,7 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
             if (Cmd::scanMode) {
                 otherDevice2W->memorizeOther2W = {};
                 // printf(" Answer %X Cmd %X ", iohc->payload.packet.header.cmd, IOHC::lastSendCmd);
-                otherDevice2W->mapValid[IOHC::lastSendCmd] = iohc->payload.packet.header.cmd;
+                otherDevice2W->mapValid[IOHC::lastSendCmd.load()] = iohc->payload.packet.header.cmd;
             }
         break;
     }
@@ -674,7 +678,7 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
             if (Cmd::scanMode) {
                 otherDevice2W->memorizeOther2W = {};
                 // printf(" Unknown %X Cmd %X ", iohc->payload.buffer[9], IOHC::lastSendCmd);
-                otherDevice2W->mapValid[IOHC::lastSendCmd] = iohc->payload.buffer[9];
+                otherDevice2W->mapValid[IOHC::lastSendCmd.load()] = iohc->payload.buffer[9];
             }
             break;
         }
@@ -691,6 +695,15 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
         }
         case 0X2E: {
             printf("1W Learning mode\n");
+            if (Cmd::pairMode) {
+                addLogMessage("2W pair step: 1W learn frame received from " + deviceId);
+                const uint32_t nowMs = millis();
+                if (nowMs - lastTwoWLearnDiscoverMs > 2500UL) {
+                    lastTwoWLearnDiscoverMs = nowMs;
+                    addLogMessage("2W pair step: triggering discover2A after 1W learn frame");
+                    otherDevice2W->cmd(IOHC::Other2WButton::discover2A, nullptr);
+                }
+            }
             break;
         }
         case 0x39: {

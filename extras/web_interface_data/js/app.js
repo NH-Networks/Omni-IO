@@ -121,6 +121,7 @@
             twowWindowInput: document.getElementById("twow-window"),
             twowSetWindowButton: document.getElementById("twow-setwindow"),
             twowPairButton: document.getElementById("twow-pair"),
+            twowPairAltButton: document.getElementById("twow-pair-alt"),
             twowListenButton: document.getElementById("twow-listen"),
             twowListenSlowButton: document.getElementById("twow-listen-slow"),
             twowDiscover28Button: document.getElementById("twow-discover28"),

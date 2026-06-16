@@ -109,6 +109,7 @@ namespace IOHC {
             unsigned long twoWScanUntilMs = 0;
             bool currentBatchHas2W = false;
             bool resumeTwoWScanAfterTx = false;
+            unsigned long resumeTwoWScanUntilMs = 0;
             uint32_t resumeTwoWScanWindowMs = 0;
             uint32_t resumeTwoWScanDwellUs = TWOW_SCAN_INTERVAL_US;
 

@@ -42,7 +42,7 @@ namespace IOHC {
 
     void iohcOtherDevice2W::forgePacket(iohcPacket *packet, const std::vector<uint8_t> &toSend, size_t typn = 0) {
         digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
-        IOHC::relStamp = esp_timer_get_time();
+        IOHC::relStamp.store(esp_timer_get_time());
 
         packet->payload.packet.header.CtrlByte1.asStruct.MsgLen = sizeof(_header) - 1;
         packet->payload.packet.header.CtrlByte1.asStruct.Protocol = 0;
@@ -257,34 +257,21 @@ namespace IOHC {
                 address broadcast_3b = {0x00, 0x00, 0x3b};
                 address broadcast_3f = {0x00, 0x00, 0x3f};
 
+                const std::vector<std::vector<uint8_t>> payloads = {
+                    {0xa0, 0xb4, 0x38, 0xd2, 0x5f, 0x27, 0x28, 0x6f, 0xed, 0xd2, 0xad, 0x1f},
+                    {0x93, 0x32, 0xd6, 0x18, 0xde, 0x2a, 0x0f, 0xa6, 0x25, 0x0e, 0x2c, 0x7e}
+                };
+                const uint8_t *targets[] = {broadcast_3b, broadcast_3f};
+
                 std::vector<iohcPacket *> packets2send;
-                for (size_t i = 0; i < 2; i++) {
+                for (size_t i = 0; i < 4; i++) {
                     auto *packet = new iohcPacket;
                     packets2send.push_back(packet);
 
-                    if (i > 20) {
-                        std::vector<uint8_t> toSend = {0x00};
-                        forgePacket(packet, toSend);
-                        packet->payload.packet.header.cmd = iohcDevice::SEND_UNKNOWN_0x2E;
-                        memcpy(packet->payload.packet.header.target, broadcast_3f, 3);
-                    }
-                    if (i <= 20) {
-                        std::vector<uint8_t> toSend = {};
-                        forgePacket(packet, toSend);
-                        packet->payload.packet.header.cmd = iohcDevice::SEND_DISCOVER_0x28;
-                        memcpy(packet->payload.packet.header.target, broadcast_3b, 3);
-                    }
-                    if (i <= 10) {
-                        std::vector<uint8_t> toSend = {
-                            0x93, 0x32, 0xd6, 0x18, 0xde, 0x2a, 0x0f, 0xa6, 0x25, 0x0e, 0x2c, 0x7e
-                        };
-                        std::vector<uint8_t> toSend2 = {
-                            0xa0, 0xb4, 0x38, 0xd2, 0x5f, 0x27, 0x28, 0x6f, 0xed, 0xd2, 0xad, 0x1f
-                        };
-                        forgePacket(packet, toSend2);
-                        packet->payload.packet.header.cmd = iohcDevice::SEND_DISCOVER_REMOTE_0x2A;
-                        memcpy(packet->payload.packet.header.target, broadcast_3b, 3);
-                    }
+                    const auto &toSend = payloads[i / 2];
+                    forgePacket(packet, toSend);
+                    packet->payload.packet.header.cmd = iohcDevice::SEND_DISCOVER_REMOTE_0x2A;
+                    memcpy(packet->payload.packet.header.target, targets[i % 2], 3);
                     //                    packet->payload.packet.header.cmd = iohcDevice::SEND_DISCOVER_REMOTE_0x2A;
 
                     //                    memorizeSend.memorizedData = toSend; //.assign(toSend, toSend + 12);
@@ -296,7 +283,7 @@ namespace IOHC {
                     packet->payload.packet.header.CtrlByte2.asStruct.LPM = 1;
                     packet->payload.packet.header.CtrlByte2.asStruct.Prio = 1;
 
-                    memcpy(packet->payload.packet.header.source, /*from*/realcopy/*gateway*/, 3);
+                    memcpy(packet->payload.packet.header.source, gateway, 3);
 
                     packet->delayed = 250; // Give enough time for the answer
                     packet->repeatTime = 250; // Slow down discover loop
@@ -335,7 +322,7 @@ namespace IOHC {
                     packet->payload.packet.header.cmd = 0x00;
                     memorizeOther2W.memorizedData = toSend;
                     memorizeOther2W.memorizedCmd = 0x00;
-                    IOHC::lastSendCmd = 0x00;
+                    IOHC::lastSendCmd.store(0x00);
 
                     packet->payload.packet.header.CtrlByte1.asStruct.StartFrame = 1;
 

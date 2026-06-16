@@ -28,6 +28,7 @@ static const char WIFI_STRENGTH_TOPIC[] = "iown/info/wifi_rssi";
 static const char IP_ADDRESS_TOPIC[] = "iown/info/ip";
 static const char GATEWAY_ID[] = "MyOpenIO";
 static TaskHandle_t s_mqttSchedulerTask = nullptr;
+static TaskHandle_t s_mqttPostConnectTask = nullptr;
 static std::atomic<bool> s_heartbeatEnabled{false};
 static std::atomic<uint32_t> s_nextHeartbeatAtMs{0};
 static uint32_t s_lastMqttConnectAttemptMs = 0;

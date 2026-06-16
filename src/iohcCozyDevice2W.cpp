@@ -41,7 +41,7 @@ namespace IOHC {
     */
     void iohcCozyDevice2W::forgePacket(iohcPacket *packet, const std::vector<unsigned char> &toSend) {
         digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
-        IOHC::relStamp = esp_timer_get_time();
+        IOHC::relStamp.store(esp_timer_get_time());
 
         // Common Flags
         // 8 if protocol version is 0 else 10
@@ -269,7 +269,7 @@ namespace IOHC {
 
             default: break;
         } // switch (cmd)
-        IOHC::packetStamp = esp_timer_get_time();
+        IOHC::packetStamp.store(esp_timer_get_time());
         //        save(); // Save Cozy associated devices
     }
 

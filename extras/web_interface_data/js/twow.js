@@ -109,7 +109,7 @@
             setTwoWStatus(app, message);
             appendTwoWLog(app, message);
             app.logStatus(message);
-            if (command.indexOf("discover") === 0 || command === "pair2W" || command === "listen2W" || command === "listen2Wslow" || command === "powerOn" || command === "associate" || command === "midnight") {
+            if (command.indexOf("discover") === 0 || command === "pair2W" || command === "pair2Walt" || command === "listen2W" || command === "listen2Wslow" || command === "powerOn" || command === "associate" || command === "midnight") {
                 if (app.pendingTwoWResponse && app.pendingTwoWResponse.timer) {
                     clearTimeout(app.pendingTwoWResponse.timer);
                 }
@@ -121,7 +121,7 @@
                             appendTwoWLog(app, app.i18nText("status.twow_no_response", "Geen 2W antwoord ontvangen"), true);
                             app.pendingTwoWResponse = null;
                         }
-                    }, (command === "pair2W") ? 45000 : ((command === "listen2W" || command === "listen2Wslow") ? 30000 : 5000))
+                    }, (command === "pair2W" || command === "pair2Walt") ? 45000 : ((command === "listen2W" || command === "listen2Wslow") ? 30000 : 5000))
                 };
             }
         } catch (error) {
@@ -164,6 +164,7 @@
         bindButton(app, app.elements.twowAssociateButton, function () { return "associate"; });
         bindButton(app, app.elements.twowAckButton, function () { return "ack"; });
         bindButton(app, app.elements.twowPairButton, function () { return "pair2W"; });
+        bindButton(app, app.elements.twowPairAltButton, function () { return "pair2Walt"; });
         bindButton(app, app.elements.twowListenButton, function () { return "listen2W"; });
         bindButton(app, app.elements.twowListenSlowButton, function () { return "listen2Wslow"; });
         bindButton(app, app.elements.twowDiscover28Button, function () { return "discover28"; });

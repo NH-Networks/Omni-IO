@@ -438,7 +438,7 @@ void handleApiCommand(AsyncWebServerRequest *request, JsonObject &doc, JsonObjec
       segments[0] == "powerOn" || segments[0] == "setTemp" || segments[0] == "setMode" ||
       segments[0] == "setPresence" || segments[0] == "setWindow" || segments[0] == "midnight" ||
       segments[0] == "associate" || segments[0] == "ack" || segments[0] == "discover28" ||
-      segments[0] == "discover2A" || segments[0] == "pair2W" || segments[0] == "listen2W" || segments[0] == "listen2Wslow" || segments[0] == "fake0" || segments[0] == "custom" ||
+      segments[0] == "discover2A" || segments[0] == "pair2W" || segments[0] == "pair2Walt" || segments[0] == "listen2W" || segments[0] == "listen2Wslow" || segments[0] == "fake0" || segments[0] == "custom" ||
       segments[0] == "custom60";
   for (uint8_t idx = 0; idx <= lastEntry; ++idx) {
     if (_cmdHandler[idx] == nullptr)

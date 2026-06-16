@@ -179,7 +179,7 @@ namespace IOHC {
         attachInterrupt(RADIO_PREAMBLE_DETECTED, i_preamble, RISING);
 #endif
 
-        callbackQueue = xQueueCreate(20, sizeof(struct Callback *));
+        callbackQueue = xQueueCreate(40, sizeof(struct Callback *));
         auto callbackTaskCode = xTaskCreatePinnedToCore(callbackTaskLoop, "CallbackTask", 4096, NULL, 5, &callbackTask, 0);
         if (callbackTaskCode != pdPASS || callbackQueue == NULL) {
             printf("ERROR: Can't create callback-task or corresponding queue %d\n", callbackTaskCode);
@@ -518,6 +518,7 @@ void iohcRadio::startQueuedSend() {
     txCounter = 0;
     txComplete = false;
     resumeTwoWScanAfterTx = twoWScanActive && twoWScanUntilMs > millis();
+    resumeTwoWScanUntilMs = resumeTwoWScanAfterTx ? twoWScanUntilMs : 0;
     resumeTwoWScanWindowMs = resumeTwoWScanAfterTx
         ? static_cast<uint32_t>(twoWScanUntilMs - millis())
         : 0;
@@ -609,14 +610,20 @@ void iohcRadio::onTxTicker(void *arg) {
             radio->Sender.detach();
             radio->packets2send.clear();
             radio->currentBatchHas2W = false;
-            if (start2WListen) {
+            const unsigned long nowMs = millis();
+            const bool resumePairingScan = radio->resumeTwoWScanAfterTx &&
+                                           radio->resumeTwoWScanUntilMs > nowMs;
+            if (resumePairingScan) {
+                const uint32_t remainingMs =
+                    static_cast<uint32_t>(radio->resumeTwoWScanUntilMs - nowMs);
+                radio->startTwoWScan(remainingMs, radio->resumeTwoWScanDwellUs);
+            } else if (start2WListen) {
                 radio->startTwoWScan();
-            } else if (radio->resumeTwoWScanAfterTx && radio->resumeTwoWScanWindowMs > 0) {
-                radio->startTwoWScan(radio->resumeTwoWScanWindowMs, radio->resumeTwoWScanDwellUs);
-            } else {
+            } else if (radio->twoWScanActive) {
                 radio->stopTwoWScan();
             }
             radio->resumeTwoWScanAfterTx = false;
+            radio->resumeTwoWScanUntilMs = 0;
             radio->resumeTwoWScanWindowMs = 0;
             radio->startQueuedSend();
             return;
@@ -655,7 +662,8 @@ bool queueCallback(IohcPacketDelegate* callback, iohcPacket* packet) {
     callbackData->callback = callback;
     callbackData->packet = packet;
 
-    if (xQueueSendToBack(callbackQueue, &callbackData, 0) != pdPASS) {
+    if (xQueueSendToBack(callbackQueue, &callbackData, pdMS_TO_TICKS(25)) != pdPASS) {
+        addLogMessage("Radio callback queue full; dropping packet");
         vPortFree(callbackData);
         return false;
     }
@@ -675,7 +683,7 @@ bool queueCallback(IohcPacketDelegate* callback, iohcPacket* packet) {
     bool IRAM_ATTR iohcRadio::sent(iohcPacket *packet) {
         bool ret = false;
         if (packet) {
-            packetStamp = esp_timer_get_time();
+            packetStamp.store(esp_timer_get_time());
             packet->decode(true);
             addLogMessage(String(packet->decodeToString(true).c_str()));
         }
@@ -705,7 +713,7 @@ bool queueCallback(IohcPacketDelegate* callback, iohcPacket* packet) {
         iohc->frequency = scan_freqs[currentFreqIdx];
 
         _g_payload_millis = esp_timer_get_time();
-        packetStamp = _g_payload_millis;
+        packetStamp.store(_g_payload_millis);
 #if defined(RADIO_SX127X)
         if (stats) {
             iohc->rssi = static_cast<float>(Radio::readByte(REG_RSSIVALUE)) / -2.0f;
@@ -738,8 +746,8 @@ bool queueCallback(IohcPacketDelegate* callback, iohcPacket* packet) {
         uint16_t fifoCount = 0;
         uint32_t emptySinceUs = 0;
         const uint32_t readStartedUs = micros();
-        const uint32_t fifoStableEmptyUs = 1200;
-        const uint32_t fifoReadTimeoutUs = 12000;
+        const uint32_t fifoStableEmptyUs = twoWScanActive ? 3500 : 1200;
+        const uint32_t fifoReadTimeoutUs = twoWScanActive ? 30000 : 12000;
         const uint8_t irqFlags1Before = Radio::readByte(REG_IRQFLAGS1);
         const uint8_t irqFlags2Before = Radio::readByte(REG_IRQFLAGS2);
 
@@ -752,6 +760,15 @@ bool queueCallback(IohcPacketDelegate* callback, iohcPacket* packet) {
                     iohc->payload.buffer[iohc->buffer_length++] = value;
                 } else {
                     rxOverflow = true;
+                }
+                if (iohc->buffer_length >= 1) {
+                    const uint8_t expectedLength =
+                        iohc->payload.packet.header.CtrlByte1.asStruct.MsgLen + 1;
+                    if (expectedLength >= sizeof(_header) &&
+                        expectedLength <= MAX_FRAME_LEN &&
+                        iohc->buffer_length >= expectedLength) {
+                        break;
+                    }
                 }
                 continue;
             }
