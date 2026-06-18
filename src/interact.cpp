@@ -50,6 +50,7 @@ void tokenize(std::string const &str, const char delim, Tokens &out) {
 namespace Cmd {
 std::atomic<bool> verbosity = true;
 std::atomic<bool> pairMode = false;
+std::atomic<bool> pairAltMode = false;
 std::atomic<bool> scanMode = false;
 #if defined(ESP32)
 TimersUS::TickerUsESP32 kbd_tick;
@@ -59,12 +60,14 @@ static TimerHandle_t twoWPairTimer = nullptr;
 
 static void twoWPairTimeout(TimerHandle_t) {
     pairMode = false;
+    pairAltMode = false;
     addLogMessage("2W pairing window closed");
 }
 
 static void startTwoWPairingWindow(uint32_t windowMs) {
     setCrashMarker("pair2W: open pairing window");
     pairMode = true;
+    pairAltMode = false;
     addLogMessage("2W pairing window opened");
     setCrashMarker("pair2W: start 2W scan");
     addLogMessage("2W pair trace: starting scan");
@@ -86,6 +89,7 @@ static void startTwoWPairingWindow(uint32_t windowMs) {
 static void startTwoWPairingWindowAlt(uint32_t windowMs) {
     setCrashMarker("pair2Walt: open pairing window");
     pairMode = true;
+    pairAltMode = true;
     addLogMessage("2W alternate pairing window opened");
     setCrashMarker("pair2Walt: start 2W scan");
     addLogMessage("2W alt pair trace: starting scan");
@@ -532,7 +536,7 @@ void createCommands() {
     });
 
     Cmd::addHandler((char *) "discover2A", (char *) "discover2A", [](Tokens *cmd)-> void {
-        IOHC::iohcOtherDevice2W::getInstance()->cmd(IOHC::Other2WButton::discover2A, nullptr);
+        IOHC::iohcOtherDevice2W::getInstance()->cmd(IOHC::Other2WButton::discover2A, cmd);
     });
 
     Cmd::addHandler((char *) "listen2W", (char *) "Listen for 2W packets", [](Tokens *cmd)-> void {

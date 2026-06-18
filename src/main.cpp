@@ -697,11 +697,13 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
             printf("1W Learning mode\n");
             if (Cmd::pairMode) {
                 addLogMessage("2W pair step: 1W learn frame received from " + deviceId);
-                const uint32_t nowMs = millis();
-                if (nowMs - lastTwoWLearnDiscoverMs > 2500UL) {
-                    lastTwoWLearnDiscoverMs = nowMs;
-                    addLogMessage("2W pair step: triggering discover2A after 1W learn frame");
-                    otherDevice2W->cmd(IOHC::Other2WButton::discover2A, nullptr);
+                if (Cmd::pairAltMode) {
+                    const uint32_t nowMs = millis();
+                    if (nowMs - lastTwoWLearnDiscoverMs > 2500UL) {
+                        lastTwoWLearnDiscoverMs = nowMs;
+                        addLogMessage("2W alt pair step: triggering discover2A after 1W learn frame");
+                        otherDevice2W->cmd(IOHC::Other2WButton::discover2A, nullptr);
+                    }
                 }
             }
             break;

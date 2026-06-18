@@ -257,14 +257,24 @@ namespace IOHC {
                 address broadcast_3b = {0x00, 0x00, 0x3b};
                 address broadcast_3f = {0x00, 0x00, 0x3f};
 
-                const std::vector<std::vector<uint8_t>> payloads = {
+                std::vector<std::vector<uint8_t>> payloads = {
                     {0xa0, 0xb4, 0x38, 0xd2, 0x5f, 0x27, 0x28, 0x6f, 0xed, 0xd2, 0xad, 0x1f},
                     {0x93, 0x32, 0xd6, 0x18, 0xde, 0x2a, 0x0f, 0xa6, 0x25, 0x0e, 0x2c, 0x7e}
                 };
+                if (data && data->size() > 1) {
+                    uint8_t customPayload[12] = {};
+                    if (hexStringToBytes(data->at(1), customPayload) == sizeof(customPayload)) {
+                        payloads.clear();
+                        payloads.emplace_back(customPayload, customPayload + sizeof(customPayload));
+                    } else {
+                        Serial.println("discover2A expects a 12-byte hex payload, example: discover2A 00112233445566778899aabb");
+                        break;
+                    }
+                }
                 const uint8_t *targets[] = {broadcast_3b, broadcast_3f};
 
                 std::vector<iohcPacket *> packets2send;
-                for (size_t i = 0; i < 4; i++) {
+                for (size_t i = 0; i < payloads.size() * 2; i++) {
                     auto *packet = new iohcPacket;
                     packets2send.push_back(packet);
 

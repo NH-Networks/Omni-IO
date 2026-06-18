@@ -83,6 +83,7 @@ namespace Cmd {
 
 extern std::atomic<bool> verbosity;
 extern std::atomic<bool> pairMode;
+extern std::atomic<bool> pairAltMode;
 extern std::atomic<bool> scanMode;
 
 #if defined(ESP32)
