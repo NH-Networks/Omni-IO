@@ -38,7 +38,7 @@
     #include <TickerUsESP32.h>
 #endif
 
-#define SM_GRANULARITY_US               130ULL  // Ticker function frequency in uS (100 minimum) 4 x 26µs = 104
+#define SM_GRANULARITY_US              1000ULL  // Keep ESP timer load low; DIO packet/sync events are interrupt-driven
 #define SM_GRANULARITY_MS               1       // Ticker function frequency in uS
 #define SM_PREAMBLE_RECOVERY_TIMEOUT_US 15000   // Keep channel locked long enough for the io-homecontrol preamble
 #define DEFAULT_SCAN_INTERVAL_US        13520   // Normal 1W-stable RX dwell time
@@ -79,6 +79,7 @@ namespace IOHC {
             static void tickerCounter(iohcRadio *radio);
             static TaskHandle_t txTaskHandle;
             static volatile bool txComplete;
+            static volatile bool txBatchActive;
             //static void setPreambleLength(uint16_t preambleLen);
 
         private:
@@ -112,6 +113,8 @@ namespace IOHC {
             unsigned long resumeTwoWScanUntilMs = 0;
             uint32_t resumeTwoWScanWindowMs = 0;
             uint32_t resumeTwoWScanDwellUs = TWOW_SCAN_INTERVAL_US;
+            uint64_t txStartedAtUs = 0;
+            TaskHandle_t tickerTaskHandle = nullptr;
 
         #if defined(ESP8266)
             Timers::TickerUs TickTimer;

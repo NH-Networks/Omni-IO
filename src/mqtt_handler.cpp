@@ -213,7 +213,6 @@ void publishDiscovery(const std::string &id, const std::string &name, const std:
     doc["state_opening"] = "OPENING";
     doc["state_stopped"] = "STOP";
     doc["device_class"] = "blind";
-    doc["expire_after"] = 120;
     doc["optimistic"] = false;
     doc["retain"] = true;
     doc["qos"] = 0;
@@ -318,6 +317,10 @@ static void handleMqttConnectImpl() {
         std::string name = r.name.empty() ? r.description : r.name;
         publishDiscovery(id, name, key);
         publishTravelTimeDiscovery(id, name, key, r.travelTime);
+        const float position = r.positionTracker.getPosition();
+        publishCoverPosition(id, position);
+        publishCoverState(id, position >= 99.5f ? "OPEN" :
+                              (position <= 0.5f ? "CLOSE" : "STOP"));
         //std::string t = "iown/" + id + "/set";
         //mqttClient.subscribe(t.c_str(), 0);
         //mqttClient.subscribe(("iown/" + id + "/pair").c_str(), 0);
@@ -551,13 +554,6 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
             t.push_back(std::to_string(closeVal));
             t.push_back(it->description);
             IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Absolute, &t);
-            std::string stateTopic = "iown/" + id + "/state";
-            const char *state = (openVal >= 99) ? "OPEN" : (openVal <= 1 ? "CLOSE" : "STOP");
-            mqttClient.publish(stateTopic.c_str(), 0, true, state);
-            std::string posTopic = "iown/" + id + "/position";
-            std::string openStr = std::to_string(openVal);
-            mqttClient.publish(posTopic.c_str(), 0, true, openStr.c_str());
-            syncWebPosition(id, openVal);
             mqttClient.publish(topicStr.c_str(), 0, true, "", 0);
         }
         return;
@@ -575,15 +571,6 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
             t.push_back(payloadStr);
             t.push_back(it->description);
             IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Absolute, &t);
-            std::string stateTopic = "iown/" + id + "/state";
-            int val = atoi(payloadStr.c_str());
-            int openVal = 100 - std::clamp(val, 0, 100);
-            const char *state = (openVal >= 99) ? "OPEN" : (openVal <= 1 ? "CLOSE" : "STOP");
-            mqttClient.publish(stateTopic.c_str(), 0, true, state);
-            std::string posTopic = "iown/" + id + "/position";
-            std::string openStr = std::to_string(openVal);
-            mqttClient.publish(posTopic.c_str(), 0, true, openStr.c_str());
-            syncWebPosition(id, openVal);
             mqttClient.publish(topicStr.c_str(), 0, true, "", 0);
         }
         return;
@@ -601,20 +588,12 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
             std::transform(payloadStr.begin(), payloadStr.end(), payloadStr.begin(), ::tolower);
             t.push_back(payloadStr);
             t.push_back(it->description);
-            std::string stateTopic = "iown/" + id + "/state";
-
             if (payloadStr == "open") {
                 IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Open, &t);
-                mqttClient.publish(stateTopic.c_str(), 0, true, "OPEN");
-                syncWebPosition(id, static_cast<int>(it->positionTracker.getPosition()));
             } else if (payloadStr == "close") {
                 IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Close, &t);
-                mqttClient.publish(stateTopic.c_str(), 0, true, "CLOSE");
-                syncWebPosition(id, static_cast<int>(it->positionTracker.getPosition()));
             } else if (payloadStr == "stop") {
                 IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Stop, &t);
-                mqttClient.publish(stateTopic.c_str(), 0, true, "STOP");
-                syncWebPosition(id, static_cast<int>(it->positionTracker.getPosition()));
             } else if (payloadStr == "vent") {
                 IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Vent, &t);
             } else if (payloadStr == "force") {

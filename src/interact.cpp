@@ -61,7 +61,6 @@ static TimerHandle_t twoWPairTimer = nullptr;
 static void twoWPairTimeout(TimerHandle_t) {
     pairMode = false;
     pairAltMode = false;
-    addLogMessage("2W pairing window closed");
 }
 
 static void startTwoWPairingWindow(uint32_t windowMs) {

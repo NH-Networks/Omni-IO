@@ -28,6 +28,15 @@
 #define SHORT_PREAMBLE_MS 40
 
 namespace IOHC {
+    static void radioTickerTaskLoop(void *arg) {
+        auto *radio = static_cast<iohcRadio *>(arg);
+        const TickType_t interval = pdMS_TO_TICKS(1);
+        while (true) {
+            iohcRadio::tickerCounter(radio);
+            vTaskDelay(interval);
+        }
+    }
+
     iohcRadio *iohcRadio::_iohcRadio = nullptr;
     volatile unsigned long iohcRadio::_g_payload_millis = 0L;
     uint8_t iohcRadio::_flags[2] = {0, 0};
@@ -35,6 +44,7 @@ namespace IOHC {
     volatile iohcRadio::RadioState iohcRadio::radioState = iohcRadio::RadioState::IDLE;
     TaskHandle_t iohcRadio::txTaskHandle = nullptr;
     volatile bool iohcRadio::txComplete = false;
+    volatile bool iohcRadio::txBatchActive = false;
 
 
     TaskHandle_t handle_interrupt;
@@ -116,7 +126,7 @@ namespace IOHC {
         }
 
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-        if (iohcRadio::radioState == iohcRadio::RadioState::TX) {
+        if (iohcRadio::txBatchActive) {
             iohcRadio::txComplete = true;
             if (iohcRadio::txTaskHandle) {
                 vTaskNotifyGiveFromISR(iohcRadio::txTaskHandle, &xHigherPriorityTaskWoken);
@@ -130,7 +140,7 @@ namespace IOHC {
     }
 
     void IRAM_ATTR handle_sync_interrupt_fromisr() {
-        if (iohcRadio::radioState == iohcRadio::RadioState::TX) {
+        if (iohcRadio::txBatchActive) {
             return;
         }
 
@@ -257,8 +267,17 @@ namespace IOHC {
                       this->scanTimeUs,
                       scan_freqs[0],
                       this->configuredNumFreqs);
-        // Enable frequency hopping to scan all configured channels
+        // Enable frequency hopping to scan all configured channels.
+#if defined(ESP32)
+        if (!tickerTaskHandle &&
+            xTaskCreatePinnedToCore(radioTickerTaskLoop, "radioTicker", 4096, this,
+                                    4, &tickerTaskHandle, 0) != pdPASS) {
+            tickerTaskHandle = nullptr;
+            addLogMessage("Failed to create radio ticker task");
+        }
+#else
         TickTimer.attach_us(SM_GRANULARITY_US, tickerCounter, this);
+#endif
     }
 
     void iohcRadio::startTwoWScan(uint32_t windowMs, uint32_t dwellUs) {
@@ -344,6 +363,10 @@ namespace IOHC {
     void IRAM_ATTR iohcRadio::tickerCounter(iohcRadio *radio) {
         // Not need to put in IRAM as we reuse task for µs instead ISR
 #if defined(RADIO_SX127X)
+        if (txBatchActive) {
+            return;
+        }
+
         Radio::readBytes(REG_IRQFLAGS1, _flags, sizeof(_flags));
 
         // If Int of PayLoad
@@ -517,6 +540,7 @@ void iohcRadio::startQueuedSend() {
     sendQueue.pop();
     txCounter = 0;
     txComplete = false;
+    txBatchActive = true;
     resumeTwoWScanAfterTx = twoWScanActive && twoWScanUntilMs > millis();
     resumeTwoWScanUntilMs = resumeTwoWScanAfterTx ? twoWScanUntilMs : 0;
     resumeTwoWScanWindowMs = resumeTwoWScanAfterTx
@@ -547,6 +571,7 @@ void iohcRadio::startQueuedSend() {
     Radio::clearFlags();
     Radio::writeBytes(REG_FIFO, packet->payload.buffer, packet->buffer_length);
     Radio::setTx();
+    txStartedAtUs = esp_timer_get_time();
     //packetStamp = esp_timer_get_time();
     //packet->decode(true); //false);
     //IOHC::lastSendCmd = packet->payload.packet.header.cmd;
@@ -580,6 +605,11 @@ void iohcRadio::onTxTicker(void *arg) {
         Radio::writeByte(0x3F, 0x08); // Clear PacketSent bit
         iohcRadio::txComplete = true;
     }
+    if (!radio->txComplete &&
+        esp_timer_get_time() - radio->txStartedAtUs > 2000000ULL) {
+        ets_printf("TX: PacketSent timeout; forcing completion\n");
+        iohcRadio::txComplete = true;
+    }
 
     // ⏳ Wait for TXDONE
     if (!radio->txComplete) {
@@ -589,8 +619,6 @@ void iohcRadio::onTxTicker(void *arg) {
 
     // ✅ TXDONE received
     ESP_LOGD("RADIO", "TXDONE flag set, ready to send repeat or next packet.\n");
-    Radio::setRx();
-    radio->setRadioState(RadioState::RX);
 
     // 🔁 Repeat logic
     if (packet->repeat > 0) {
@@ -610,6 +638,7 @@ void iohcRadio::onTxTicker(void *arg) {
             radio->Sender.detach();
             radio->packets2send.clear();
             radio->currentBatchHas2W = false;
+            radio->txBatchActive = false;
             const unsigned long nowMs = millis();
             const bool resumePairingScan = radio->resumeTwoWScanAfterTx &&
                                            radio->resumeTwoWScanUntilMs > nowMs;
@@ -621,6 +650,9 @@ void iohcRadio::onTxTicker(void *arg) {
                 radio->startTwoWScan();
             } else if (radio->twoWScanActive) {
                 radio->stopTwoWScan();
+            } else {
+                Radio::setRx();
+                radio->setRadioState(RadioState::RX);
             }
             radio->resumeTwoWScanAfterTx = false;
             radio->resumeTwoWScanUntilMs = 0;
@@ -643,6 +675,7 @@ void iohcRadio::onTxTicker(void *arg) {
     Radio::clearFlags();
     Radio::writeBytes(REG_FIFO, packet->payload.buffer, packet->buffer_length);
     Radio::setTx();
+    radio->txStartedAtUs = esp_timer_get_time();
     //packetStamp = esp_timer_get_time();
     //packet->decode(true); //false);
     //IOHC::lastSendCmd = packet->payload.packet.header.cmd;
