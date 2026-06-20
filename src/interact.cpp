@@ -61,12 +61,14 @@ static TimerHandle_t twoWPairTimer = nullptr;
 static void twoWPairTimeout(TimerHandle_t) {
     pairMode = false;
     pairAltMode = false;
+    resetTwoWPairingSession();
 }
 
 static void startTwoWPairingWindow(uint32_t windowMs) {
     setCrashMarker("pair2W: open pairing window");
     pairMode = true;
     pairAltMode = false;
+    resetTwoWPairingSession();
     addLogMessage("2W pairing window opened");
     setCrashMarker("pair2W: start 2W scan");
     addLogMessage("2W pair trace: starting scan");
@@ -89,6 +91,7 @@ static void startTwoWPairingWindowAlt(uint32_t windowMs) {
     setCrashMarker("pair2Walt: open pairing window");
     pairMode = true;
     pairAltMode = true;
+    resetTwoWPairingSession();
     addLogMessage("2W alternate pairing window opened");
     setCrashMarker("pair2Walt: start 2W scan");
     addLogMessage("2W alt pair trace: starting scan");

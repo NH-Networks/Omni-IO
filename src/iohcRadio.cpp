@@ -568,6 +568,9 @@ void iohcRadio::startQueuedSend() {
 
     // Send first packet immediately
     Radio::setStandby();
+    if (packet->frequency != 0) {
+        Radio::setCarrier(Radio::Carrier::Frequency, packet->frequency);
+    }
     Radio::clearFlags();
     Radio::writeBytes(REG_FIFO, packet->payload.buffer, packet->buffer_length);
     Radio::setTx();
@@ -672,6 +675,9 @@ void iohcRadio::onTxTicker(void *arg) {
 
     radio->setRadioState(RadioState::TX); // Stay TX until done
     Radio::setStandby();
+    if (packet->frequency != 0) {
+        Radio::setCarrier(Radio::Carrier::Frequency, packet->frequency);
+    }
     Radio::clearFlags();
     Radio::writeBytes(REG_FIFO, packet->payload.buffer, packet->buffer_length);
     Radio::setTx();

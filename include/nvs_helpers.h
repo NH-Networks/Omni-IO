@@ -16,6 +16,7 @@ static constexpr char NVS_KEY_SYSLOG_SERVER[] = "syslog_server";
 static constexpr char NVS_KEY_SYSLOG_PORT[] = "syslog_port";
 static constexpr char NVS_KEY_SYSLOG_TAG[] = "syslog_tag";
 static constexpr char NVS_KEY_DISPLAY_ENABLED[] = "display_on";
+static constexpr char NVS_KEY_2W_SYSTEM[] = "iohc_2w_key";
 
 
 bool nvs_init();

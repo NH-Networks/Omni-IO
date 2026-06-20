@@ -60,6 +60,7 @@ namespace IOHC {
 enum class ConnState { Connecting, Connected, Disconnected };
 extern ConnState mqttStatus;
 void tokenize(std::string const &str, const char delim, Tokens &out);
+void resetTwoWPairingSession();
 
 struct _cmdEntry {
     char cmd[15];

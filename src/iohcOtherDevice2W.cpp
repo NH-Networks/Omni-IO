@@ -208,12 +208,9 @@ namespace IOHC {
             case Other2WButton::discover28: {
                 std::vector<uint8_t> toSend = {};
 
-                //                uint8_t broadcast[3];
-                address broadcast = {0x00, 0xFF, 0xFB}; //{0x02, 0x02, 0xFB}; //data->at(1).c_str();
-                //            hexStringToBytes(dat, broadcast);
-                size_t i = 0;
+                address broadcast = {0x00, 0x00, 0x3B};
                 std::vector<iohcPacket *> packets2send;
-                for (i = 0; i < 1; i++) {
+                for (size_t i = 0; i < 1; i++) {
                     auto *packet = new iohcPacket;
                     packets2send.push_back(packet);
                     forgePacket(packet, toSend);
@@ -225,14 +222,13 @@ namespace IOHC {
                     packet->payload.packet.header.CtrlByte1.asStruct.StartFrame = 1;
                     packet->payload.packet.header.CtrlByte1.asStruct.EndFrame = 1;
 
-                    packet->payload.packet.header.CtrlByte2.asStruct.LPM = 1;
-                    packet->payload.packet.header.CtrlByte2.asStruct.Prio = 1;
+                    packet->payload.packet.header.CtrlByte2.asByte = 0;
 
                     memcpy(packet->payload.packet.header.source, gateway, 3);
                     memcpy(packet->payload.packet.header.target, broadcast, 3);
 
-                    packet->delayed = 250; // Give enough time for the answer
-                    packet->repeatTime = 50;
+                    packet->repeat = 3;
+                    packet->repeatTime = 75;
                 }
                 digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
                 _radioInstance->send(packets2send);
