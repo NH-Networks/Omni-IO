@@ -64,6 +64,21 @@ static void twoWPairTimeout(TimerHandle_t) {
     resetTwoWPairingSession();
 }
 
+void extendTwoWPairingWindow(uint32_t windowMs) {
+    IOHC::iohcRadio::getInstance()->startTwoWScan(
+        windowMs, TWOW_SLOW_SCAN_INTERVAL_US);
+    if (!twoWPairTimer) {
+        twoWPairTimer = xTimerCreate(
+            "twoWPair", pdMS_TO_TICKS(windowMs), pdFALSE, nullptr,
+            twoWPairTimeout);
+    }
+    if (twoWPairTimer) {
+        xTimerStop(twoWPairTimer, 0);
+        xTimerChangePeriod(twoWPairTimer, pdMS_TO_TICKS(windowMs), 0);
+        xTimerStart(twoWPairTimer, 0);
+    }
+}
+
 static void startTwoWPairingWindow(uint32_t windowMs) {
     setCrashMarker("pair2W: open pairing window");
     pairMode = true;
@@ -72,19 +87,10 @@ static void startTwoWPairingWindow(uint32_t windowMs) {
     addLogMessage("2W pairing window opened");
     setCrashMarker("pair2W: start 2W scan");
     addLogMessage("2W pair trace: starting scan");
-    IOHC::iohcRadio::getInstance()->startTwoWScan(windowMs, TWOW_SLOW_SCAN_INTERVAL_US);
+    extendTwoWPairingWindow(windowMs);
     setCrashMarker("pair2W: send discover28");
     addLogMessage("2W pair trace: sending discover28");
     IOHC::iohcOtherDevice2W::getInstance()->cmd(IOHC::Other2WButton::discover28, nullptr);
-
-    if (!twoWPairTimer) {
-        twoWPairTimer = xTimerCreate("twoWPair", pdMS_TO_TICKS(windowMs), pdFALSE, nullptr, twoWPairTimeout);
-    }
-    if (twoWPairTimer) {
-        xTimerStop(twoWPairTimer, 0);
-        xTimerChangePeriod(twoWPairTimer, pdMS_TO_TICKS(windowMs), 0);
-        xTimerStart(twoWPairTimer, 0);
-    }
 }
 
 static void startTwoWPairingWindowAlt(uint32_t windowMs) {
@@ -95,7 +101,7 @@ static void startTwoWPairingWindowAlt(uint32_t windowMs) {
     addLogMessage("2W alternate pairing window opened");
     setCrashMarker("pair2Walt: start 2W scan");
     addLogMessage("2W alt pair trace: starting scan");
-    IOHC::iohcRadio::getInstance()->startTwoWScan(windowMs, TWOW_SLOW_SCAN_INTERVAL_US);
+    extendTwoWPairingWindow(windowMs);
 
     setCrashMarker("pair2Walt: send discover28");
     addLogMessage("2W alt pair trace: sending discover28");
@@ -105,15 +111,6 @@ static void startTwoWPairingWindowAlt(uint32_t windowMs) {
     setCrashMarker("pair2Walt: send discover2A");
     addLogMessage("2W alt pair trace: sending discover2A");
     IOHC::iohcOtherDevice2W::getInstance()->cmd(IOHC::Other2WButton::discover2A, nullptr);
-
-    if (!twoWPairTimer) {
-        twoWPairTimer = xTimerCreate("twoWPair", pdMS_TO_TICKS(windowMs), pdFALSE, nullptr, twoWPairTimeout);
-    }
-    if (twoWPairTimer) {
-        xTimerStop(twoWPairTimer, 0);
-        xTimerChangePeriod(twoWPairTimer, pdMS_TO_TICKS(windowMs), 0);
-        xTimerStart(twoWPairTimer, 0);
-    }
 }
 
 static void startTwoWPairingTask(void *param) {
@@ -364,7 +361,7 @@ void createCommands() {
 
     Cmd::addHandler((char *) "pair2W", (char *) "Start 2W pairing window", [](Tokens *cmd)-> void {
         setCrashMarker("command: pair2W");
-        uint32_t windowMs = 45000;
+        uint32_t windowMs = 90000;
         if (cmd && cmd->size() > 1) {
             const uint32_t seconds = strtoul(cmd->at(1).c_str(), nullptr, 10);
             if (seconds >= 10 && seconds <= 180) {
@@ -389,7 +386,7 @@ void createCommands() {
 
     Cmd::addHandler((char *) "pair2Walt", (char *) "Start alternate 2W pairing window", [](Tokens *cmd)-> void {
         setCrashMarker("command: pair2Walt");
-        uint32_t windowMs = 45000;
+        uint32_t windowMs = 90000;
         if (cmd && cmd->size() > 1) {
             const uint32_t seconds = strtoul(cmd->at(1).c_str(), nullptr, 10);
             if (seconds >= 10 && seconds <= 180) {

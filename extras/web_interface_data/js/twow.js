@@ -121,7 +121,7 @@
                             appendTwoWLog(app, app.i18nText("status.twow_no_response", "Geen 2W antwoord ontvangen"), true);
                             app.pendingTwoWResponse = null;
                         }
-                    }, (command === "pair2W" || command === "pair2Walt") ? 45000 : ((command === "listen2W" || command === "listen2Wslow") ? 30000 : 5000))
+                    }, (command === "pair2W" || command === "pair2Walt") ? 90000 : ((command === "listen2W" || command === "listen2Wslow") ? 30000 : 5000))
                 };
             }
         } catch (error) {

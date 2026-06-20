@@ -899,6 +899,15 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
             for (unsigned char idx: keyCap)
                 printf("%2.2X", idx);
             printf("\n");
+            if (Cmd::pairMode && Cmd::pairAltMode) {
+                addLogMessage(
+                    "2W VELUX pair step: product key received; extending scan to 90 seconds");
+                Cmd::extendTwoWPairingWindow(90000);
+                addLogMessage(
+                    "2W VELUX pair step: retrying discover28 after product key");
+                otherDevice2W->cmd(
+                    IOHC::Other2WButton::discover28, nullptr);
+            }
             break;
         }
         case 0X2E: {
