@@ -94,7 +94,7 @@
   "button.twow_setmode": "Set mode",
   "button.twow_setpresence": "Set presence",
   "button.twow_setwindow": "Set window",
-  "button.twow_pair": "Pair 2W",
+    "button.twow_pair": "Auto pair 1W / 2W",
   "button.twow_listen": "Listen 2W",
   "button.twow_listen_slow": "Listen slow",
   "button.twow_discover28": "Discover 28",

@@ -933,6 +933,80 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
         return true;
     }
 
+    bool iohcRemote1W::importLearnedRemote(
+        const address node, const uint8_t *key, uint16_t sequence,
+        uint8_t type, uint8_t manufacturer) {
+        auto it = std::find_if(remotes.begin(), remotes.end(),
+                               [&](const remote &entry) {
+            return memcmp(entry.node, node, sizeof(address)) == 0;
+        });
+
+        if (it == remotes.end()) {
+            remote learned{};
+            memcpy(learned.node, node, sizeof(address));
+            memcpy(learned.key, key, sizeof(learned.key));
+            learned.sequence = sequence;
+            learned.type = {type, 0};
+            learned.manufacturer = manufacturer;
+            learned.paired = true;
+            learned.repeatOnNoResponse = false;
+            learned.travelTime = DEFAULT_TRAVEL_TIME_SEC;
+            learned.positionTracker.setTravelTime(learned.travelTime);
+
+            const std::string addressString =
+                bytesToHexString(node, sizeof(address));
+            learned.description = "S" + addressString;
+            learned.name = "Solar " + addressString;
+            remotes.push_back(learned);
+            it = std::prev(remotes.end());
+        } else {
+            memcpy(it->key, key, sizeof(it->key));
+            it->sequence = sequence;
+            it->type = {type, 0};
+            it->manufacturer = manufacturer;
+            it->paired = true;
+        }
+
+        nvs_write_sequence(it->node, it->sequence);
+        if (!save()) {
+            return false;
+        }
+
+#if defined(MQTT)
+        if (mqttClient.connected()) {
+            const std::string id =
+                bytesToHexString(it->node, sizeof(it->node));
+            const std::string keyString =
+                bytesToHexString(it->key, sizeof(it->key));
+            publishDiscovery(id, it->name, keyString);
+            publishTravelTimeDiscovery(
+                id, it->name, keyString, it->travelTime);
+            mqttClient.subscribe(("iown/" + id + "/set").c_str(), 0);
+            mqttClient.subscribe(
+                ("iown/" + id + "/position/set").c_str(), 0);
+        }
+#endif
+        return true;
+    }
+
+    void iohcRemote1W::syncSequence(
+        const address node, uint16_t nextSequence) {
+        auto it = std::find_if(remotes.begin(), remotes.end(),
+                               [&](const remote &entry) {
+            return memcmp(entry.node, node, sizeof(address)) == 0;
+        });
+        if (it == remotes.end()) {
+            return;
+        }
+
+        const uint16_t delta =
+            static_cast<uint16_t>(nextSequence - it->sequence);
+        if (delta != 0 && delta < 0x8000) {
+            it->sequence = nextSequence;
+            nvs_write_sequence(it->node, it->sequence);
+        }
+    }
+
     bool iohcRemote1W::removeRemote(const std::string &description) {
         auto it = std::find_if(remotes.begin(), remotes.end(), [&](const remote &e) {
             return e.description == description;

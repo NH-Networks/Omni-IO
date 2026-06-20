@@ -84,6 +84,10 @@ namespace IOHC {
         bool renameRemote(const std::string &description, const std::string &name);
         bool setTravelTime(const std::string &description, uint32_t travelTime);
         bool setRepeatOnNoResponse(const std::string &description, bool repeatOnNoResponse);
+        bool importLearnedRemote(const address node, const uint8_t *key,
+                                 uint16_t sequence, uint8_t type,
+                                 uint8_t manufacturer);
+        void syncSequence(const address node, uint16_t nextSequence);
         void updatePositions();
 
     private:

@@ -104,6 +104,19 @@ struct TwoWPairSession {
 
 static TwoWPairSession twoWPairSession;
 
+struct SolarPairSession {
+    bool active = false;
+    bool hasChallenge = false;
+    IOHC::address source = {};
+    uint32_t startedMs = 0;
+    uint8_t type = 0;
+    uint8_t challengeData = 0;
+    uint8_t challengeSequence[2] = {};
+    uint8_t challengeHmac[6] = {};
+};
+
+static SolarPairSession solarPairSession;
+
 uint32_t frequencies[] = FREQS2SCAN;
 constexpr uint8_t kNumScanFrequencies =
     static_cast<uint8_t>(sizeof(frequencies) / sizeof(frequencies[0]));
@@ -128,9 +141,43 @@ static const char *resetReasonName(esp_reset_reason_t reason) {
 
 void resetTwoWPairingSession() {
     twoWPairSession = {};
+    solarPairSession = {};
     twoWPairSession.stage = Cmd::pairMode
         ? TwoWPairStage::AwaitDiscoverAnswer
         : TwoWPairStage::Idle;
+}
+
+static uint8_t oneWTypeFromTarget(const IOHC::address target) {
+    const uint16_t broadcast =
+        static_cast<uint16_t>(target[1] << 8) | target[2];
+    return (broadcast & 0x3f) == 0x3f
+        ? static_cast<uint8_t>(broadcast >> 6)
+        : 0;
+}
+
+static bool sameAddress(
+    const IOHC::address first, const IOHC::address second) {
+    return memcmp(first, second, sizeof(IOHC::address)) == 0;
+}
+
+static bool verifySolarChallenge(const uint8_t *key) {
+    if (!solarPairSession.hasChallenge) {
+        return false;
+    }
+
+    std::vector<uint8_t> frame = {
+        0x39,
+        solarPairSession.challengeData
+    };
+    uint8_t calculated[16] = {};
+    uint8_t keyCopy[16] = {};
+    memcpy(keyCopy, key, sizeof(keyCopy));
+    iohcCrypto::create_1W_hmac(
+        calculated, solarPairSession.challengeSequence,
+        keyCopy, frame);
+    return memcmp(
+        calculated, solarPairSession.challengeHmac,
+        sizeof(solarPairSession.challengeHmac)) == 0;
 }
 
 static bool isPairingPeer(const IOHC::iohcPacket *packet) {
@@ -456,6 +503,29 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
     }
     addLogMessage("Command received from " + deviceId +
                   " (" + deviceName + ")");
+    if (iohc->payload.packet.header.CtrlByte1.asStruct.Protocol == 1) {
+        uint16_t receivedSequence = 0;
+        bool hasSequence = false;
+        if (iohc->payload.packet.header.cmd == 0x30 &&
+            iohc->buffer_length >= 29) {
+            receivedSequence =
+                static_cast<uint16_t>(
+                    iohc->payload.packet.msg.p0x30.sequence[0] << 8) |
+                iohc->payload.packet.msg.p0x30.sequence[1];
+            hasSequence = true;
+        } else if (iohc->buffer_length >= 17) {
+            receivedSequence =
+                static_cast<uint16_t>(
+                    iohc->payload.buffer[iohc->buffer_length - 8] << 8) |
+                iohc->payload.buffer[iohc->buffer_length - 7];
+            hasSequence = true;
+        }
+        if (hasSequence) {
+            remote1W->syncSequence(
+                iohc->payload.packet.header.source,
+                static_cast<uint16_t>(receivedSequence + 1));
+        }
+    }
     switch (iohc->payload.packet.header.cmd) {
         case iohcDevice::RECEIVED_DISCOVER_0x28: {
             printf("2W Pairing Asked\n");
@@ -895,25 +965,67 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
                 keyCap[idx] = iohc->payload.packet.msg.p0x30.enc_key[idx];
 
             iohcCrypto::encrypt_1W_key((const uint8_t *) iohc->payload.packet.header.source, (uint8_t *) keyCap);
-            printf("CLEAR KEY: ");
-            for (unsigned char idx: keyCap)
-                printf("%2.2X", idx);
-            printf("\n");
-            if (Cmd::pairMode && Cmd::pairAltMode) {
+            if (!Cmd::pairMode) {
+                break;
+            }
+
+            const bool matchingSession =
+                solarPairSession.active &&
+                sameAddress(solarPairSession.source,
+                            iohc->payload.packet.header.source) &&
+                millis() - solarPairSession.startedMs <= 120000UL;
+            if (!matchingSession || !verifySolarChallenge(keyCap)) {
                 addLogMessage(
-                    "2W VELUX pair step: product key received; extending scan to 90 seconds");
-                Cmd::extendTwoWPairingWindow(90000);
+                    "Auto pair: rejected 1W CMD 30 because the 2E/39 proof is missing or invalid");
+                break;
+            }
+
+            const uint16_t sequence =
+                static_cast<uint16_t>(
+                    iohc->payload.packet.msg.p0x30.sequence[0] << 8) |
+                iohc->payload.packet.msg.p0x30.sequence[1];
+            const uint8_t learnedType = solarPairSession.type != 0
+                ? solarPairSession.type
+                : oneWTypeFromTarget(iohc->payload.packet.header.target);
+            const bool imported = remote1W->importLearnedRemote(
+                iohc->payload.packet.header.source, keyCap,
+                static_cast<uint16_t>(sequence + 1), learnedType,
+                iohc->payload.packet.msg.p0x30.man_id);
+            if (imported) {
                 addLogMessage(
-                    "2W VELUX pair step: retrying discover28 after product key");
-                otherDevice2W->cmd(
-                    IOHC::Other2WButton::discover28, nullptr);
+                    "Auto pair completed: VELUX solar/1W controller " +
+                    deviceId + " authenticated and stored");
+                Cmd::pairMode = false;
+                Cmd::pairAltMode = false;
+                radioInstance->stopTwoWScan();
+                resetTwoWPairingSession();
+            } else {
+                addLogMessage(
+                    "Auto pair failed: authenticated VELUX profile could not be stored");
             }
             break;
         }
         case 0X2E: {
             printf("1W Learning mode\n");
             if (Cmd::pairMode) {
-                addLogMessage("2W pair step: 1W learn frame received from " + deviceId);
+                const bool newSession =
+                    !solarPairSession.active ||
+                    !sameAddress(solarPairSession.source,
+                                 iohc->payload.packet.header.source) ||
+                    millis() - solarPairSession.startedMs > 120000UL;
+                if (newSession) {
+                    solarPairSession = {};
+                    solarPairSession.active = true;
+                    memcpy(solarPairSession.source,
+                           iohc->payload.packet.header.source,
+                           sizeof(IOHC::address));
+                    solarPairSession.startedMs = millis();
+                }
+                solarPairSession.type =
+                    oneWTypeFromTarget(iohc->payload.packet.header.target);
+                addLogMessage(
+                    "Auto pair: VELUX solar/1W learn frame received from " +
+                    deviceId);
                 if (Cmd::pairAltMode) {
                     const uint32_t nowMs = millis();
                     if (nowMs - lastTwoWLearnDiscoverMs > 2500UL) {
@@ -926,15 +1038,25 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
             break;
         }
         case 0x39: {
-            if (keyCap[0] == 0) break;
-            uint8_t hmac[16];
-            std::vector<uint8_t> frame(&iohc->payload.packet.header.cmd, &iohc->payload.packet.header.cmd + 2);
-            // frame = {0x39, 0x00}; //
-            iohcCrypto::create_1W_hmac(hmac, iohc->payload.packet.msg.p0x39.sequence, keyCap, frame);
-            printf("MAC: ");
-            for (uint8_t idx = 0; idx < 6; idx++)
-                printf("%2.2X", hmac[idx]);
-            printf("\n");
+            if (Cmd::pairMode &&
+                solarPairSession.active &&
+                sameAddress(solarPairSession.source,
+                            iohc->payload.packet.header.source) &&
+                millis() - solarPairSession.startedMs <= 120000UL) {
+                solarPairSession.challengeData =
+                    iohc->payload.packet.msg.p0x39.data;
+                memcpy(solarPairSession.challengeSequence,
+                       iohc->payload.packet.msg.p0x39.sequence,
+                       sizeof(solarPairSession.challengeSequence));
+                memcpy(solarPairSession.challengeHmac,
+                       iohc->payload.packet.msg.p0x39.hmac,
+                       sizeof(solarPairSession.challengeHmac));
+                solarPairSession.type =
+                    oneWTypeFromTarget(iohc->payload.packet.header.target);
+                solarPairSession.hasChallenge = true;
+                addLogMessage(
+                    "Auto pair: VELUX 1W challenge captured; waiting for CMD 30");
+            }
             break;
         }
         case 0x48:
