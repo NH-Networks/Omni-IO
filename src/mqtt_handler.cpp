@@ -3,6 +3,7 @@
 #if defined(MQTT)
 
 #include <iohcRemote1W.h>
+#include <iohcPacket.h>
 #include <iohcCryptoHelpers.h>
 #include <AsyncMqttClient.h>
 #include <ArduinoJson.h>
@@ -26,6 +27,7 @@ const char AVAILABILITY_TOPIC[] = "iown/status";
 static const char FREE_MEM_TOPIC[] = "iown/info/free_mem";
 static const char WIFI_STRENGTH_TOPIC[] = "iown/info/wifi_rssi";
 static const char IP_ADDRESS_TOPIC[] = "iown/info/ip";
+static const char RADIO_LOG_TOPIC[] = "iown/log";
 static const char GATEWAY_ID[] = "MyOpenIO";
 static TaskHandle_t s_mqttSchedulerTask = nullptr;
 static TaskHandle_t s_mqttPostConnectTask = nullptr;
@@ -36,6 +38,7 @@ static constexpr uint32_t MQTT_RECONNECT_INTERVAL_MS = 5000;
 
 static void mqttSchedulerTask(void*);
 static void publishIohcFrameDiscovery();
+static void publishRadioLogDiscovery();
 static void publishFreeMemDiscovery();
 static void publishIpAddressDiscovery();
 static void publishWifiStrengthDiscovery();
@@ -283,6 +286,52 @@ void publishCoverPosition(const std::string &id, float position) {
     syncWebPosition(id, static_cast<int>(position));
 }
 
+void publishRadioLogEvent(const IOHC::iohcPacket *packet,
+                          const char *direction) {
+    if (!packet || !direction || !mqttClient.connected() ||
+        packet->buffer_length < sizeof(IOHC::_header)) {
+        return;
+    }
+
+    const bool oneWay =
+        packet->payload.packet.header.CtrlByte1.asStruct.Protocol == 1;
+    const bool isTx = strcmp(direction, "TX") == 0;
+    const char *protocol = oneWay ? "1W" : "2W";
+    const std::string command =
+        bytesToHexString(&packet->payload.packet.header.cmd, 1);
+
+    JsonDocument doc;
+    doc["event_type"] = oneWay
+        ? (isTx ? "1w_tx" : "1w_rx")
+        : (isTx ? "2w_tx" : "2w_rx");
+    doc["protocol"] = protocol;
+    doc["direction"] = isTx ? "TX" : "RX";
+    doc["from"] =
+        bytesToHexString(packet->payload.packet.header.source, 3);
+    doc["to"] =
+        bytesToHexString(packet->payload.packet.header.target, 3);
+    doc["cmd"] = command;
+    doc["frequency"] = packet->frequency;
+    doc["timestamp_ms"] = millis();
+
+    const uint8_t dataLength =
+        packet->buffer_length > sizeof(IOHC::_header)
+            ? packet->buffer_length - sizeof(IOHC::_header)
+            : 0;
+    doc["data"] = dataLength
+        ? bytesToHexString(
+              packet->payload.buffer + sizeof(IOHC::_header), dataLength)
+        : "";
+    doc["message"] =
+        String(protocol) + " " + (isTx ? "TX" : "RX") +
+        " cmd=" + command.c_str();
+
+    std::string payload;
+    const size_t length = serializeJson(doc, payload);
+    mqttClient.publish(
+        RADIO_LOG_TOPIC, 0, false, payload.c_str(), length);
+}
+
 // ==== BELANGRIJK: scheduler die het zware werk in een eigen task zet ====
 void handleMqttConnect() {
     if (mqttStatus != ConnState::Connected) return;
@@ -310,6 +359,7 @@ static void handleMqttConnectImpl() {
     publishWifiStrengthDiscovery();
     // Discovery van de ‘frame’ sensor eerst, zodat state pub direct een entity heeft
     publishIohcFrameDiscovery();
+    publishRadioLogDiscovery();
     const auto &remotes = IOHC::iohcRemote1W::getInstance()->getRemotes();
     for (const auto &r : remotes) {
         std::string id = bytesToHexString(r.node, sizeof(r.node));
@@ -435,6 +485,29 @@ static void publishIohcFrameDiscovery() {
     size_t cfgLen = serializeJson(configDoc, cfg);
     mqttClient.publish((mqtt_discovery_topic + "/sensor/iohc_frame/config").c_str(),
                        0, true, cfg.c_str(), cfgLen);
+}
+
+static void publishRadioLogDiscovery() {
+    JsonDocument doc;
+    doc["name"] = "IOHC Radio Log";
+    doc["unique_id"] = "iohc_radio_log";
+    doc["state_topic"] = RADIO_LOG_TOPIC;
+    JsonArray eventTypes = doc["event_types"].to<JsonArray>();
+    eventTypes.add("1w_rx");
+    eventTypes.add("1w_tx");
+    eventTypes.add("2w_rx");
+    eventTypes.add("2w_tx");
+    doc["availability_topic"] = AVAILABILITY_TOPIC;
+    doc["payload_available"] = "online";
+    doc["payload_not_available"] = "offline";
+    doc["icon"] = "mdi:radio-tower";
+    populateGatewayDevice(doc["device"]);
+
+    std::string payload;
+    const size_t length = serializeJson(doc, payload);
+    mqttClient.publish(
+        (mqtt_discovery_topic + "/event/iohc_radio_log/config").c_str(),
+        0, true, payload.c_str(), length);
 }
 
 static void publishFreeMemDiscovery() {

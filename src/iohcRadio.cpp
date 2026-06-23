@@ -24,6 +24,9 @@
 #include <log_buffer.h>
 #include <utils.h>
 #include <web_server_handler.h>
+#if defined(MQTT)
+#include <mqtt_handler.h>
+#endif
 #define LONG_PREAMBLE_MS 1920
 #define SHORT_PREAMBLE_MS 40
 
@@ -725,6 +728,9 @@ bool queueCallback(IohcPacketDelegate* callback, iohcPacket* packet) {
             packetStamp.store(esp_timer_get_time());
             packet->decode(true);
             addLogMessage(String(packet->decodeToString(true).c_str()));
+#if defined(MQTT)
+            publishRadioLogEvent(packet, "TX");
+#endif
         }
         if (txCB && !queueCallback(&txCB, packet)) {
             delete packet;

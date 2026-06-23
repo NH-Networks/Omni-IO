@@ -11,6 +11,10 @@
 #include <AsyncMqttClient.h>
 #include <ArduinoJson.h>
 
+namespace IOHC {
+class iohcPacket;
+}
+
 extern AsyncMqttClient mqttClient;
 extern const char AVAILABILITY_TOPIC[];
 
@@ -29,6 +33,8 @@ void publishHeartbeat();
 void mqttFuncHandler(const char *cmd);
 void publishCoverState(const std::string &id, const char *state);
 void publishCoverPosition(const std::string &id, float position);
+void publishRadioLogEvent(const IOHC::iohcPacket *packet,
+                          const char *direction);
 void removeDiscovery(const std::string &id);
 
 #endif // MQTT

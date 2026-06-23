@@ -1121,6 +1121,7 @@ bool publishMsg(IOHC::iohcPacket *iohc) {
     std::string message;
     size_t messageSize = serializeJson(doc, message);
 #if defined(MQTT)
+    publishRadioLogEvent(iohc, "RX");
     mqttClient.publish("iown/Frame", 1, false, message.c_str(), messageSize);
     mqttClient.publish((mqtt_discovery_topic + "/sensor/iohc_frame/state").c_str(), 0, false, message.c_str(), messageSize);
 #endif
