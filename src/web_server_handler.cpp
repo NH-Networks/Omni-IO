@@ -5,6 +5,7 @@
 #include "ESPAsyncWebServer.h" // Or WebServer.h if that's preferred for memory
 #include <AsyncJson.h>
 #include <algorithm>
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <LittleFS.h>
@@ -394,6 +395,33 @@ void handleApiAction(AsyncWebServerRequest *request, JsonObject &doc, JsonObject
   root["message"] = msg;
 }
 
+void handleApiInfo(AsyncWebServerRequest *request, JsonObject &root) {
+#ifdef FIRMWARE_VERSION
+  root["version"] = FIRMWARE_VERSION;
+#else
+  root["version"] = "dev";
+#endif
+#ifdef FIRMWARE_BRANCH
+  root["branch"] = FIRMWARE_BRANCH;
+#else
+  root["branch"] = "unknown";
+#endif
+}
+
+void handleApiReboot(AsyncWebServerRequest *request) {
+  request->send(200, "application/json",
+                "{\"success\":true,\"message\":\"Restarting...\"}");
+  static std::atomic<bool> rebootScheduled{false};
+  if (!rebootScheduled.exchange(true)) {
+    xTaskCreate(
+        [](void *) {
+          vTaskDelay(pdMS_TO_TICKS(750));
+          ESP.restart();
+        },
+        "apiReboot", 2048, nullptr, 1, nullptr);
+  }
+}
+
 void handleApiLogs(AsyncWebServerRequest *request, JsonArray &root) {
   auto logs = getLogMessages();
   for (const auto &msg : logs) {
@@ -717,6 +745,7 @@ void setupWebServer() {
   // API Endpoints
   server.on("/api/devices", HTTP_GET, jsonGet(handleApiDevices));
   server.on("/api/remotes", HTTP_GET, jsonGet(handleApiRemotes));
+  server.on("/api/info", HTTP_GET, jsonGet(handleApiInfo));
   server.on("/api/logs", HTTP_GET, jsonGet(handleApiLogs));
   server.on("/api/lastaddr", HTTP_GET, jsonGet(handleApiLastAddr));
 #if defined(SSD1306_DISPLAY)
@@ -730,6 +759,7 @@ void setupWebServer() {
 #endif
   server.on("/api/command", HTTP_POST, jsonPost(handleApiCommand));
   server.on("/api/action", HTTP_POST, jsonPost(handleApiAction));
+  server.on("/api/reboot", HTTP_POST, handleApiReboot);
 #if defined(SSD1306_DISPLAY)
   server.on("/api/display", HTTP_POST, jsonPost(handleApiDisplaySet));
 #endif

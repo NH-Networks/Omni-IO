@@ -1,4 +1,4 @@
-{
+﻿{
   "page.title": "MiOpen.IO - Device Control",
   "header.title": "Device Control",
   "nav.devices": "Devices",
@@ -45,6 +45,7 @@
   "status.display_load_error": "Could not load display settings",
   "status.display_save_error": "Saving display setting failed",
   "label.firmware": "Firmware:",
+  "label.github_update_branch": "Branch:",
   "label.filesystem": "Filesystem:",
   "label.devices": "Devices:",
   "label.remotes": "Remotes:",
@@ -58,16 +59,19 @@
   "placeholder.discovery_topic": "Discovery Topic",
   "placeholder.syslog_server": "Syslog Server",
   "placeholder.syslog_port": "Syslog Port",
+  "option.current_branch": "Current firmware branch",
 
   "button.send": "Send",
   "button.update": "Update",
   "button.upload_firmware": "Upload Firmware",
+  "button.check_github_update": "Check GitHub update",
   "button.upload_filesystem": "Upload Filesystem",
   "button.upload_devices": "Upload Devices",
   "button.download_devices": "Download Devices",
   "button.upload_remotes": "Upload Remotes",
   "button.download_remotes": "Download Remotes",
   "button.close": "Close",
+  "button.restart": "Restart",
   "button.save": "Save",
   "button.pair": "Pair",
   "button.unpair": "Unpair",
@@ -80,6 +84,9 @@
   "button.edit": "Edit",
   "button.link": "Link",
   "button.unlink": "Unlink",
+  "confirm.restart": "Restart device now?",
+  "toast.restarting": "Restarting...",
+  "toast.restart_failed": "Restart request failed.",
 
   "popup.title_default": "Popup",
   "popup.label_device": "Device:",

@@ -1,4 +1,4 @@
-{
+﻿{
   "page.title": "MiOpen.IO - Apparaatbeheer",
   "header.title": "Apparaatbeheer",
   "nav.devices": "Schermen",
@@ -45,6 +45,7 @@
   "status.display_load_error": "Display instellingen konden niet geladen worden",
   "status.display_save_error": "Opslaan van display instelling mislukt",
   "label.firmware": "Firmware:",
+  "label.github_update_branch": "Branch:",
   "label.filesystem": "Bestandssysteem:",
   "label.devices": "Schermen:",
   "label.remotes": "Remotes:",
@@ -58,16 +59,19 @@
   "placeholder.discovery_topic": "Discovery topic",
   "placeholder.syslog_server": "Syslog Server",
   "placeholder.syslog_port": "Syslog Poort",
+  "option.current_branch": "Huidige firmware branch",
 
   "button.send": "Verstuur",
   "button.update": "Opslaan",
   "button.upload_firmware": "Upload Firmware",
+  "button.check_github_update": "Controleer GitHub update",
   "button.upload_filesystem": "Upload Filesystem",
   "button.upload_devices": "Upload Schermen",
   "button.download_devices": "Download Schermen",
   "button.upload_remotes": "Upload Remotes",
   "button.download_remotes": "Download Remotes",
   "button.close": "Sluiten",
+  "button.restart": "Herstart",
   "button.save": "Opslaan",
   "button.pair": "Koppel",
   "button.unpair": "Ontkoppel",
@@ -80,6 +84,9 @@
   "button.edit": "Bewerk",
   "button.link": "Link",
   "button.unlink": "Unlink",
+  "confirm.restart": "Apparaat nu herstarten?",
+  "toast.restarting": "Herstarten...",
+  "toast.restart_failed": "Herstartverzoek mislukt.",
 
   "popup.title_default": "Popup",
   "popup.label_device": "Scherm:",

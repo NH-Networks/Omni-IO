@@ -6,14 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title data-i18n="page.title">MiOpen.IO - Device Control</title>
     <link rel="icon" href="img/logo.png">
-    <link rel="stylesheet" href="css/style.css?v=20260526b">
+    <link rel="stylesheet" href="css/style.css?v=20260630a">
 </head>
 
 <body>
     <header>
         <img src="img/logo.png" alt="MiOpen.IO Logo" class="logo">
         <h1 data-i18n="header.title">Device Control</h1>
-        <nav>
+        <button id="menu-toggle" aria-label="Open menu" aria-expanded="false" type="button"><span></span><span></span><span></span></button>
+        <div id="menu-backdrop"></div>
+        <nav id="main-menu">
+            <button id="menu-close" aria-label="Close menu" type="button">&times;</button>
             <a onclick="showPage('devices')" class="items" data-i18n="nav.devices">Devices</a>
             <a onclick="showPage('help')" class="items" data-i18n="nav.help">Log</a>
             <a onclick="showPage('settings')" class="items" data-i18n="nav.settings">Settings</a>
@@ -109,8 +112,16 @@
             </div>
         </div>
         <div id="settings-page" style="display:none;">
-            <div class="left">
-                <section id="mqtt-settings-section">
+            <div class="settings-tabbar" role="tablist" aria-label="Settings sections">
+                <button class="settings-tab active" type="button" data-settings-tab="mqtt" data-i18n="section.mqtt_settings">MQTT settings</button>
+                <button class="settings-tab" type="button" data-settings-tab="display" data-i18n="section.display_settings">Display</button>
+                <button class="settings-tab" type="button" data-settings-tab="update" data-i18n="section.update">Update</button>
+                <span class="settings-tabbar-spacer"></span>
+                <button id="settings-restart" class="settings-tab settings-tab-action" type="button" data-i18n="button.restart">Restart</button>
+                <button id="settings-close" class="settings-tab settings-tab-action" type="button" data-i18n="button.close">Close</button>
+            </div>
+            <div class="settings-grid">
+                <section id="mqtt-settings-section" class="settings-panel active" data-settings-panel="mqtt">
                     <div class="title">
                         <h2 data-i18n="section.mqtt_settings">MQTT settings</h2>
                     </div>
@@ -128,7 +139,7 @@
                         <button id="mqtt-update" data-i18n="button.update">Update</button>
                     </div>
                 </section>
-                <section id="display-settings-section">
+                <section id="display-settings-section" class="settings-panel" data-settings-panel="display">
                     <div class="title">
                         <h2 data-i18n="section.display_settings">Display</h2>
                     </div>
@@ -142,14 +153,20 @@
                     </div>
                 </section>
 
-            </div>
-
-            <div class="right">
-                <section id="update-section">
+                <section id="update-section" class="settings-panel" data-settings-panel="update">
                     <div class="title">
                         <h2 data-i18n="section.update">Update</h2>
                     </div>
                     <div class="card">
+                        <p id="github-update-status" class="setting-status" data-i18n="status.github_update_ready">GitHub update check ready</p>
+                        <label for="github-update-branch" data-i18n="label.github_update_branch">Branch:</label>
+                        <select id="github-update-branch">
+                            <option value="auto" data-i18n="option.current_branch">Current firmware branch</option>
+                            <option value="main">main</option>
+                            <option value="dev-main">dev-main</option>
+                            <option value="Beta">Beta</option>
+                        </select>
+                        <button id="github-update-check" data-i18n="button.check_github_update">Check GitHub update</button>
                         <label for="firmware-file" data-i18n="label.firmware">Firmware:</label>
                         <div class="firmware-line"><input type="file" id="firmware-file" accept=".bin">
                         <button id="upload-firmware" data-i18n="button.upload_firmware">Upload Firmware</button></div>
@@ -171,6 +188,7 @@
                     </div>
                 </section>
             </div>
+        </div>
 
 
     </main>
@@ -225,19 +243,14 @@
         </div>
     </div>
     <script src="js/i18n.js?v=20260526b"></script>
+    <script src="js/toast.js?v=20260630a"></script>
     <script src="js/api.js?v=20260526b"></script>
     <script src="js/popup.js?v=20260526b"></script>
     <script src="js/devices.js?v=20260526b"></script>
     <script src="js/remotes.js?v=20260526b"></script>
-    <script src="js/settings.js?v=20260526b"></script>
-    <script src="js/app.js?v=20260526b"></script>
-    <script>
-        function showPage(page) {
-            document.getElementById('devices-page').style.display = (page === 'devices') ? 'grid' : 'none';
-            document.getElementById('settings-page').style.display = (page === 'settings') ? 'grid' : 'none';
-            document.getElementById('help-page').style.display = (page === 'help') ? 'grid' : 'none';
-        }
-    </script>
+    <script src="js/settings.js?v=20260630a"></script>
+    <script src="js/app.js?v=20260630a"></script>
+    <script src="js/menu.js?v=20260630a"></script>
 </body>
 
 </html>

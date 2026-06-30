@@ -21,7 +21,12 @@
                 requestOptions.cache = "no-store";
             }
 
-            const response = await fetch(requestUrl, requestOptions);
+            let response;
+            try {
+                response = await fetch(requestUrl, requestOptions);
+            } catch (error) {
+                throw new Error("ESP niet bereikbaar. Controleer of het toestel online is of net herstart.");
+            }
             const data = await ensureJson(response);
             if (!response.ok) {
                 throw new Error(data.message || ("HTTP error " + response.status));
@@ -76,6 +81,9 @@
             filesystemUploadButton: document.getElementById("upload-filesystem"),
             firmwareFileInput: document.getElementById("firmware-file"),
             firmwareUploadButton: document.getElementById("upload-firmware"),
+            githubUpdateButton: document.getElementById("github-update-check"),
+            githubUpdateBranchInput: document.getElementById("github-update-branch"),
+            githubUpdateStatus: document.getElementById("github-update-status"),
             helpDeviceButton: document.getElementById("help-device"),
             helpRemoteButton: document.getElementById("help-remote"),
             lastAddrInput: document.getElementById("last-address"),
@@ -85,6 +93,11 @@
             mqttServerInput: document.getElementById("mqtt-server"),
             mqttUpdateButton: document.getElementById("mqtt-update"),
             mqttUserInput: document.getElementById("mqtt-user"),
+            settingsTabs: document.querySelectorAll("[data-settings-tab]"),
+            settingsPanels: document.querySelectorAll("[data-settings-panel]"),
+            settingsRestartButton: document.getElementById("settings-restart"),
+            settingsCloseButton: document.getElementById("settings-close"),
+            selectLog: document.getElementById("select-log"),
             displayEnabledInput: document.getElementById("display-enabled"),
             displayUpdateButton: document.getElementById("display-update"),
             displayStatus: document.getElementById("display-status"),
@@ -108,17 +121,37 @@
         return fallback || key;
     }
 
-    function logStatus(app, message, isError) {
+    function applyLogFilter(app) {
+        if (!app.elements.selectLog || !app.elements.statusMessages) {
+            return;
+        }
+
+        const selected = app.elements.selectLog.value || "all";
+        Array.prototype.forEach.call(app.elements.statusMessages.children, function (entry) {
+            const level = entry.dataset.level || "info";
+            entry.hidden = selected !== "all" && level !== selected;
+        });
+    }
+
+    function logStatus(app, message, isError, level) {
         const logEntry = document.createElement("p");
         logEntry.textContent = message;
-        if (isError) {
+        const logLevel = level || (isError ? "error" : "info");
+        logEntry.dataset.level = logLevel;
+        logEntry.classList.add("log-" + logLevel);
+        if (logLevel === "error") {
             logEntry.style.color = "red";
         }
 
         app.elements.statusMessages.appendChild(logEntry);
+        applyLogFilter(app);
         app.elements.statusMessages.scrollTop = app.elements.statusMessages.scrollHeight;
         while (app.elements.statusMessages.children.length > 20) {
             app.elements.statusMessages.removeChild(app.elements.statusMessages.firstChild);
+        }
+
+        if (typeof window.showToast === "function" && isError) {
+            window.showToast(message, "error", 6000);
         }
     }
 
@@ -199,7 +232,7 @@
         ws.onmessage = function (event) {
             const data = JSON.parse(event.data);
             if (data.type === "log") {
-                app.logStatus(data.message);
+                app.logStatus(data.message, data.level === "error", data.level);
             } else if (data.type === "position") {
                 app.updateDeviceFill(data.id, data.position);
             } else if (data.type === "init") {
@@ -233,8 +266,33 @@
         if (app.elements.displayEnabledInput) {
             app.elements.displayEnabledInput.addEventListener("change", app.updateDisplayConfig);
         }
+        if (app.elements.selectLog) {
+            app.elements.selectLog.addEventListener("change", function () {
+                applyLogFilter(app);
+            });
+        }
+        if (app.elements.settingsTabs) {
+            app.elements.settingsTabs.forEach(function (tab) {
+                tab.addEventListener("click", function () {
+                    app.scrollToSettingsPanel(tab.dataset.settingsTab);
+                });
+            });
+        }
+        if (app.elements.settingsRestartButton) {
+            app.elements.settingsRestartButton.addEventListener("click", app.restartDevice);
+        }
+        if (app.elements.settingsCloseButton) {
+            app.elements.settingsCloseButton.addEventListener("click", function () {
+                if (window.showPage) {
+                    window.showPage("devices");
+                }
+            });
+        }
         if (app.elements.firmwareUploadButton) {
             app.elements.firmwareUploadButton.addEventListener("click", app.uploadFirmware);
+        }
+        if (app.elements.githubUpdateButton) {
+            app.elements.githubUpdateButton.addEventListener("click", app.checkGithubUpdate);
         }
         if (app.elements.filesystemUploadButton) {
             app.elements.filesystemUploadButton.addEventListener("click", app.uploadFilesystem);
@@ -247,16 +305,22 @@
         }
         if (app.elements.downloadDevicesButton) {
             app.elements.downloadDevicesButton.addEventListener("click", function () {
-                window.MiOpenApi.downloadFile("/api/download/devices", "1W.json").catch(function (error) {
-                    app.logStatus("Error downloading file: " + error.message, true);
-                });
+                const message = "Devices download started.";
+                if (typeof window.showToast === "function") window.showToast(message, "info");
+                window.MiOpenApi.downloadFile("/api/download/devices", "1W.json")
+                    .catch(function (error) {
+                        app.logStatus("Error downloading file: " + error.message, true);
+                    });
             });
         }
         if (app.elements.downloadRemotesButton) {
             app.elements.downloadRemotesButton.addEventListener("click", function () {
-                window.MiOpenApi.downloadFile("/api/download/remotes", "RemoteMap.json").catch(function (error) {
-                    app.logStatus("Error downloading file: " + error.message, true);
-                });
+                const message = "Remotes download started.";
+                if (typeof window.showToast === "function") window.showToast(message, "info");
+                window.MiOpenApi.downloadFile("/api/download/remotes", "RemoteMap.json")
+                    .catch(function (error) {
+                        app.logStatus("Error downloading file: " + error.message, true);
+                    });
             });
         }
         if (app.elements.addPopupButton) {
@@ -273,8 +337,8 @@
         const app = {
             elements: createElements(),
             i18nText: i18nText,
-            logStatus: function (message, isError) {
-                logStatus(app, message, isError);
+            logStatus: function (message, isError, level) {
+                logStatus(app, message, isError, level);
             },
             state: {
                 devicesCache: [],
@@ -303,6 +367,7 @@
         app.logStatus("Loading devices...");
         app.loadMqttConfig();
         app.loadDisplayConfig();
+        app.loadFirmwareInfo();
         app.fetchAndDisplayDevices();
         app.fetchAndDisplayRemotes();
         app.loadLastAddress();
