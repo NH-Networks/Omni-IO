@@ -68,3 +68,43 @@ jobs:
         with:
           name: ${{ matrix.env }}-${{ github.ref_name }}-${{ github.sha }}
           path: artifacts/
+
+  release:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Create release notes
+        run: |
+          cat > release-notes.md <<EOF
+          Automated branch build for \`${{ github.ref_name }}\`.
+
+          Commit: \`${{ github.sha }}\`
+
+          Included files:
+          - Firmware binaries
+          - Filesystem binaries
+          - Build info JSON per board
+          EOF
+
+      - name: Publish branch release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ github.ref_name }}-latest
+          commit: ${{ github.sha }}
+          name: ${{ github.ref_name }} latest build
+          bodyFile: release-notes.md
+          artifacts: release-artifacts/*
+          allowUpdates: true
+          removeArtifacts: true
+          replacesArtifacts: true
+          artifactErrorsFailBuild: true
+          prerelease: ${{ github.ref_name != 'master' }}
