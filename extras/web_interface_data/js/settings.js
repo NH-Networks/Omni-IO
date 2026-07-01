@@ -78,6 +78,20 @@
             normalizedSha.indexOf(normalizedVersion.substring(0, 7)) === 0;
     }
 
+    function resolveGithubBranch(branch, fallback) {
+        const value = String(branch || "").trim();
+        if (value.toLowerCase() === "beta") {
+            return "Beta";
+        }
+        if (value === "main") {
+            return "master";
+        }
+        if (value === "master" || value === "dev-main" || value === "Beta") {
+            return value;
+        }
+        return fallback || "Beta";
+    }
+
     async function checkGithubUpdate(app) {
         const repo = "djbenbe/miopen.io";
         if (app.elements.githubUpdateButton) {
@@ -95,7 +109,9 @@
             const selectedBranch = app.elements.githubUpdateBranchInput
                 ? app.elements.githubUpdateBranchInput.value
                 : "auto";
-            const branch = selectedBranch === "auto" ? firmwareBranch : selectedBranch;
+            const branch = selectedBranch === "auto"
+                ? resolveGithubBranch(firmwareBranch, "Beta")
+                : resolveGithubBranch(selectedBranch, "Beta");
             const githubResponse = await fetch("https://api.github.com/repos/" + repo + "/commits/" + branch, {
                 cache: "no-store",
                 headers: { "Accept": "application/vnd.github+json" }
@@ -159,9 +175,9 @@
             const info = await window.MiOpenApi.requestJson("/api/info");
             const branch = info.branch || "";
             const hasBranchOption = Array.prototype.some.call(app.elements.githubUpdateBranchInput.options, function (option) {
-                return option.value === branch;
+                return option.value === resolveGithubBranch(branch, "");
             });
-            app.elements.githubUpdateBranchInput.value = hasBranchOption ? branch : "auto";
+            app.elements.githubUpdateBranchInput.value = hasBranchOption ? resolveGithubBranch(branch, "") : "auto";
         } catch (error) {
             console.error("Error fetching firmware info", error);
         }
