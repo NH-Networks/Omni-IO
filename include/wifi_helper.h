@@ -19,7 +19,6 @@
 
 #include <interact.h>
 #include <WiFi.h>
-#include <WiFiManager.h>
 #include <atomic>
 
 extern struct WiFiStatus {

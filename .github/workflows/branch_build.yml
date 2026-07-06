@@ -1,0 +1,70 @@
+name: Branch Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - dev-main
+      - Beta
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env:
+          - LilyGoTBeamV12ESP32
+          - LilyGoLoraESP32
+          - LilyGoT3S3
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            .pio
+          key: ${{ runner.os }}-pio-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-${{ matrix.env }}-
+            ${{ runner.os }}-pio-
+
+      - name: Install PlatformIO
+        run: pip install -U platformio
+
+      - name: Build firmware
+        run: pio run -e ${{ matrix.env }}
+
+      - name: Build filesystem
+        run: pio run -e ${{ matrix.env }} -t buildfs
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p artifacts
+          cp .pio/build/${{ matrix.env }}/firmware.bin artifacts/${{ matrix.env }}_${{ github.ref_name }}_${{ github.sha }}_firmware.bin
+          cp .pio/build/${{ matrix.env }}/littlefs.bin artifacts/${{ matrix.env }}_${{ github.ref_name }}_${{ github.sha }}_filesystem.bin
+          cat > artifacts/${{ matrix.env }}_${{ github.ref_name }}_${{ github.sha }}_info.json <<EOF
+          {
+            "branch": "${{ github.ref_name }}",
+            "commit": "${{ github.sha }}",
+            "environment": "${{ matrix.env }}"
+          }
+          EOF
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.env }}-${{ github.ref_name }}-${{ github.sha }}
+          path: artifacts/

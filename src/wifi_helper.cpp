@@ -17,6 +17,7 @@
 #include <wifi_helper.h>
 #include <oled_display.h>
 #include <user_config.h>
+#include <log_buffer.h>
 #if defined(MQTT)
 #include <mqtt_handler.h>
 #endif
@@ -32,6 +33,9 @@ const long PORTAL_TIMEOUT = 300000; // 5 minuten = 300.000 ms
 const uint32_t WIFI_NOTIFY_GOT_IP = BIT0;
 const uint32_t WIFI_NOTIFY_DISCONNECTED = BIT1;
 const uint32_t WIFI_NOTIFY_RECONNECT = BIT2;
+static constexpr uint32_t WIFI_RECONNECT_INTERVAL_MS = 10000;
+static constexpr uint32_t WIFI_STACK_RESET_AFTER_MS = 120000;
+static constexpr uint32_t WIFI_RESTART_AFTER_MS = 1800000;
 
 // below variables are thread safe because of the use of a single task that reads/modifies them (except for wifiStatus, but that one has atomic fields)
 TimersUS::TickerUsESP32 wifiReconnectTimer {};
@@ -41,6 +45,9 @@ WiFiStatus wifiStatus = { ConnState::Disconnected, 0, 0 };
 TaskHandle_t wifiWorkerTaskHandle = NULL;
 bool mdnsStarted = false;
 bool webServerStarted = false;
+static uint32_t s_wifiDisconnectedSinceMs = 0;
+static uint32_t s_lastWiFiReconnectAttemptMs = 0;
+static uint32_t s_lastWiFiStackResetMs = 0;
 
 // Replicate WiFiManager::getRSSIasQuality() without constructing a WiFiManager object.
 static int rssiToQuality(int rssi) {
@@ -87,6 +94,9 @@ static void handleWifiConnected() {
         wifiStatus.connectionStatus = ConnState::Connected;
         wifiStatus.rssi = WiFi.RSSI();
         wifiStatus.signalStrengthPercent = rssiToQuality(wifiStatus.rssi);
+        s_wifiDisconnectedSinceMs = 0;
+        s_lastWiFiReconnectAttemptMs = 0;
+        s_lastWiFiStackResetMs = 0;
 
         wifiReconnectTimer.detach();
         rssiTimer.attach(5, rssiTimerCb);
@@ -115,14 +125,21 @@ static void configureWifiDisconnected() {
     wifiStatus.connectionStatus = ConnState::Disconnected;
     wifiStatus.signalStrengthPercent = 0;
     wifiStatus.rssi = 0;
+    const uint32_t now = millis();
+    if (s_wifiDisconnectedSinceMs == 0) {
+        s_wifiDisconnectedSinceMs = now;
+    }
     rssiTimer.detach();
     wifiReconnectTimer.attach(10, wifiReconnectTimerCb);
+    if (mdnsStarted) {
+        MDNS.end();
+    }
     mdnsStarted = false;
     updateDisplayStatus();
 }
 
 static void handleWifiDisconnected() {
-    if (wifiStatus.connectionStatus == ConnState::Connected) {
+    if (wifiStatus.connectionStatus == ConnState::Connected || s_wifiDisconnectedSinceMs == 0) {
         configureWifiDisconnected();
     }
 }
@@ -157,6 +174,57 @@ static void triggerWiFiReconnect() {
         applyAdvancedWiFiSettings();
         WiFi.mode(WIFI_STA);
         WiFi.begin();
+        s_lastWiFiReconnectAttemptMs = millis();
+    }
+}
+
+static void resetWiFiStack() {
+    Serial.println("WiFi: Resetting WiFi stack after prolonged disconnect...");
+    addLogMessage("WiFi: resetting WiFi stack");
+    WiFi.disconnect(false, false);
+    vTaskDelay(pdMS_TO_TICKS(250));
+    WiFi.mode(WIFI_OFF);
+    vTaskDelay(pdMS_TO_TICKS(500));
+    WiFi.mode(WIFI_STA);
+    WiFi.setHostname("MiOpenIO");
+    applyAdvancedWiFiSettings();
+    WiFi.begin();
+    s_lastWiFiStackResetMs = millis();
+    s_lastWiFiReconnectAttemptMs = s_lastWiFiStackResetMs;
+}
+
+static void maintainWiFiConnection() {
+    const uint32_t now = millis();
+
+    if (WiFi.status() == WL_CONNECTED) {
+        if (wifiStatus.connectionStatus != ConnState::Connected) {
+            handleWifiConnected();
+        } else {
+            wifiStatus.rssi = WiFi.RSSI();
+            wifiStatus.signalStrengthPercent = rssiToQuality(wifiStatus.rssi);
+        }
+        return;
+    }
+
+    handleWifiDisconnected();
+
+    if (s_wifiDisconnectedSinceMs == 0) {
+        s_wifiDisconnectedSinceMs = now;
+    }
+
+    if (static_cast<int32_t>(now - s_lastWiFiReconnectAttemptMs) >= static_cast<int32_t>(WIFI_RECONNECT_INTERVAL_MS)) {
+        triggerWiFiReconnect();
+    }
+
+    if (static_cast<int32_t>(now - s_wifiDisconnectedSinceMs) >= static_cast<int32_t>(WIFI_STACK_RESET_AFTER_MS) &&
+        static_cast<int32_t>(now - s_lastWiFiStackResetMs) >= static_cast<int32_t>(WIFI_STACK_RESET_AFTER_MS)) {
+        resetWiFiStack();
+    }
+
+    if (static_cast<int32_t>(now - s_wifiDisconnectedSinceMs) >= static_cast<int32_t>(WIFI_RESTART_AFTER_MS)) {
+        Serial.println("WiFi: disconnected too long, restarting device");
+        addLogMessage("WiFi: disconnected too long, restarting device");
+        esp_restart();
     }
 }
 
@@ -249,7 +317,8 @@ static void wifiWorker(void * pvParameters) {
 
     uint32_t events = 0;
     while (true) {
-        xTaskNotifyWait(0, UINT32_MAX, &events, portMAX_DELAY);
+        events = 0;
+        xTaskNotifyWait(0, UINT32_MAX, &events, pdMS_TO_TICKS(5000));
 
         if ((events & WIFI_NOTIFY_DISCONNECTED) != 0) {
             handleWifiDisconnected();
@@ -263,6 +332,8 @@ static void wifiWorker(void * pvParameters) {
             wifiStatus.connectionStatus != ConnState::Connected) {
             handleWifiConnected();
         }
+
+        maintainWiFiConnection();
     }
 }
 

@@ -1,4 +1,4 @@
-#include <web_server_handler.h>
+﻿#include <web_server_handler.h>
 
 #if defined(WEBSERVER)
 #include "ArduinoJson.h"       // For creating JSON responses
@@ -12,6 +12,7 @@
 #include <LittleFS.h>
 #include <Update.h>
 #include <cstdlib>
+#include <cctype>
 #include <interact.h>
 #include <iohcCryptoHelpers.h>
 #include <iohcRemote1W.h>
@@ -21,8 +22,9 @@
 #include <mqtt_handler.h>
 #include <nvs_helpers.h>
 #include <oled_display.h>
-#if defined(SYSLOG)
 #include <WiFi.h>
+#include <wifi_helper.h>
+#if defined(SYSLOG)
 #include <syslog_helper.h>
 #endif
 #include <tokens.h>
@@ -522,6 +524,17 @@ void handleApiInfo(AsyncWebServerRequest *request, JsonObject &root) {
 #else
   root["version"] = "dev";
 #endif
+  root["uptimeMs"] = millis();
+  root["freeHeap"] = ESP.getFreeHeap();
+  root["wifiConnected"] = WiFi.status() == WL_CONNECTED;
+  root["wifiRssi"] = wifiStatus.rssi.load();
+  root["wifiQuality"] = wifiStatus.signalStrengthPercent.load();
+  root["ip"] = WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : "";
+#if defined(MQTT)
+  root["mqttConnected"] = mqttClient.connected();
+  root["mqttState"] = mqttStatus == ConnState::Connected ? "connected" :
+                      (mqttStatus == ConnState::Connecting ? "connecting" : "disconnected");
+#endif
 }
 
 void handleApiLogs(AsyncWebServerRequest *request, JsonArray &root) {
@@ -698,6 +711,43 @@ void handleApiSyslogTest(AsyncWebServerRequest *request, JsonObject &doc, JsonOb
 }
 #endif
 
+static String normaliseIoSystemKey(const String &input) {
+  String key;
+  key.reserve(32);
+  for (size_t i = 0; i < input.length(); ++i) {
+    char c = input.charAt(i);
+    if (isxdigit(static_cast<unsigned char>(c))) {
+      key += static_cast<char>(tolower(static_cast<unsigned char>(c)));
+    }
+  }
+  return key;
+}
+
+void handleApiIoKeyGet(AsyncWebServerRequest *request, JsonObject &root) {
+  std::string key;
+  if (nvs_read_string(NVS_KEY_2W_SYSTEM, key) && key.length() == 32) {
+    root["configured"] = true;
+    root["key"] = key.c_str();
+  } else {
+    root["configured"] = false;
+    root["key"] = "";
+  }
+}
+
+void handleApiIoKeySet(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
+  String key = normaliseIoSystemKey(doc["key"] | "");
+  if (!key.isEmpty() && key.length() != 32) {
+    request->send(400, "application/json",
+                  "{\"success\":false,\"message\":\"IO system key must be 32 hexadecimal characters\"}");
+    return;
+  }
+
+  nvs_write_string(NVS_KEY_2W_SYSTEM, std::string(key.c_str()));
+  root["success"] = true;
+  root["message"] = key.isEmpty() ? "IO system key cleared" : "IO system key saved";
+  root["configured"] = !key.isEmpty();
+  root["key"] = key.c_str();
+}
 #if defined(MQTT)
 void handleApiMqttGet(AsyncWebServerRequest *request, JsonObject &root) {
   root["server"] = mqtt_server.c_str();
@@ -888,6 +938,7 @@ void setupWebServer() {
   server.on("/api/logs", HTTP_GET, jsonGet(handleApiLogs));
   server.on("/api/lastaddr", HTTP_GET, jsonGet(handleApiLastAddr));
   server.on("/api/2w/status", HTTP_GET, jsonGet(handleApiTwoWStatus));
+  server.on("/api/io-key", HTTP_GET, jsonGet(handleApiIoKeyGet));
 #if defined(SSD1306_DISPLAY)
   server.on("/api/display", HTTP_GET, jsonGet(handleApiDisplayGet));
 #endif
@@ -899,6 +950,7 @@ void setupWebServer() {
 #endif
   server.on("/api/command", HTTP_POST, jsonPost(handleApiCommand));
   server.on("/api/action", HTTP_POST, jsonPost(handleApiAction));
+  server.on("/api/io-key", HTTP_POST, jsonPost(handleApiIoKeySet));
 #if defined(SSD1306_DISPLAY)
   server.on("/api/display", HTTP_POST, jsonPost(handleApiDisplaySet));
 #endif
@@ -956,3 +1008,7 @@ void loopWebServer() {
 }
 
 #endif // defined(WEBSERVER)
+
+
+
+

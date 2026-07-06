@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
     function setSettingsStatus(app, message, isError) {
         if (!app.elements.settingsStatus) {
             return;
@@ -11,6 +11,9 @@
         }
         app.elements.settingsStatus.hidden = false;
         app.elements.settingsStatus.classList.toggle("error", !!isError);
+        if (typeof window.showToast === "function") {
+            window.showToast(message, isError);
+        }
     }
 
     function hideSettingsStatus(app) {
@@ -28,6 +31,9 @@
 
         app.elements.displayStatus.textContent = message;
         app.elements.displayStatus.classList.toggle("error", !!isError);
+        if (isError && typeof window.showToast === "function") {
+            window.showToast(message, true);
+        }
     }
 
     async function loadLastAddress(app) {
@@ -226,7 +232,7 @@
         try {
             const result = await window.MiOpenApi.postJson("/api/syslog/test", {});
             if (result.success) {
-                app.logStatus(app.i18nText("log.syslog_test_sent", "Test message sent — check your syslog server."));
+                app.logStatus(app.i18nText("log.syslog_test_sent", "Test message sent â€” check your syslog server."));
             } else {
                 app.logStatus(app.i18nText("log.syslog_test_failed", "Test failed: ") + (result.message || ""), true);
             }
@@ -239,6 +245,70 @@
         }
     }
 
+    function normaliseIoKey(value) {
+        return (value || "").replace(/[^0-9a-fA-F]/g, "").toLowerCase();
+    }
+
+    function setIoKeyStatus(app, message, isError) {
+        if (app.elements.ioKeyStatus) {
+            app.elements.ioKeyStatus.textContent = message;
+            app.elements.ioKeyStatus.classList.toggle("error", !!isError);
+        }
+    }
+
+    async function loadIoSystemKey(app) {
+        if (!app.elements.ioSystemKeyInput) {
+            return;
+        }
+        try {
+            const config = await window.MiOpenApi.requestJson("/api/io-key");
+            app.elements.ioSystemKeyInput.value = config.key || "";
+            setIoKeyStatus(
+                app,
+                config.configured
+                    ? app.i18nText("status.io_key_loaded", "IO system key is configured")
+                    : app.i18nText("status.io_key_empty", "No IO system key configured")
+            );
+        } catch (error) {
+            console.error("Error fetching IO system key", error);
+            setIoKeyStatus(app, app.i18nText("status.io_key_load_error", "Could not load IO system key"), true);
+        }
+    }
+
+    async function saveIoSystemKey(app) {
+        if (!app.elements.ioSystemKeyInput) {
+            return;
+        }
+        const key = normaliseIoKey(app.elements.ioSystemKeyInput.value);
+        if (key.length !== 32) {
+            setIoKeyStatus(app, app.i18nText("status.io_key_invalid", "Use exactly 32 hexadecimal characters"), true);
+            return;
+        }
+        try {
+            const result = await window.MiOpenApi.postJson("/api/io-key", { key: key });
+            app.elements.ioSystemKeyInput.value = result.key || key;
+            setSettingsStatus(app, app.i18nText("status.io_key_saved", "IO system key saved"));
+            setIoKeyStatus(app, app.i18nText("status.io_key_loaded", "IO system key is configured"));
+        } catch (error) {
+            console.error("Error saving IO system key", error);
+            setIoKeyStatus(app, error.message || app.i18nText("status.io_key_save_error", "Saving IO system key failed"), true);
+        }
+    }
+
+    async function clearIoSystemKey(app) {
+        if (!app.elements.ioSystemKeyInput) {
+            return;
+        }
+        try {
+            await window.MiOpenApi.postJson("/api/io-key", { key: "" });
+            app.elements.ioSystemKeyInput.value = "";
+            setSettingsStatus(app, app.i18nText("status.io_key_cleared", "IO system key cleared"));
+            setIoKeyStatus(app, app.i18nText("status.io_key_empty", "No IO system key configured"));
+        } catch (error) {
+            console.error("Error clearing IO system key", error);
+            setIoKeyStatus(app, error.message || app.i18nText("status.io_key_save_error", "Saving IO system key failed"), true);
+        }
+    }
     async function uploadSelectedFile(app, input, url, missingMessage, successMessage, refreshFn) {
         const file = input.files[0];
         if (!file) {
@@ -257,7 +327,59 @@
         }
     }
 
+    function initSettingsTabs() {
+        const tabs = Array.from(document.querySelectorAll("[data-settings-tab]"));
+        const panels = Array.from(document.querySelectorAll("[data-settings-panel]"));
+
+        function activate(name) {
+            tabs.forEach(function (tab) {
+                tab.classList.toggle("active", tab.dataset.settingsTab === name);
+            });
+            panels.forEach(function (panel) {
+                const isActive = panel.dataset.settingsPanel === name;
+                panel.classList.toggle("active", isActive);
+                panel.hidden = !isActive;
+            });
+        }
+
+        tabs.forEach(function (tab) {
+            tab.addEventListener("click", function () {
+                activate(tab.dataset.settingsTab);
+            });
+        });
+
+        const activeTab = tabs.find(function (tab) {
+            return tab.classList.contains("active");
+        });
+        activate(activeTab ? activeTab.dataset.settingsTab : "integration");
+    }
+
+    function initSettingsActions(app) {
+        const closeButton = document.getElementById("settings-close");
+        if (closeButton) {
+            closeButton.addEventListener("click", function () {
+                if (typeof window.showPage === "function") {
+                    window.showPage("devices");
+                }
+            });
+        }
+
+        const restartButton = document.getElementById("settings-restart");
+        if (restartButton) {
+            restartButton.addEventListener("click", function () {
+                setSettingsStatus(
+                    app,
+                    app.i18nText("status.restart_unavailable", "Restart is not available from this firmware build"),
+                    true
+                );
+            });
+        }
+    }
+
     function init(app) {
+        initSettingsTabs();
+        initSettingsActions(app);
+
         app.loadLastAddress = function () {
             return loadLastAddress(app);
         };
@@ -284,6 +406,15 @@
         };
         app.sendSyslogTest = function () {
             return sendSyslogTest(app);
+        };
+        app.loadIoSystemKey = function () {
+            return loadIoSystemKey(app);
+        };
+        app.saveIoSystemKey = function () {
+            return saveIoSystemKey(app);
+        };
+        app.clearIoSystemKey = function () {
+            return clearIoSystemKey(app);
         };
         app.uploadFirmware = function () {
             return uploadSelectedFile(
@@ -334,3 +465,5 @@
         init: init
     };
 })();
+
+

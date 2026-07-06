@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
     function ensureApiModule() {
         if (window.MiOpenApi) {
             return;
@@ -102,6 +102,10 @@
             syslogTagInput: document.getElementById("syslog-tag"),
             syslogUpdateButton: document.getElementById("syslog-update"),
             syslogTestButton: document.getElementById("syslog-test"),
+            ioSystemKeyInput: document.getElementById("io-system-key"),
+            ioKeyStatus: document.getElementById("io-key-status"),
+            ioKeySaveButton: document.getElementById("io-key-save"),
+            ioKeyClearButton: document.getElementById("io-key-clear"),
             twowStatus: document.getElementById("twow-status"),
             twowLastTx: document.getElementById("twow-last-tx"),
             twowLastResult: document.getElementById("twow-last-result"),
@@ -294,6 +298,12 @@
         if (app.elements.syslogTestButton) {
             app.elements.syslogTestButton.addEventListener("click", app.sendSyslogTest);
         }
+        if (app.elements.ioKeySaveButton) {
+            app.elements.ioKeySaveButton.addEventListener("click", app.saveIoSystemKey);
+        }
+        if (app.elements.ioKeyClearButton) {
+            app.elements.ioKeyClearButton.addEventListener("click", app.clearIoSystemKey);
+        }
         if (app.elements.settingsStatusCloseButton) {
             app.elements.settingsStatusCloseButton.addEventListener("click", function () {
                 app.hideSettingsStatus();
@@ -378,8 +388,11 @@
         app.loadMqttConfig();
         app.loadDisplayConfig();
         app.loadSyslogConfig();
+        app.loadIoSystemKey();
         app.fetchAndDisplayDevices();
         app.fetchAndDisplayRemotes();
         app.loadLastAddress();
     });
 })();
+
+

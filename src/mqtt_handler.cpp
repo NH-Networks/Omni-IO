@@ -35,6 +35,7 @@ static std::atomic<bool> s_heartbeatEnabled{false};
 static std::atomic<uint32_t> s_nextHeartbeatAtMs{0};
 static uint32_t s_lastMqttConnectAttemptMs = 0;
 static constexpr uint32_t MQTT_RECONNECT_INTERVAL_MS = 5000;
+static constexpr uint32_t MQTT_CONNECT_TIMEOUT_MS = 15000;
 
 static void mqttSchedulerTask(void*);
 static void publishIohcFrameDiscovery();
@@ -449,6 +450,15 @@ static void mqttSchedulerTask(void*) {
         vTaskDelay(pdMS_TO_TICKS(1000));
 
         const uint32_t now = millis();
+
+        if (mqttStatus == ConnState::Connecting &&
+            static_cast<int32_t>(now - s_lastMqttConnectAttemptMs) >= static_cast<int32_t>(MQTT_CONNECT_TIMEOUT_MS)) {
+            Serial.println("MQTT connect timeout, retrying later");
+            addLogMessage("MQTT connect timeout, retrying later");
+            mqttClient.disconnect();
+            mqttStatus = ConnState::Disconnected;
+            updateDisplayStatus();
+        }
 
         if (mqttStatus == ConnState::Disconnected && WiFi.status() == WL_CONNECTED &&
             static_cast<int32_t>(now - s_lastMqttConnectAttemptMs) >= static_cast<int32_t>(MQTT_RECONNECT_INTERVAL_MS)) {
