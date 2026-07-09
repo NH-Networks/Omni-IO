@@ -16,7 +16,12 @@
             requestOptions.cache = "no-store";
         }
 
-        const response = await fetch(requestUrl, requestOptions);
+        let response;
+        try {
+            response = await fetch(requestUrl, requestOptions);
+        } catch (error) {
+            throw new Error("ESP niet bereikbaar. Controleer of het toestel online is of net herstart.");
+        }
         const data = await ensureJson(response);
         if (!response.ok) {
             throw new Error(data.message || ("HTTP error " + response.status));

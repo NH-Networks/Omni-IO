@@ -16,6 +16,7 @@ jobs:
       matrix:
         env:
           - HeltecLoraV2ESP32
+          - LilyGoTBeamV12ESP32
           - LilyGoLoraESP32
           - LilyGoT3S3
 
@@ -85,9 +86,9 @@ jobs:
       - name: Create release notes
         run: |
           cat > release-notes.md <<EOF
-          Automated branch build for \`${{ github.ref_name }}\`.
+          Automated branch build for `${{ github.ref_name }}`.
 
-          Commit: \`${{ github.sha }}\`
+          Commit: `${{ github.sha }}`
 
           Included files:
           - Firmware binaries

@@ -73,6 +73,9 @@
             commandDeviceSelect: document.querySelector("#help-page #device-select"),
             commandInput: document.getElementById("command-input"),
             deviceList: document.getElementById("device-list"),
+            backupFileInput: document.getElementById("backup-file"),
+            backupUploadButton: document.getElementById("upload-backup"),
+            downloadBackupButton: document.getElementById("download-backup"),
             devicesFileInput: document.getElementById("devices-file"),
             devicesUploadButton: document.getElementById("upload-devices"),
             downloadDevicesButton: document.getElementById("download-devices"),
@@ -81,9 +84,6 @@
             filesystemUploadButton: document.getElementById("upload-filesystem"),
             firmwareFileInput: document.getElementById("firmware-file"),
             firmwareUploadButton: document.getElementById("upload-firmware"),
-            githubUpdateButton: document.getElementById("github-update-check"),
-            githubUpdateBranchInput: document.getElementById("github-update-branch"),
-            githubUpdateStatus: document.getElementById("github-update-status"),
             helpDeviceButton: document.getElementById("help-device"),
             helpRemoteButton: document.getElementById("help-remote"),
             lastAddrInput: document.getElementById("last-address"),
@@ -93,14 +93,37 @@
             mqttServerInput: document.getElementById("mqtt-server"),
             mqttUpdateButton: document.getElementById("mqtt-update"),
             mqttUserInput: document.getElementById("mqtt-user"),
-            settingsTabs: document.querySelectorAll("[data-settings-tab]"),
-            settingsPanels: document.querySelectorAll("[data-settings-panel]"),
-            settingsRestartButton: document.getElementById("settings-restart"),
-            settingsCloseButton: document.getElementById("settings-close"),
-            selectLog: document.getElementById("select-log"),
+            wifiSsidInput: document.getElementById("wifi-ssid"),
+            wifiPasswordInput: document.getElementById("wifi-password"),
+            wifiScanButton: document.getElementById("wifi-scan-btn"),
+            wifiScanResults: document.getElementById("wifi-scan-results"),
+            wifiConfigSaveButton: document.getElementById("wifi-config-save"),
+            wifiConfigStatus: document.getElementById("wifi-config-status"),
+            networkHostnameInput: document.getElementById("net-hostname"),
+            networkDhcpInput: document.getElementById("net-dhcp"),
+            networkIpInput: document.getElementById("net-ip"),
+            networkMaskInput: document.getElementById("net-mask"),
+            networkGatewayInput: document.getElementById("net-gateway"),
+            networkDns1Input: document.getElementById("net-dns1"),
+            networkDns2Input: document.getElementById("net-dns2"),
+            networkSntpInput: document.getElementById("net-sntp"),
+            networkStatus: document.getElementById("network-status"),
+            networkSaveButton: document.getElementById("network-save"),
+            fallbackEnabledInput: document.getElementById("fallback-enabled"),
+            fallbackRetriesBootInput: document.getElementById("fallback-retries-boot"),
+            fallbackRetriesRunningInput: document.getElementById("fallback-retries-running"),
+            fallbackTimeoutInput: document.getElementById("fallback-timeout"),
+            fallbackStatus: document.getElementById("fallback-status"),
+            fallbackSaveButton: document.getElementById("fallback-save"),
             displayEnabledInput: document.getElementById("display-enabled"),
             displayUpdateButton: document.getElementById("display-update"),
             displayStatus: document.getElementById("display-status"),
+            syslogEnabledInput: document.getElementById("syslog-enabled"),
+            syslogServerInput: document.getElementById("syslog-server"),
+            syslogPortInput: document.getElementById("syslog-port"),
+            syslogTagInput: document.getElementById("syslog-tag"),
+            syslogUpdateButton: document.getElementById("syslog-update"),
+            syslogTestButton: document.getElementById("syslog-test"),
             remotePopupButton: document.getElementById("remote-popup"),
             remotesFileInput: document.getElementById("remotes-file"),
             remotesUploadButton: document.getElementById("upload-remotes"),
@@ -121,37 +144,40 @@
         return fallback || key;
     }
 
-    function applyLogFilter(app) {
-        if (!app.elements.selectLog || !app.elements.statusMessages) {
+    function logStatus(app, message, isError) {
+        if (!app.elements.statusMessages || !message) {
             return;
         }
 
-        const selected = app.elements.selectLog.value || "all";
-        Array.prototype.forEach.call(app.elements.statusMessages.children, function (entry) {
-            const level = entry.dataset.level || "info";
-            entry.hidden = selected !== "all" && level !== selected;
-        });
-    }
 
-    function logStatus(app, message, isError, level) {
+
         const logEntry = document.createElement("p");
         logEntry.textContent = message;
-        const logLevel = level || (isError ? "error" : "info");
-        logEntry.dataset.level = logLevel;
-        logEntry.classList.add("log-" + logLevel);
-        if (logLevel === "error") {
+        if (isError) {
             logEntry.style.color = "red";
         }
 
         app.elements.statusMessages.appendChild(logEntry);
-        applyLogFilter(app);
         app.elements.statusMessages.scrollTop = app.elements.statusMessages.scrollHeight;
-        while (app.elements.statusMessages.children.length > 20) {
+        while (app.elements.statusMessages.children.length > 300) {
             app.elements.statusMessages.removeChild(app.elements.statusMessages.firstChild);
         }
+    }
 
-        if (typeof window.showToast === "function" && isError) {
-            window.showToast(message, "error", 6000);
+    async function loadLogBuffer(app) {
+        if (!app.elements.statusMessages || !window.MiOpenApi) {
+            return;
+        }
+        try {
+            const logs = await window.MiOpenApi.requestJson("/api/logs");
+            app.elements.statusMessages.textContent = "";
+            if (Array.isArray(logs)) {
+                logs.forEach(function (message) {
+                    logStatus(app, message);
+                });
+            }
+        } catch (error) {
+            logStatus(app, "Could not load log buffer", true);
         }
     }
 
@@ -228,13 +254,16 @@
     function initWebSocket(app) {
         const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
         const ws = new WebSocket(wsScheme + "://" + window.location.host + "/ws");
+        app.state.ws = ws;
 
         ws.onmessage = function (event) {
             const data = JSON.parse(event.data);
             if (data.type === "log") {
-                app.logStatus(data.message, data.level === "error", data.level);
+                app.logStatus(data.message);
             } else if (data.type === "position") {
                 app.updateDeviceFill(data.id, data.position);
+            } else if (data.type === "deviceaction") {
+                app.applyDeviceAction(data);
             } else if (data.type === "init") {
                 app.fetchAndDisplayDevices();
             } else if (data.type === "lastaddr") {
@@ -243,14 +272,18 @@
         };
 
         ws.onopen = function () {
-            app.logStatus("WebSocket connected");
+            app.state.wsConnected = true;
         };
 
         ws.onclose = function () {
-            app.logStatus("WebSocket disconnected", true);
+            app.state.wsConnected = false;
+            if (!app.state.wsReconnectTimer) {
+                app.state.wsReconnectTimer = setTimeout(function () {
+                    app.state.wsReconnectTimer = null;
+                    initWebSocket(app);
+                }, 2000);
+            }
         };
-
-        app.state.ws = ws;
     }
 
     function bindEvents(app) {
@@ -260,42 +293,38 @@
         if (app.elements.mqttUpdateButton) {
             app.elements.mqttUpdateButton.addEventListener("click", app.updateMqttConfig);
         }
+        if (app.elements.wifiScanButton) {
+            app.elements.wifiScanButton.addEventListener("click", app.scanWifiNetworks);
+        }
+        if (app.elements.wifiConfigSaveButton) {
+            app.elements.wifiConfigSaveButton.addEventListener("click", app.saveWifiConfig);
+        }
+        if (app.elements.networkSaveButton) {
+            app.elements.networkSaveButton.addEventListener("click", app.saveNetworkConfig);
+        }
         if (app.elements.displayUpdateButton) {
             app.elements.displayUpdateButton.addEventListener("click", app.updateDisplayConfig);
         }
-        if (app.elements.displayEnabledInput) {
-            app.elements.displayEnabledInput.addEventListener("change", app.updateDisplayConfig);
+        if (app.elements.syslogUpdateButton) {
+            app.elements.syslogUpdateButton.addEventListener("click", app.updateSyslogConfig);
         }
-        if (app.elements.selectLog) {
-            app.elements.selectLog.addEventListener("change", function () {
-                applyLogFilter(app);
-            });
+        if (app.elements.syslogTestButton) {
+            app.elements.syslogTestButton.addEventListener("click", app.sendSyslogTest);
         }
-        if (app.elements.settingsTabs) {
-            app.elements.settingsTabs.forEach(function (tab) {
-                tab.addEventListener("click", function () {
-                    app.scrollToSettingsPanel(tab.dataset.settingsTab);
-                });
-            });
+        if (app.elements.ioKeySaveButton) {
+            app.elements.ioKeySaveButton.addEventListener("click", app.saveIoSystemKey);
         }
-        if (app.elements.settingsRestartButton) {
-            app.elements.settingsRestartButton.addEventListener("click", app.restartDevice);
-        }
-        if (app.elements.settingsCloseButton) {
-            app.elements.settingsCloseButton.addEventListener("click", function () {
-                if (window.showPage) {
-                    window.showPage("devices");
-                }
-            });
+        if (app.elements.ioKeyClearButton) {
+            app.elements.ioKeyClearButton.addEventListener("click", app.clearIoSystemKey);
         }
         if (app.elements.firmwareUploadButton) {
             app.elements.firmwareUploadButton.addEventListener("click", app.uploadFirmware);
         }
-        if (app.elements.githubUpdateButton) {
-            app.elements.githubUpdateButton.addEventListener("click", app.checkGithubUpdate);
-        }
         if (app.elements.filesystemUploadButton) {
             app.elements.filesystemUploadButton.addEventListener("click", app.uploadFilesystem);
+        }
+        if (app.elements.backupUploadButton) {
+            app.elements.backupUploadButton.addEventListener("click", app.uploadBackup);
         }
         if (app.elements.devicesUploadButton) {
             app.elements.devicesUploadButton.addEventListener("click", app.uploadDevices);
@@ -303,24 +332,22 @@
         if (app.elements.remotesUploadButton) {
             app.elements.remotesUploadButton.addEventListener("click", app.uploadRemotes);
         }
+        if (app.elements.downloadBackupButton) {
+            app.elements.downloadBackupButton.addEventListener("click", function () {
+                window.MiOpenApi.downloadFile("/api/download/backup", "miopen-backup.json").catch(function (error) {
+                });
+            });
+        }
         if (app.elements.downloadDevicesButton) {
             app.elements.downloadDevicesButton.addEventListener("click", function () {
-                const message = "Devices download started.";
-                if (typeof window.showToast === "function") window.showToast(message, "info");
-                window.MiOpenApi.downloadFile("/api/download/devices", "1W.json")
-                    .catch(function (error) {
-                        app.logStatus("Error downloading file: " + error.message, true);
-                    });
+                window.MiOpenApi.downloadFile("/api/download/devices", "1W.json").catch(function (error) {
+                });
             });
         }
         if (app.elements.downloadRemotesButton) {
             app.elements.downloadRemotesButton.addEventListener("click", function () {
-                const message = "Remotes download started.";
-                if (typeof window.showToast === "function") window.showToast(message, "info");
-                window.MiOpenApi.downloadFile("/api/download/remotes", "RemoteMap.json")
-                    .catch(function (error) {
-                        app.logStatus("Error downloading file: " + error.message, true);
-                    });
+                window.MiOpenApi.downloadFile("/api/download/remotes", "RemoteMap.json").catch(function (error) {
+                });
             });
         }
         if (app.elements.addPopupButton) {
@@ -337,8 +364,11 @@
         const app = {
             elements: createElements(),
             i18nText: i18nText,
-            logStatus: function (message, isError, level) {
-                logStatus(app, message, isError, level);
+            logStatus: function (message, isError) {
+                logStatus(app, message, isError);
+            },
+            loadLogBuffer: function () {
+                return loadLogBuffer(app);
             },
             state: {
                 devicesCache: [],
@@ -363,13 +393,23 @@
             app.fetchAndDisplayRemotes();
         });
 
-        app.logStatus("System started");
-        app.logStatus("Loading devices...");
+        window.MiOpenApi.requestJson("/api/info").then(function (info) {
+            const el = document.getElementById("firmware-version");
+            if (el && info.version) {
+                el.textContent = "Firmware: " + info.version;
+            }
+        }).catch(function () {});
+
+        app.loadLogBuffer();
         app.loadMqttConfig();
+        app.loadWifiConfig();
+        app.loadNetworkConfig();
+        app.loadFallbackConfig();
         app.loadDisplayConfig();
-        app.loadFirmwareInfo();
+        app.loadSyslogConfig();
         app.fetchAndDisplayDevices();
         app.fetchAndDisplayRemotes();
         app.loadLastAddress();
     });
 })();
+

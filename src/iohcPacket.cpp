@@ -25,9 +25,13 @@
 namespace IOHC {
     void IRAM_ATTR iohcPacket::decode(bool verbosity) {
 
-        if (packetStamp - relStamp > 500000L) {
+        const auto currentPacketStamp = packetStamp.load();
+        auto currentRelStamp = relStamp.load();
+
+        if (currentPacketStamp - currentRelStamp > 500000L) {
             printf("\n");
-            relStamp = packetStamp; // - this->relStamp;
+            relStamp.store(currentPacketStamp); // - this->relStamp;
+            currentRelStamp = currentPacketStamp;
             // for (uint8_t i = 0; i < 3; i++)
             //     source_originator[i] = this->payload.packet.header.source[i];
         }
@@ -65,15 +69,17 @@ else _dir[0] = ' ';
                this->payload.packet.header.target[0], this->payload.packet.header.target[1],
                this->payload.packet.header.target[2],
                this->payload.packet.header.cmd);
-        
+
         // if (verbosity) printf(" +%03.3f F%03.3f, %03.1fdBm %f %f\t", static_cast<float>(packetStamp - relStamp)/1000.0, static_cast<float>(this->frequency)/1000000.0, this->rssi, this->lna, this->afc);
         // if (verbosity) printf(" +%03.3f F%03.3f, %03.1fdBm %f\t", static_cast<float>(packetStamp - relStamp)/1000.0, static_cast<float>(this->frequency)/1000000.0, this->rssi, this->afc);
         // if (verbosity) printf(" +%03.3f\t%03.1fdBm\t", static_cast<float>(packetStamp - relStamp)/1000.0,  this->rssi);
 //        if (verbosity) printf(" +%03.3f F%03.3f\t", static_cast<float>(packetStamp - relStamp)/1000.0, static_cast<float>(this->frequency)/1000000.0);
-        if (verbosity) printf(" +%03.3f\t", static_cast<float>(packetStamp - relStamp)/1000.0);        
+        if (verbosity) printf(" +%03.3f\t", static_cast<float>(currentPacketStamp - currentRelStamp)/1000.0);
         printf(" %s ", _dir);
 
-        uint8_t dataLen = this->buffer_length - 9;
+        uint8_t dataLen = this->buffer_length >= sizeof(_header)
+                              ? this->buffer_length - sizeof(_header)
+                              : 0;
         printf(" DATA(%2.2u) ", dataLen);
 
         // 1W fields
@@ -236,7 +242,7 @@ else _dir[0] = ' ';
 
         printf("\n");
 
-        relStamp = packetStamp;
+        relStamp.store(currentPacketStamp);
     }
 
     std::string iohcPacket::decodeToString(bool verbosity) {
@@ -253,17 +259,19 @@ else _dir[0] = ' ';
         ss << "(" << std::setw(2) << std::setfill('0') << std::dec
            << (int)this->payload.packet.header.CtrlByte1.asStruct.MsgLen << ") ";
         ss << (this->payload.packet.header.CtrlByte1.asStruct.Protocol ? "1W" : "2W") << " ";
-        ss << "FROM " << std::uppercase << std::hex << std::setw(2) << std::setfill('0')
-           << (int)this->payload.packet.header.source[0]
-           << (int)this->payload.packet.header.source[1]
-           << (int)this->payload.packet.header.source[2]
+        ss << "FROM " << std::uppercase << std::hex << std::setfill('0')
+           << std::setw(2) << (int)this->payload.packet.header.source[0]
+           << std::setw(2) << (int)this->payload.packet.header.source[1]
+           << std::setw(2) << (int)this->payload.packet.header.source[2]
            << " TO "
-           << (int)this->payload.packet.header.target[0]
-           << (int)this->payload.packet.header.target[1]
-           << (int)this->payload.packet.header.target[2]
-           << " CMD " << (int)this->payload.packet.header.cmd;
+           << std::setw(2) << (int)this->payload.packet.header.target[0]
+           << std::setw(2) << (int)this->payload.packet.header.target[1]
+           << std::setw(2) << (int)this->payload.packet.header.target[2]
+           << " CMD " << std::setw(2) << (int)this->payload.packet.header.cmd;
 
-        uint8_t dataLen = this->buffer_length - 9;
+        uint8_t dataLen = this->buffer_length >= sizeof(_header)
+                              ? this->buffer_length - sizeof(_header)
+                              : 0;
         ss << " DATA(" << std::dec << (int)dataLen << ") ";
         if (dataLen)
             ss << bitrow_to_hex_string(this->payload.buffer + 9, dataLen);

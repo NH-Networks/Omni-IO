@@ -93,6 +93,11 @@ void DisplayBuffer::addLine(const std::string &leftText, const std::string &righ
     }
 }
 
+void DisplayBuffer::clear() {
+    lines.clear();
+    lines.shrink_to_fit();
+}
+
 void DisplayBuffer::purge() {
     std::vector<Line> newLines;
     for(auto &line: lines) {
@@ -102,10 +107,6 @@ void DisplayBuffer::purge() {
     }
     lines.clear();
     lines = newLines;
-}
-
-void DisplayBuffer::clear() {
-    lines.clear();
 }
 
 std::vector<std::string> DisplayBuffer::getTextToDisplay(const int width, const int height) {

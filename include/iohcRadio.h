@@ -38,10 +38,13 @@
     #include <TickerUsESP32.h>
 #endif
 
-#define SM_GRANULARITY_US               130ULL  // Ticker function frequency in uS (100 minimum) 4 x 26µs = 104
+#define SM_GRANULARITY_US              1000ULL  // Keep ESP timer load low; DIO packet/sync events are interrupt-driven
 #define SM_GRANULARITY_MS               1       // Ticker function frequency in uS
-#define SM_PREAMBLE_RECOVERY_TIMEOUT_US 1378 // 12500   // SM_GRANULARITY_US * PREAMBLE_LSB //12500   // Maximum duration in uS of Preamble before reset of receiver
-#define DEFAULT_SCAN_INTERVAL_US        13520   // Default uS between frequency changes
+#define SM_PREAMBLE_RECOVERY_TIMEOUT_US 15000   // Keep channel locked long enough for the io-homecontrol preamble
+#define DEFAULT_SCAN_INTERVAL_US        13520   // Normal 1W-stable RX dwell time
+#define TWOW_SCAN_INTERVAL_US           2700    // 2W FHSS dwell time per channel
+#define TWOW_SLOW_SCAN_INTERVAL_US      9500    // Diagnostic dwell after io-homecontrol preamble/sync timing
+#define TWOW_SCAN_WINDOW_MS             8000    // Temporary 2W listen window after 2W TX
 
 /*
     Singleton class to implement an IOHC Radio abstraction layer for controllers.
@@ -65,14 +68,18 @@ namespace IOHC {
                 ERROR        ///< Error or unknown state
             };
             void start(uint8_t num_freqs, uint32_t *scan_freqs, uint32_t scanTimeUs, IohcPacketDelegate rxCallback, IohcPacketDelegate txCallback);
+            void send(iohcPacket *packet);
             void send(std::vector<iohcPacket*>&iohcTx);
             void sendAuto(std::vector<iohcPacket*>&iohcTx); // Nieuwe versie voor AutoTxRx
+            void startTwoWScan(uint32_t windowMs = TWOW_SCAN_WINDOW_MS, uint32_t dwellUs = TWOW_SCAN_INTERVAL_US);
+            void stopTwoWScan();
             static void setRadioState(RadioState newState);
             static const char* radioStateToString(RadioState state);
             volatile static RadioState radioState;
             static void tickerCounter(iohcRadio *radio);
-            static TaskHandle_t txTaskHandle; // TX Task handle
+            static TaskHandle_t txTaskHandle;
             static volatile bool txComplete;
+            static volatile bool txBatchActive;
             //static void setPreambleLength(uint16_t preambleLen);
 
         private:
@@ -85,33 +92,39 @@ namespace IOHC {
             static iohcRadio *_iohcRadio;
             static uint8_t _flags[2];
             volatile static unsigned long _g_payload_millis;
-            
+
             volatile static bool send_lock;
 
             volatile uint32_t tickCounter = 0;
             volatile uint32_t preCounter = 0;
             volatile uint8_t txCounter = 0;
-            static void txTaskLoop(void *pvParameters);
-            static void lightTxTask(void *pvParameters);
-            //TaskHandle_t txTaskHandle = nullptr;
             static void IRAM_ATTR onTxTicker(void *arg);
 
             uint8_t num_freqs = 0;
             uint32_t *scan_freqs{};
             uint32_t scanTimeUs{};
             uint8_t currentFreqIdx = 0;
+            uint8_t configuredNumFreqs = 0;
+            uint32_t normalScanTimeUs = DEFAULT_SCAN_INTERVAL_US;
+            bool twoWScanActive = false;
+            unsigned long twoWScanUntilMs = 0;
+            bool currentBatchHas2W = false;
+            bool resumeTwoWScanAfterTx = false;
+            unsigned long resumeTwoWScanUntilMs = 0;
+            uint32_t resumeTwoWScanWindowMs = 0;
+            uint32_t resumeTwoWScanDwellUs = TWOW_SCAN_INTERVAL_US;
+            uint64_t txStartedAtUs = 0;
+            TaskHandle_t tickerTaskHandle = nullptr;
 
         #if defined(ESP8266)
             Timers::TickerUs TickTimer;
             Timers::TickerUs Sender;
-//            Timers::TickerUs FreqScanner;
         #elif defined(ESP32)
             TimersUS::TickerUsESP32 TickTimer;
             TimersUS::TickerUsESP32 Sender;
         #endif
             iohcPacket *iohc{};
-            iohcPacket *delayed{};
-            
+
             IohcPacketDelegate rxCB = nullptr;
             IohcPacketDelegate txCB = nullptr;
             std::vector<iohcPacket*> packets2send{};
@@ -119,8 +132,6 @@ namespace IOHC {
         protected:
             static void i_preamble();
             static void i_payload();
-            static void packetSender(iohcRadio *radio);
-            static void configureAutoTxRx(iohcPacket *packet); // Hulpfunctie om AutoTxRx te activeren
 
         #if defined(CC1101)
             uint8_t lenghtFrame=0;

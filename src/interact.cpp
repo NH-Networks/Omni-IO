@@ -24,11 +24,13 @@
 #include <oled_display.h>
 #include <iohcCryptoHelpers.h>
 #include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 #if defined(MQTT)
 #include <mqtt_handler.h>
 #endif
 #include <nvs_helpers.h>
+#include <log_buffer.h>
 
 ConnState mqttStatus = ConnState::Disconnected;
 
@@ -46,17 +48,88 @@ void tokenize(std::string const &str, const char delim, Tokens &out) {
 
 
 namespace Cmd {
-bool verbosity = true;
-bool pairMode = false;
-bool scanMode = false;
+std::atomic<bool> verbosity = true;
+std::atomic<bool> pairMode = false;
+std::atomic<bool> pairAltMode = false;
+std::atomic<bool> scanMode = false;
 #if defined(ESP32)
 TimersUS::TickerUsESP32 kbd_tick;
 #endif
 TimerHandle_t consoleTimer;
+static TimerHandle_t twoWPairTimer = nullptr;
+
+static void twoWPairTimeout(TimerHandle_t) {
+    pairMode = false;
+    pairAltMode = false;
+    resetTwoWPairingSession();
+}
+
+void extendTwoWPairingWindow(uint32_t windowMs) {
+    IOHC::iohcRadio::getInstance()->startTwoWScan(
+        windowMs, TWOW_SLOW_SCAN_INTERVAL_US);
+    if (!twoWPairTimer) {
+        twoWPairTimer = xTimerCreate(
+            "twoWPair", pdMS_TO_TICKS(windowMs), pdFALSE, nullptr,
+            twoWPairTimeout);
+    }
+    if (twoWPairTimer) {
+        xTimerStop(twoWPairTimer, 0);
+        xTimerChangePeriod(twoWPairTimer, pdMS_TO_TICKS(windowMs), 0);
+        xTimerStart(twoWPairTimer, 0);
+    }
+}
+
+static void startTwoWPairingWindow(uint32_t windowMs) {
+    setCrashMarker("pair2W: open pairing window");
+    pairMode = true;
+    pairAltMode = false;
+    resetTwoWPairingSession();
+    addLogMessage("2W pairing window opened");
+    setCrashMarker("pair2W: start 2W scan");
+    addLogMessage("2W pair trace: starting scan");
+    extendTwoWPairingWindow(windowMs);
+    setCrashMarker("pair2W: send discover28");
+    addLogMessage("2W pair trace: sending discover28");
+    IOHC::iohcOtherDevice2W::getInstance()->cmd(IOHC::Other2WButton::discover28, nullptr);
+}
+
+static void startTwoWPairingWindowAlt(uint32_t windowMs) {
+    setCrashMarker("pair2Walt: open pairing window");
+    pairMode = true;
+    pairAltMode = true;
+    resetTwoWPairingSession();
+    addLogMessage("2W alternate pairing window opened");
+    setCrashMarker("pair2Walt: start 2W scan");
+    addLogMessage("2W alt pair trace: starting scan");
+    extendTwoWPairingWindow(windowMs);
+
+    setCrashMarker("pair2Walt: send discover28");
+    addLogMessage("2W alt pair trace: sending discover28");
+    IOHC::iohcOtherDevice2W::getInstance()->cmd(IOHC::Other2WButton::discover28, nullptr);
+
+    vTaskDelay(pdMS_TO_TICKS(1200));
+    setCrashMarker("pair2Walt: send discover2A");
+    addLogMessage("2W alt pair trace: sending discover2A");
+    IOHC::iohcOtherDevice2W::getInstance()->cmd(IOHC::Other2WButton::discover2A, nullptr);
+}
+
+static void startTwoWPairingTask(void *param) {
+    const uint32_t windowMs = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(param));
+    vTaskDelay(pdMS_TO_TICKS(100));
+    startTwoWPairingWindow(windowMs);
+    vTaskDelete(nullptr);
+}
+
+static void startTwoWPairingAltTask(void *param) {
+    const uint32_t windowMs = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(param));
+    vTaskDelay(pdMS_TO_TICKS(100));
+    startTwoWPairingWindowAlt(windowMs);
+    vTaskDelete(nullptr);
+}
 
 static char _rxbuffer[512];
-static uint8_t _len = 0;
-static uint8_t _avail = 0;
+static uint16_t _len = 0;
+static uint16_t _avail = 0;
 /**
  * The function `createCommands()` initializes and adds various command handlers for controlling
  * different devices and functionalities.
@@ -281,7 +354,60 @@ void createCommands() {
     Cmd::addHandler((char *) "verbose", (char *) "Toggle verbose output on packets list",
                     [](Tokens *cmd)-> void { verbosity = !verbosity; });
 
-    Cmd::addHandler((char *) "pairMode", (char *) "pairMode", [](Tokens *cmd)-> void { pairMode = !pairMode; });
+    Cmd::addHandler((char *) "pairMode", (char *) "pairMode", [](Tokens *cmd)-> void {
+        pairMode = !pairMode;
+        addLogMessage(String("2W pairMode ") + (pairMode ? "enabled" : "disabled"));
+    });
+
+    Cmd::addHandler((char *) "pair2W", (char *) "Start 2W pairing window", [](Tokens *cmd)-> void {
+        setCrashMarker("command: pair2W");
+        uint32_t windowMs = 90000;
+        if (cmd && cmd->size() > 1) {
+            const uint32_t seconds = strtoul(cmd->at(1).c_str(), nullptr, 10);
+            if (seconds >= 10 && seconds <= 180) {
+                windowMs = seconds * 1000UL;
+            }
+        }
+        BaseType_t taskCreated = xTaskCreate(
+            startTwoWPairingTask,
+            "pair2W",
+            4096,
+            reinterpret_cast<void *>(static_cast<uintptr_t>(windowMs)),
+            1,
+            nullptr
+        );
+        if (taskCreated != pdPASS) {
+            addLogMessage("2W pair trace: task create failed, running inline");
+            startTwoWPairingWindow(windowMs);
+        } else {
+            addLogMessage("2W pair trace: scheduled");
+        }
+    });
+
+    Cmd::addHandler((char *) "pair2Walt", (char *) "Start alternate 2W pairing window", [](Tokens *cmd)-> void {
+        setCrashMarker("command: pair2Walt");
+        uint32_t windowMs = 90000;
+        if (cmd && cmd->size() > 1) {
+            const uint32_t seconds = strtoul(cmd->at(1).c_str(), nullptr, 10);
+            if (seconds >= 10 && seconds <= 180) {
+                windowMs = seconds * 1000UL;
+            }
+        }
+        BaseType_t taskCreated = xTaskCreate(
+            startTwoWPairingAltTask,
+            "pair2Walt",
+            4096,
+            reinterpret_cast<void *>(static_cast<uintptr_t>(windowMs)),
+            1,
+            nullptr
+        );
+        if (taskCreated != pdPASS) {
+            addLogMessage("2W alt pair trace: task create failed, running inline");
+            startTwoWPairingWindowAlt(windowMs);
+        } else {
+            addLogMessage("2W alt pair trace: scheduled");
+        }
+    });
 
     // Utils
     Cmd::addHandler((char *) "dump", (char *) "Dump Transceiver registers", [](Tokens *cmd)-> void {
@@ -289,7 +415,7 @@ void createCommands() {
 //        Serial.printf("*%d packets in memory\t", nextPacket);
 //        Serial.printf("*%d devices discovered\n\n", sysTable->size());
     });
-    /*    
+    /*
     //    Cmd::addHandler((char *)"dump2", (char *)"Dump Transceiver registers 1Col", [](Tokens*cmd)->void {Radio::dump2(); Serial.printf("*%d packets in memory\t", nextPacket); Serial.printf("*%d devices discovered\n\n", sysTable->size());});
     Cmd::addHandler((char *) "list1W", (char *) "List received packets", [](Tokens *cmd)-> void {
         for (uint8_t i = 0; i < nextPacket; i++) msgRcvd(radioPackets[i]);
@@ -308,7 +434,8 @@ void createCommands() {
     Cmd::addHandler((char *) "cat", (char *) "Print file content", [](Tokens *cmd)-> void { cat(cmd->at(1).c_str()); });
     Cmd::addHandler((char *) "rm", (char *) "Remove file", [](Tokens *cmd)-> void { rm(cmd->at(1).c_str()); });
     Cmd::addHandler((char *) "lastAddr", (char *) "Show last received address", [](Tokens *cmd)-> void {
-        Serial.println(bytesToHexString(IOHC::lastFromAddress, sizeof(IOHC::lastFromAddress)).c_str());
+        const auto _a = IOHC::lastFromAddress.load();
+        Serial.println(bytesToHexString(_a.b, sizeof(_a.b)).c_str());
     });
 #if defined(MQTT)
     Cmd::addHandler((char *) "mqttIp", (char *) "Set MQTT server IP", [](Tokens *cmd)-> void {
@@ -408,7 +535,15 @@ void createCommands() {
     });
 
     Cmd::addHandler((char *) "discover2A", (char *) "discover2A", [](Tokens *cmd)-> void {
-        IOHC::iohcOtherDevice2W::getInstance()->cmd(IOHC::Other2WButton::discover2A, nullptr);
+        IOHC::iohcOtherDevice2W::getInstance()->cmd(IOHC::Other2WButton::discover2A, cmd);
+    });
+
+    Cmd::addHandler((char *) "listen2W", (char *) "Listen for 2W packets", [](Tokens *cmd)-> void {
+        IOHC::iohcRadio::getInstance()->startTwoWScan(30000, TWOW_SCAN_INTERVAL_US);
+    });
+
+    Cmd::addHandler((char *) "listen2Wslow", (char *) "Listen for 2W packets with longer channel dwell", [](Tokens *cmd)-> void {
+        IOHC::iohcRadio::getInstance()->startTwoWScan(30000, TWOW_SLOW_SCAN_INTERVAL_US);
     });
 /*
     Cmd::addHandler((char *) "fake0", (char *) "fake0", [](Tokens *cmd)-> void {
@@ -484,6 +619,10 @@ bool addHandler(char *cmd, char *description, void (*handler)(Tokens*)) {
 char *cmdReceived(bool echo) {
   _avail = Serial.available();
   if (_avail) {
+    if ((_len + _avail) > 512) {
+        _avail = 512 - _len;
+        Serial.println("Too much data, truncating it at 512 bytes");
+    }
     _len += Serial.readBytes(&_rxbuffer[_len], _avail);
     if (echo) {
       _rxbuffer[_len] = '\0';

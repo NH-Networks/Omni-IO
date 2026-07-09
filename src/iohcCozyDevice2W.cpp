@@ -29,6 +29,7 @@ namespace IOHC {
         if (!_iohcCozyDevice2W) {
             _iohcCozyDevice2W = new iohcCozyDevice2W();
             _iohcCozyDevice2W->load();
+            _iohcCozyDevice2W->initializeValid();
         }
         return _iohcCozyDevice2W;
     }
@@ -40,7 +41,7 @@ namespace IOHC {
     */
     void iohcCozyDevice2W::forgePacket(iohcPacket *packet, const std::vector<unsigned char> &toSend) {
         digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
-        IOHC::relStamp = esp_timer_get_time();
+        IOHC::relStamp.store(esp_timer_get_time());
 
         // Common Flags
         // 8 if protocol version is 0 else 10
@@ -84,7 +85,6 @@ namespace IOHC {
             case DeviceButton::associate: {
                 std::vector<uint8_t> toSend = {};
 
-                packets2send.clear();
                 auto* packet = new iohcPacket;
                 forgePacket(packet, toSend);
 
@@ -98,15 +98,13 @@ namespace IOHC {
                 memcpy(packet->payload.packet.header.source, gateway, 3);
                 memcpy(packet->payload.packet.header.target, master_to, 3);
 
-                packets2send.push_back(packet);
                 digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
-                _radioInstance->send(packets2send);
+                _radioInstance->send(packet);
                 break;
             }
             case DeviceButton::powerOn: {
                 std::vector<uint8_t> toSend = {0x0C, 0x60, 0x01, 0x2C};
 
-                packets2send.clear();
                 auto* packet = new iohcPacket;
                 forgePacket(packet, toSend);
 
@@ -119,9 +117,8 @@ namespace IOHC {
                 memcpy(packet->payload.packet.header.source, gateway, 3);
                 memcpy(packet->payload.packet.header.target, master_to, 3);
 
-                packets2send.push_back(packet);
                 digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
-                _radioInstance->send(packets2send);
+                _radioInstance->send(packet);
 
                 break;
             }
@@ -135,7 +132,6 @@ namespace IOHC {
                 if (data->size() == 2) addr = 0;
                 else addr = std::stoi(data->at(2));
 
-                packets2send.clear();
                 auto* packet = new iohcPacket;
                 forgePacket(packet, toSend);
 
@@ -150,9 +146,8 @@ namespace IOHC {
 
                 packet->delayed = 50;
 
-                packets2send.push_back(packet);
                 digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
-                _radioInstance->send(packets2send);
+                _radioInstance->send(packet);
                 //                mqttClient.publish("iown/Frame", 0, false, message.c_str(), messageSize);
 
                 break;
@@ -173,18 +168,19 @@ namespace IOHC {
 
                 size_t dest = 0;
 
-                packets2send.clear();
+                std::vector<iohcPacket *> packets2send;
                 for (const auto &addr: addresses) {
-                    packets2send.push_back(new iohcPacket);
-                    forgePacket(packets2send.back(), toSend);
+                    auto* packet = new iohcPacket;
+                    packets2send.push_back(packet);
+                    forgePacket(packet, toSend);
 
-                    packets2send.back()->payload.packet.header.cmd = iohcDevice::SEND_WRITE_PRIVATE_0x20;
+                    packet->payload.packet.header.cmd = iohcDevice::SEND_WRITE_PRIVATE_0x20;
                     memorizeSend.memorizedData = toSend;
                     memorizeSend.memorizedCmd = iohcDevice::SEND_WRITE_PRIVATE_0x20;
 
-                    packets2send.back()->payload.packet.header.CtrlByte1.asStruct.StartFrame = 1;
-                    memcpy(packets2send.back()->payload.packet.header.source, gateway, 3);
-                    memcpy(packets2send.back()->payload.packet.header.target,
+                    packet->payload.packet.header.CtrlByte1.asStruct.StartFrame = 1;
+                    memcpy(packet->payload.packet.header.source, gateway, 3);
+                    memcpy(packet->payload.packet.header.target,
                            addresses.at(dest/*addr*/).data()/* 0 Master_to*/, 3);
 
                     dest++;
@@ -203,21 +199,20 @@ namespace IOHC {
                 if (strcasecmp(dat, "on") == 0) toSend[4] = 0x01;
                 if (strcasecmp(dat, "off") == 0) toSend[4] = 0x00;
 
-                packets2send.clear();
-                packets2send.push_back(new iohcPacket);
-                forgePacket(packets2send.back(), toSend);
+                auto* packet = new iohcPacket;
+                forgePacket(packet, toSend);
 
-                packets2send.back()->payload.packet.header.cmd = iohcDevice::SEND_WRITE_PRIVATE_0x20;
+                packet->payload.packet.header.cmd = iohcDevice::SEND_WRITE_PRIVATE_0x20;
                 memorizeSend.memorizedData = toSend;
                 memorizeSend.memorizedCmd = iohcDevice::SEND_WRITE_PRIVATE_0x20;
 
-                packets2send.back()->payload.packet.header.CtrlByte1.asStruct.StartFrame = 1;
+                packet->payload.packet.header.CtrlByte1.asStruct.StartFrame = 1;
 
-                memcpy(packets2send.back()->payload.packet.header.source, gateway, 3);
-                memcpy(packets2send.back()->payload.packet.header.target, master_to, 3);
+                memcpy(packet->payload.packet.header.source, gateway, 3);
+                memcpy(packet->payload.packet.header.target, master_to, 3);
 
                 digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
-                _radioInstance->send(packets2send);
+                _radioInstance->send(packet);
                 break;
             }
             case DeviceButton::setWindow: {
@@ -231,23 +226,22 @@ namespace IOHC {
                 if (data->size() == 2) addr = 0;
                 else addr = std::stoi(data->at(2));
 
-                packets2send.clear();
-                packets2send.push_back(new iohcPacket);
-                forgePacket(packets2send.back(), toSend);
+                auto* packet = new iohcPacket;
+                forgePacket(packet, toSend);
 
-                packets2send.back()->payload.packet.header.cmd = iohcDevice::SEND_WRITE_PRIVATE_0x20;
+                packet->payload.packet.header.cmd = iohcDevice::SEND_WRITE_PRIVATE_0x20;
                 memorizeSend.memorizedData = toSend;
                 memorizeSend.memorizedCmd = iohcDevice::SEND_WRITE_PRIVATE_0x20;
 
-                packets2send.back()->payload.packet.header.CtrlByte1.asStruct.StartFrame = 1;
+                packet->payload.packet.header.CtrlByte1.asStruct.StartFrame = 1;
 
-                memcpy(packets2send.back()->payload.packet.header.source, gateway, 3);
-                memcpy(packets2send.back()->payload.packet.header.target, addresses.at(addr).data()/* 0 Master_to*/, 3);
+                memcpy(packet->payload.packet.header.source, gateway, 3);
+                memcpy(packet->payload.packet.header.target, addresses.at(addr).data()/* 0 Master_to*/, 3);
 
-                packets2send.back()->delayed = 50;
+                packet->delayed = 50;
 
                 digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
-                _radioInstance->send(packets2send);
+                _radioInstance->send(packet);
                 break;
             }
             case DeviceButton::midnight: {
@@ -255,28 +249,27 @@ namespace IOHC {
                 std::vector<uint8_t> toSend = {0x0c, 0x60, 0x01, 0x30};
                 //, 0x2b, 0x05, 0x00, 0x0f, 0x04, 0x0c, 0xe7, 0x07};
 
-                packets2send.clear();
-                packets2send.push_back(new iohcPacket);
-                forgePacket(packets2send.back(), toSend);
+                auto *packet = new iohcPacket;
+                forgePacket(packet, toSend);
 
-                packets2send.back()->payload.packet.header.cmd = iohcDevice::SEND_WRITE_PRIVATE_0x20;
+                packet->payload.packet.header.cmd = iohcDevice::SEND_WRITE_PRIVATE_0x20;
                 memorizeSend.memorizedData = toSend;
                 memorizeSend.memorizedCmd = iohcDevice::SEND_WRITE_PRIVATE_0x20;
 
-                packets2send.back()->payload.packet.header.CtrlByte1.asStruct.StartFrame = 1;
+                packet->payload.packet.header.CtrlByte1.asStruct.StartFrame = 1;
 
-                memcpy(packets2send.back()->payload.packet.header.source, gateway, 3);
-                memcpy(packets2send.back()->payload.packet.header.target, master_to, 3);
+                memcpy(packet->payload.packet.header.source, gateway, 3);
+                memcpy(packet->payload.packet.header.target, master_to, 3);
 
                 digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
-                _radioInstance->send(packets2send);
+                _radioInstance->send(packet);
 
                 break;
             }
 
             default: break;
         } // switch (cmd)
-        IOHC::packetStamp = esp_timer_get_time();
+        IOHC::packetStamp.store(esp_timer_get_time());
         //        save(); // Save Cozy associated devices
     }
 
@@ -296,8 +289,15 @@ namespace IOHC {
 
         fs::File f = LittleFS.open(COZY_2W_FILE, "r", true);
         JsonDocument doc;
-        deserializeJson(doc, f);
+        DeserializationError error = deserializeJson(doc, f);
         f.close();
+
+        if (error) {
+            Serial.print("Failed to parse JSON: ");
+            Serial.println(error.c_str());
+            return false;
+        }
+
 
         // Iterate through the JSON object
         for (JsonPair kv: doc.as<JsonObject>()) {
@@ -362,5 +362,24 @@ namespace IOHC {
         f.close();
 
         return true;
+    }
+
+    void iohcCozyDevice2W::initializeValid() {
+        size_t validKey = 0;
+        auto valid = std::vector<uint8_t>(255);
+        std::iota(valid.begin(), valid.end(), 0);
+
+        valid = {
+            0x00, 0x01, 0x03, 0x0a, 0x0c, 0x19, 0x1e, 0x20, 0x23, 0x28, 0x2a, 0x2c, 0x2e, 0x31, 0x32, 0x36, 0x38, 0x39,
+            0x3c, 0x46, 0x48, 0x4a, 0x4b,
+            0x50, 0x52, 0x54, 0x56, 0x60, 0x64, 0x6e, 0x6f, 0x71, 0x73, 0x80, 0x82, 0x84, 0x86, 0x88, 0x8a, 0x8b, 0x8e,
+            0x90, 0x92, 0x94, 0x96, 0x98,
+            //Not in firmware 02 0e 25 30 34 3a 3d 58
+            0x02, 0x0b, 0x0e, 0x14, 0x16, 0x25, 0x30, 0x34, 0x3a, 0x3d, 0x58
+        };
+
+        for (int key: valid) {
+            mapValid[key] = 0;
+        }
     }
 }

@@ -186,7 +186,6 @@
                         await popupOptions.onDelete();
                         closePopup();
                     } catch (error) {
-                        app.logStatus("Error deleting: " + error.message, true);
                         exitDeleteMode();
                     }
                 };

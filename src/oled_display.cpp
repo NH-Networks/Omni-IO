@@ -28,10 +28,12 @@
 #include <chrono>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <freertos/semphr.h>
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RST);
 DisplayBuffer displayBuffer;
 SemaphoreHandle_t displayBufferMutex = xSemaphoreCreateMutex();
+
 TaskHandle_t displayTaskHandle = nullptr;
 std::chrono::time_point<std::chrono::system_clock> startTime;
 std::atomic<int64_t> lastDataTime = 0;
@@ -151,7 +153,7 @@ void setTimerSpeed(bool needsFast) {
 bool initDisplay() {
     bool enabled = true;
     if (nvs_read_bool(NVS_KEY_DISPLAY_ENABLED, enabled)) {
-        displayEnabled.store(enabled);
+        displayEnabled = enabled;
     }
 
     Wire.begin(OLED_SDA, OLED_SCL);
@@ -181,7 +183,7 @@ int getSecondsSinceStart() {
 }
 
 int getSecondsSinceNoData() {
-    return (esp_timer_get_time() - lastDataTime.load()) / 1000000LL;;
+    return (esp_timer_get_time() - lastDataTime.load()) / 1000000LL;
 }
 
 const char* getRemoteName(const uint8_t *remote, const char *name) {
@@ -242,7 +244,7 @@ void setDisplayEnabled(bool enabled) {
         return;
     }
 
-    displayEnabled.store(enabled);
+    displayEnabled = enabled;
     nvs_write_bool(NVS_KEY_DISPLAY_ENABLED, enabled);
 
     if (!enabled) {
@@ -252,7 +254,6 @@ void setDisplayEnabled(bool enabled) {
         lastDataTime.store(esp_timer_get_time());
         setTimerSpeed(slow);
     } else {
-        display.ssd1306_command(SSD1306_DISPLAYON);
         lastDataTime.store(esp_timer_get_time());
         setTimerSpeed(fast);
     }
@@ -329,15 +330,25 @@ void drawLogo() {
 }
 
 void displayTask(void *) {
+    bool taskDisplayOn = true;
     while (true) {
-        const TickType_t waitTicks = pdMS_TO_TICKS(timerIsFast ? MILLIS_BETWEEN_DISPLAY_UPDATE_FAST
-                                                               : MILLIS_BETWEEN_DISPLAY_UPDATE_SLOW);
+        const bool showData = timerIsFast.load();
+        const TickType_t waitTicks = pdMS_TO_TICKS(showData ? MILLIS_BETWEEN_DISPLAY_UPDATE_FAST
+                                                            : MILLIS_BETWEEN_DISPLAY_UPDATE_SLOW);
         ulTaskNotifyTake(pdTRUE, waitTicks);
 
-        if (!displayEnabled.load()) {
-            display.clearDisplay();
-            display.display();
-            display.ssd1306_command(SSD1306_DISPLAYOFF);
+        if (displayEnabled.load()) {
+            if (!taskDisplayOn) {
+                display.ssd1306_command(SSD1306_DISPLAYON);
+                taskDisplayOn = true;
+            }
+        } else {
+            if (taskDisplayOn) {
+                display.clearDisplay();
+                display.display();
+                display.ssd1306_command(SSD1306_DISPLAYOFF);
+                taskDisplayOn = false;
+            }
             continue;
         }
 
@@ -345,7 +356,7 @@ void displayTask(void *) {
 
         const auto secondsSinceNoData = getSecondsSinceNoData();
 
-        if (timerIsFast || secondsSinceNoData < SECONDS_BEFORE_SCREENSAVER) {
+        if (showData || secondsSinceNoData < SECONDS_BEFORE_SCREENSAVER) {
             drawData();
         } else {
             drawLogo();

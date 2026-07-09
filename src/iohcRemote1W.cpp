@@ -36,6 +36,14 @@ namespace IOHC {
     iohcRemote1W* iohcRemote1W::_iohcRemote1W = nullptr;
     static constexpr uint32_t DEFAULT_TRAVEL_TIME_SEC = 10;
 
+    static void broadcastWebDeviceAction(const iohcRemote1W::remote &r, const char *action) {
+#if defined(WEBSERVER)
+        const std::string id = bytesToHexString(r.node, sizeof(r.node));
+        broadcastDeviceAction(id.c_str(), action,
+                              static_cast<int>(std::round(r.positionTracker.getPosition())),
+                              static_cast<int>(std::round(r.targetPosition)), "gateway");
+#endif
+    }
     static void positionTaskLoop(void *arg) {
         auto *inst = static_cast<iohcRemote1W *>(arg);
         while (true) {
@@ -77,7 +85,7 @@ namespace IOHC {
     }
 
     void iohcRemote1W::forgePacket(iohcPacket* packet, uint16_t typn) {
-        IOHC::relStamp = esp_timer_get_time();
+        IOHC::relStamp.store(esp_timer_get_time());
         digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
 
         packet->payload.packet.header.CtrlByte1.asStruct.MsgLen = sizeof(_header) - 1;
@@ -87,7 +95,7 @@ namespace IOHC {
         packet->payload.packet.header.CtrlByte2.asByte = 0;
         packet->payload.packet.header.CtrlByte2.asStruct.LPM = 1;
         // Broadcast Target
-        uint16_t bcast = (typn << 6) + 0b111111; 
+        uint16_t bcast = (typn << 6) + 0b111111;
         packet->payload.packet.header.target[0] = 0x00;
         packet->payload.packet.header.target[1] = bcast >> 8;
         packet->payload.packet.header.target[2] = bcast & 0x00ff;
@@ -96,7 +104,7 @@ namespace IOHC {
         packet->repeatTime = 40; //40ms
         packet->repeat = 4;
         packet->lock = false;
-        
+
     }
 
     std::vector<uint8_t> frame;
@@ -153,11 +161,12 @@ namespace IOHC {
         switch (cmd) {
             case RemoteButton::Pair: {
                 // 0x2e: 0x1120 + target broadcast + source + 0x2e00 + sequence + hmac
-                packets2send.clear();
 
+                std::vector<iohcPacket *> packets2send;
 //                for (auto&r: remotes) {
 
                     auto* packet = new iohcPacket;
+                    packets2send.push_back(packet);
                     IOHC::iohcRemote1W::forgePacket(packet, r.type[0]);
                     // Packet length
                     packet->payload.packet.header.CtrlByte1.asStruct.MsgLen += sizeof(_p0x2e);
@@ -185,7 +194,6 @@ namespace IOHC {
 
                     packet->buffer_length = packet->payload.packet.header.CtrlByte1.asStruct.MsgLen + 1;
 
-                    packets2send.push_back(packet);
                     // if (typn) packet->payload.packet.header.CtrlByte2.asStruct.LPM = 0; //TODO only first is LPM
                     digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
 //                }
@@ -201,12 +209,13 @@ namespace IOHC {
 
             case RemoteButton::Remove: {
                 // 0x39: 0x1c00 + target broadcast + source + 0x3900 + sequence + hmac
-                packets2send.clear();
 
+                std::vector<iohcPacket *> packets2send;
 //                for (auto&r: remotes) {
 
 
                     auto* packet = new iohcPacket;
+                    packets2send.push_back(packet);
                     IOHC::iohcRemote1W::forgePacket(packet, r.type[0]);
                     // Packet length
                     //                    packet->payload.packet.header.CtrlByte1.asStruct.MsgLen = sizeof(_header) - 1;
@@ -234,7 +243,6 @@ namespace IOHC {
 
                     packet->buffer_length = packet->payload.packet.header.CtrlByte1.asStruct.MsgLen + 1;
 
-                    packets2send.push_back(packet);
                     digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
 //                }
                 _radioInstance->send(packets2send);
@@ -250,11 +258,12 @@ namespace IOHC {
 
             case RemoteButton::Add: {
                 // 0x30: 0x1100 + target broadcast + source + 0x3000 + ???
-                packets2send.clear();
 
+                std::vector<iohcPacket *> packets2send;
 //                for (auto&r: remotes) {
 
                     auto* packet = new iohcPacket;
+                    packets2send.push_back(packet);
                     IOHC::iohcRemote1W::forgePacket(packet, r.type[0]);
                     // Packet length
                     packet->payload.packet.header.CtrlByte1.asStruct.MsgLen += sizeof(_p0x30);
@@ -283,7 +292,7 @@ namespace IOHC {
 
                     packet->buffer_length = packet->payload.packet.header.CtrlByte1.asStruct.MsgLen + 1;
 
-                    packets2send.push_back(packet);
+
                     digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
 //                }
                 _radioInstance->send(packets2send);
@@ -294,12 +303,14 @@ namespace IOHC {
                 break;
             }
            default: {
-                packets2send.clear();
-
                 // 0x00: 0x1600 + target broadcast + source + 0x00 + Originator + ACEI + Main Param + FP1 + FP2 + sequence + hmac
+
+                std::vector<iohcPacket *> packets2send;
 //                for (auto&r: remotes) {
 
                     auto* packet = new iohcPacket;
+                    packets2send.push_back(packet);
+
                     IOHC::iohcRemote1W::forgePacket(packet, r.type[0]);
                     // Packet length
                     // packet->payload.packet.header.CtrlByte1.asStruct.MsgLen += sizeof(_p0x00);
@@ -319,6 +330,7 @@ namespace IOHC {
                             r.positionTracker.startOpening();
                             r.movement = remote::Movement::Opening;
                             r.targetPosition = 100.0f;
+                            broadcastWebDeviceAction(r, "OPENING");
 #if defined(MQTT)
                             {
                                 std::string id = bytesToHexString(r.node, sizeof(r.node));
@@ -335,6 +347,7 @@ namespace IOHC {
                             r.positionTracker.startClosing();
                             r.movement = remote::Movement::Closing;
                             r.targetPosition = 0.0f;
+                            broadcastWebDeviceAction(r, "CLOSING");
 #if defined(MQTT)
                             {
                                 std::string id = bytesToHexString(r.node, sizeof(r.node));
@@ -351,6 +364,7 @@ namespace IOHC {
                             r.positionTracker.stop();
                             r.movement = remote::Movement::Idle;
                             r.targetPosition = r.positionTracker.getPosition();
+                            broadcastWebDeviceAction(r, "STOP");
 #if defined(MQTT)
                             {
                                 std::string id = bytesToHexString(r.node, sizeof(r.node));
@@ -406,6 +420,7 @@ namespace IOHC {
                                 r.movement = remote::Movement::Idle;
                             }
                             r.targetPosition = percent;
+                            broadcastWebDeviceAction(r, remoteButtonToString(cmd));
                             break;
                         }
                         case RemoteButton::Absolute: {
@@ -446,6 +461,7 @@ namespace IOHC {
                                 r.movement = remote::Movement::Idle;
                             }
                             r.targetPosition = target;
+                            broadcastWebDeviceAction(r, remoteButtonToString(cmd));
                             break;
                         }
                         case RemoteButton::Mode1:{
@@ -629,15 +645,15 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
                     // }
                     packet->buffer_length = packet->payload.packet.header.CtrlByte1.asStruct.MsgLen + 1;
 
-                    packets2send.push_back(packet);
                     digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
+
+                    _radioInstance->send(packets2send);
+
+                    display1WAction(r.node, remoteButtonToString(cmd), "TX", r.name.c_str());
+                    Serial.printf("%s position: %.0f%%\n", r.name.c_str(), r.positionTracker.getPosition());
+                    display1WPosition(r.node, r.positionTracker.getPosition(), r.name.c_str());
+                    break;
                 }
-                _radioInstance->send(packets2send);
-                display1WAction(r.node, remoteButtonToString(cmd), "TX", r.name.c_str());
-                Serial.printf("%s position: %.0f%%\n", r.name.c_str(), r.positionTracker.getPosition());
-                display1WPosition(r.node, r.positionTracker.getPosition(), r.name.c_str());
-                break;
-//            }
         }
         this->save(); // Save sequence number
     }
@@ -653,9 +669,9 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
         }
 
         fs::File f = LittleFS.open(IOHC_1W_REMOTE, "r");
-        JsonDocument doc; 
+        JsonDocument doc;
 
-        DeserializationError error = deserializeJson(doc, f); 
+        DeserializationError error = deserializeJson(doc, f);
 
         if (error) {
             Serial.print("Failed to parse JSON: ");
@@ -670,18 +686,33 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
         std::vector<remote> loadedRemotes;
         for (JsonPair kv: doc.as<JsonObject>()) {
             remote r;
-            // hexStringToBytes(kv.key().c_str(), _node);
-            hexStringToBytes(kv.key().c_str(), r.node);
-            // Serial.printf("%s\n", kv.key().c_str());
-
             auto jobj = kv.value().as<JsonObject>();
-            // hexStringToBytes(jobj["key"].as<const char *>(), _key);
-            hexStringToBytes(jobj["key"].as<const char *>(), r.key);
+            const std::string entryId = kv.key().c_str();
 
-            uint8_t btmp[2];
-            hexStringToBytes(jobj["sequence"].as<const char *>(), btmp);
-            uint16_t file_seq = (btmp[0] << 8) + btmp[1];
-            r.sequence = file_seq;
+            if (hexStringToBytes(entryId, r.node) != sizeof(r.node)) {
+                Serial.printf("Skipping 1W remote '%s': invalid id\n", entryId.c_str());
+                continue;
+            }
+
+            const char *keyText = nullptr;
+            if (jobj["key"].is<const char *>()) {
+                keyText = jobj["key"].as<const char *>();
+            }
+            if (!keyText || hexStringToBytes(keyText, r.key) != sizeof(r.key)) {
+                Serial.printf("Skipping 1W remote '%s': invalid key\n", entryId.c_str());
+                continue;
+            }
+
+            const char *sequenceText = nullptr;
+            if (jobj["sequence"].is<const char *>()) {
+                sequenceText = jobj["sequence"].as<const char *>();
+            }
+            uint8_t btmp[2] = {0, 0};
+            if (!sequenceText || hexStringToBytes(sequenceText, btmp) != sizeof(btmp)) {
+                Serial.printf("Skipping 1W remote '%s': invalid sequence\n", entryId.c_str());
+                continue;
+            }
+            r.sequence = static_cast<uint16_t>((btmp[0] << 8) + btmp[1]);
 
             uint16_t nvs_seq;
             if (nvs_read_sequence(r.node, &nvs_seq)) {
@@ -692,7 +723,11 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
             }
             // Persist the highest value back to NVS
             nvs_write_sequence(r.node, r.sequence);
-            JsonArray jarr = jobj["type"];
+            JsonArray jarr = jobj["type"].as<JsonArray>();
+            if (jarr.isNull()) {
+                Serial.printf("Skipping 1W remote '%s': missing type array\n", entryId.c_str());
+                continue;
+            }
             // Réservez de l'espace dans le vecteur pour éviter les allocations inutiles
 
             //_type.reserve(jarr.size());
@@ -704,16 +739,24 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
             //_type.push_back(i.as<uint16_t>());
                 r.type.push_back(i.as<uint8_t>());
             }
-                       
+
             // _type = jobj["type"].as<u_int16_t>();
 //            r.type = jobj["type"].as<u_int16_t>();
 
             // _manufacturer = jobj["manufacturer_id"].as<uint8_t>();
             r.manufacturer = jobj["manufacturer_id"].as<uint8_t>();
-            r.description = jobj["description"].as<std::string>();
+            if (jobj["description"].is<const char *>()) {
+                r.description = jobj["description"].as<const char *>();
+            } else if (jobj["description"].is<std::string>()) {
+                r.description = jobj["description"].as<std::string>();
+            } else {
+                r.description = entryId;
+                updateFile = true;
+            }
 
-
-            if (jobj["name"].is<std::string>()) {
+            if (jobj["name"].is<const char *>()) {
+                r.name = jobj["name"].as<const char *>();
+            } else if (jobj["name"].is<std::string>()) {
                 r.name = jobj["name"].as<std::string>();
             } else {
                 r.name = r.description;
@@ -736,6 +779,7 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
                 r.repeatOnNoResponse = jobj["repeatOnNoResponse"].as<bool>();
             } else {
                 r.repeatOnNoResponse = false;
+                updateFile = true;
             }
             r.positionTracker.setTravelTime(r.travelTime);
             if (jobj["position"].is<float>() || jobj["position"].is<int>()) {
@@ -751,6 +795,9 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
             loadedRemotes.push_back(r);
         }
 
+        if (loadedRemotes.empty()) {
+            Serial.printf("No valid 1W remotes loaded from %s\n", IOHC_1W_REMOTE);
+        }
         remotes = loadedRemotes;
         Serial.printf("Loaded %d x 1W remotes\n", remotes.size()); // _type.size());
         // Ensure JSON reflects the latest sequence values and persist defaults
@@ -787,7 +834,7 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
             btmp[0] = r.sequence >> 8;
 
             jobj["sequence"] = bytesToHexString(btmp, sizeof(btmp));
-            
+
             // JsonArray jarr = jobj.createNestedArray("type");
             auto jarr = jobj["type"].to<JsonArray>();
             for (uint8_t i : r.type) {
@@ -803,8 +850,7 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
             jobj["name"] = r.name;
 
             jobj["travel_time"] = r.travelTime;
-            jobj["position"] =
-                static_cast<int>(std::round(r.positionTracker.getPosition()));
+            jobj["position"] = static_cast<int>(std::round(r.positionTracker.getPosition()));
 
             jobj["paired"] = r.paired;
             jobj["repeatOnNoResponse"] = r.repeatOnNoResponse;
@@ -900,6 +946,80 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
         return true;
     }
 
+    bool iohcRemote1W::importLearnedRemote(
+        const address node, const uint8_t *key, uint16_t sequence,
+        uint8_t type, uint8_t manufacturer) {
+        auto it = std::find_if(remotes.begin(), remotes.end(),
+                               [&](const remote &entry) {
+            return memcmp(entry.node, node, sizeof(address)) == 0;
+        });
+
+        if (it == remotes.end()) {
+            remote learned{};
+            memcpy(learned.node, node, sizeof(address));
+            memcpy(learned.key, key, sizeof(learned.key));
+            learned.sequence = sequence;
+            learned.type = {type, 0};
+            learned.manufacturer = manufacturer;
+            learned.paired = true;
+            learned.repeatOnNoResponse = false;
+            learned.travelTime = DEFAULT_TRAVEL_TIME_SEC;
+            learned.positionTracker.setTravelTime(learned.travelTime);
+
+            const std::string addressString =
+                bytesToHexString(node, sizeof(address));
+            learned.description = "S" + addressString;
+            learned.name = "Solar " + addressString;
+            remotes.push_back(learned);
+            it = std::prev(remotes.end());
+        } else {
+            memcpy(it->key, key, sizeof(it->key));
+            it->sequence = sequence;
+            it->type = {type, 0};
+            it->manufacturer = manufacturer;
+            it->paired = true;
+        }
+
+        nvs_write_sequence(it->node, it->sequence);
+        if (!save()) {
+            return false;
+        }
+
+#if defined(MQTT)
+        if (mqttClient.connected()) {
+            const std::string id =
+                bytesToHexString(it->node, sizeof(it->node));
+            const std::string keyString =
+                bytesToHexString(it->key, sizeof(it->key));
+            publishDiscovery(id, it->name, keyString);
+            publishTravelTimeDiscovery(
+                id, it->name, keyString, it->travelTime);
+            mqttClient.subscribe(("iown/" + id + "/set").c_str(), 0);
+            mqttClient.subscribe(
+                ("iown/" + id + "/position/set").c_str(), 0);
+        }
+#endif
+        return true;
+    }
+
+    void iohcRemote1W::syncSequence(
+        const address node, uint16_t nextSequence) {
+        auto it = std::find_if(remotes.begin(), remotes.end(),
+                               [&](const remote &entry) {
+            return memcmp(entry.node, node, sizeof(address)) == 0;
+        });
+        if (it == remotes.end()) {
+            return;
+        }
+
+        const uint16_t delta =
+            static_cast<uint16_t>(nextSequence - it->sequence);
+        if (delta != 0 && delta < 0x8000) {
+            it->sequence = nextSequence;
+            nvs_write_sequence(it->node, it->sequence);
+        }
+    }
+
     bool iohcRemote1W::removeRemote(const std::string &description) {
         auto it = std::find_if(remotes.begin(), remotes.end(), [&](const remote &e) {
             return e.description == description;
@@ -967,6 +1087,7 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
                 r.positionTracker.startOpening();
                 r.movement = remote::Movement::Opening;
                 r.targetPosition = 100.0f;
+                            broadcastWebDeviceAction(r, "OPENING");
 #if defined(MQTT)
                 {
                     std::string id = bytesToHexString(r.node, sizeof(r.node));
@@ -981,6 +1102,7 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
                 r.positionTracker.startClosing();
                 r.movement = remote::Movement::Closing;
                 r.targetPosition = 0.0f;
+                            broadcastWebDeviceAction(r, "CLOSING");
 #if defined(MQTT)
                 {
                     std::string id = bytesToHexString(r.node, sizeof(r.node));
@@ -995,6 +1117,7 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
                 r.positionTracker.stop();
                 r.movement = remote::Movement::Idle;
                 r.targetPosition = r.positionTracker.getPosition();
+                            broadcastWebDeviceAction(r, "STOP");
 #if defined(MQTT)
                 {
                     std::string id = bytesToHexString(r.node, sizeof(r.node));

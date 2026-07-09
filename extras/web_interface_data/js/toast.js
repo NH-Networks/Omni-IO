@@ -1,27 +1,56 @@
 (function () {
-    var container = document.createElement("div");
-    container.id = "toast-container";
-    document.body.appendChild(container);
+    let hideTimer = null;
 
-    function dismissToast(toast) {
-        if (!toast || !toast.parentNode) return;
+    function ensureContainer() {
+        let container = document.getElementById("toast-container");
+        if (!container) {
+            container = document.createElement("div");
+            container.id = "toast-container";
+            document.body.appendChild(container);
+        }
+        return container;
+    }
+
+    function ensureToast() {
+        const container = ensureContainer();
+        let toast = document.getElementById("toast");
+        if (!toast) {
+            toast = document.createElement("div");
+            toast.id = "toast";
+            toast.className = "toast";
+            toast.hidden = true;
+            container.appendChild(toast);
+        }
+        return toast;
+    }
+
+    function hideElement(toast) {
         toast.classList.add("toast-hide");
         setTimeout(function () {
-            if (toast.parentNode) toast.parentNode.removeChild(toast);
+            toast.hidden = true;
         }, 300);
     }
 
-    window.showToast = function (msg, type, duration) {
-        var toast = document.createElement("div");
-        toast.className = "toast" + (type ? " toast-" + type : "");
-        toast.textContent = msg;
-        container.appendChild(toast);
-        var ms = (duration || 3000);
-        var timer = setTimeout(function () { dismissToast(toast); }, ms);
-        toast.addEventListener("click", function () {
-            clearTimeout(timer);
-            dismissToast(toast);
-        });
-        return toast;
+    window.showToast = function (message, isError, timeoutMs) {
+        const toast = ensureToast();
+        toast.textContent = message || "";
+        toast.className = "toast " + (isError ? "toast-error" : "toast-success");
+        toast.hidden = false;
+
+        if (hideTimer) {
+            clearTimeout(hideTimer);
+        }
+        hideTimer = setTimeout(function () {
+            hideElement(toast);
+        }, timeoutMs || 7000);
     };
-})();
+
+    window.hideToast = function () {
+        const toast = ensureToast();
+        toast.hidden = true;
+        if (hideTimer) {
+            clearTimeout(hideTimer);
+            hideTimer = null;
+        }
+    };
+}());

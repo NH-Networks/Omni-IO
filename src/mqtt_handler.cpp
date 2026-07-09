@@ -3,12 +3,16 @@
 #if defined(MQTT)
 
 #include <iohcRemote1W.h>
+#include <iohcPacket.h>
 #include <iohcCryptoHelpers.h>
 #include <AsyncMqttClient.h>
 #include <ArduinoJson.h>
 #include <interact.h>
 #include <log_buffer.h>
 #include <oled_display.h>
+#if defined(WEBSERVER)
+#include <web_server_handler.h>
+#endif
 #include <cstring>
 #include <cstdlib>
 #include <WiFi.h>
@@ -16,18 +20,67 @@
 #include <freertos/task.h>
 #include <nvs_helpers.h>
 #include <atomic>
+#include "wifi_helper.h"
 
 AsyncMqttClient mqttClient;
 const char AVAILABILITY_TOPIC[] = "iown/status";
+static const char FREE_MEM_TOPIC[] = "iown/info/free_mem";
+static const char WIFI_STRENGTH_TOPIC[] = "iown/info/wifi_rssi";
+static const char IP_ADDRESS_TOPIC[] = "iown/info/ip";
+static const char RADIO_LOG_TOPIC[] = "iown/log";
 static const char GATEWAY_ID[] = "MyOpenIO";
 static TaskHandle_t s_mqttSchedulerTask = nullptr;
+static TaskHandle_t s_mqttPostConnectTask = nullptr;
 static std::atomic<bool> s_heartbeatEnabled{false};
 static std::atomic<uint32_t> s_nextHeartbeatAtMs{0};
 static uint32_t s_lastMqttConnectAttemptMs = 0;
 static constexpr uint32_t MQTT_RECONNECT_INTERVAL_MS = 5000;
+static constexpr uint32_t MQTT_CONNECT_TIMEOUT_MS = 15000;
 
 static void mqttSchedulerTask(void*);
+static void publishIohcFrameDiscovery();
+static void publishRadioLogDiscovery();
+static void publishFreeMemDiscovery();
+static void publishIpAddressDiscovery();
+static void publishWifiStrengthDiscovery();
+void onMqttConnect(bool sessionPresent);
+void onMqttDisconnect(AsyncMqttClientDisconnectReason reason);
+void onMqttMessage(char *topic, char *payload,
+                   AsyncMqttClientMessageProperties properties,
+                   size_t len, size_t index, size_t total);
+void publishHeartbeat();
+void mqttFuncHandler(const char *cmd);
+static void mqttPostConnectTask(void*);
+static void handleMqttConnectImpl();
 
+static void populateGatewayDevice(JsonVariant variant) {
+    JsonObject device = variant.to<JsonObject>();
+    device["identifiers"] = GATEWAY_ID;
+    device["name"] = "My Open IO Gateway";
+    device["manufacturer"] = "Somfy";
+    device["model"] = "IO Blind Bridge";
+    device["sw_version"] = "1.0.0";
+}
+
+static void syncWebPosition(const std::string &id, int position) {
+#if defined(WEBSERVER)
+    broadcastDevicePosition(id.c_str(), position);
+#else
+    (void)id;
+    (void)position;
+#endif
+}
+
+static void syncWebAction(const std::string &id, const char *state, int position, int target) {
+#if defined(WEBSERVER)
+    broadcastDeviceAction(id.c_str(), state, position, target, "mqtt");
+#else
+    (void)id;
+    (void)state;
+    (void)position;
+    (void)target;
+#endif
+}
 static void startHeartbeat() {
     s_heartbeatEnabled.store(true);
     s_nextHeartbeatAtMs.store(millis() + 60000UL);
@@ -219,6 +272,18 @@ void publishHeartbeat() {
     mqttClient.publish(AVAILABILITY_TOPIC, 0, true, "online");
 }
 
+void publishFreeMem() {
+    mqttClient.publish(FREE_MEM_TOPIC, 0, true, std::to_string(esp_get_free_heap_size()).c_str());
+}
+
+void publishWifiStrength() {
+    mqttClient.publish(WIFI_STRENGTH_TOPIC, 0, true, std::to_string(wifiStatus.rssi).c_str());
+}
+
+void publishIpAddress() {
+    mqttClient.publish(IP_ADDRESS_TOPIC, 0, true, WiFi.localIP().toString().c_str());
+}
+
 void publishCoverState(const std::string &id, const char *state) {
     std::string topic = "iown/" + id + "/state";
     mqttClient.publish(topic.c_str(), 0, true, state);
@@ -229,6 +294,53 @@ void publishCoverPosition(const std::string &id, float position) {
     snprintf(buf, sizeof(buf), "%.0f", position);
     std::string topic = "iown/" + id + "/position";
     mqttClient.publish(topic.c_str(), 0, true, buf);
+    syncWebPosition(id, static_cast<int>(position));
+}
+
+void publishRadioLogEvent(const IOHC::iohcPacket *packet,
+                          const char *direction) {
+    if (!packet || !direction || !mqttClient.connected() ||
+        packet->buffer_length < sizeof(IOHC::_header)) {
+        return;
+    }
+
+    const bool oneWay =
+        packet->payload.packet.header.CtrlByte1.asStruct.Protocol == 1;
+    const bool isTx = strcmp(direction, "TX") == 0;
+    const char *protocol = oneWay ? "1W" : "2W";
+    const std::string command =
+        bytesToHexString(&packet->payload.packet.header.cmd, 1);
+
+    JsonDocument doc;
+    doc["event_type"] = oneWay
+        ? (isTx ? "1w_tx" : "1w_rx")
+        : (isTx ? "2w_tx" : "2w_rx");
+    doc["protocol"] = protocol;
+    doc["direction"] = isTx ? "TX" : "RX";
+    doc["from"] =
+        bytesToHexString(packet->payload.packet.header.source, 3);
+    doc["to"] =
+        bytesToHexString(packet->payload.packet.header.target, 3);
+    doc["cmd"] = command;
+    doc["frequency"] = packet->frequency;
+    doc["timestamp_ms"] = millis();
+
+    const uint8_t dataLength =
+        packet->buffer_length > sizeof(IOHC::_header)
+            ? packet->buffer_length - sizeof(IOHC::_header)
+            : 0;
+    doc["data"] = dataLength
+        ? bytesToHexString(
+              packet->payload.buffer + sizeof(IOHC::_header), dataLength)
+        : "";
+    doc["message"] =
+        String(protocol) + " " + (isTx ? "TX" : "RX") +
+        " cmd=" + command.c_str();
+
+    std::string payload;
+    const size_t length = serializeJson(doc, payload);
+    mqttClient.publish(
+        RADIO_LOG_TOPIC, 0, false, payload.c_str(), length);
 }
 
 // ==== BELANGRIJK: scheduler die het zware werk in een eigen task zet ====
@@ -253,8 +365,12 @@ static void mqttPostConnectTask(void* /*arg*/) {
 }
 
 static void handleMqttConnectImpl() {
-    // Discovery van de ‘frame’ sensor eerst, zodat state pub direct een entity heeft
+    publishFreeMemDiscovery();
+    publishIpAddressDiscovery();
+    publishWifiStrengthDiscovery();
+    // Publish frame discovery before state updates so Home Assistant has an entity.
     publishIohcFrameDiscovery();
+    publishRadioLogDiscovery();
     const auto &remotes = IOHC::iohcRemote1W::getInstance()->getRemotes();
     for (const auto &r : remotes) {
         std::string id = bytesToHexString(r.node, sizeof(r.node));
@@ -276,6 +392,9 @@ static void handleMqttConnectImpl() {
     }
     startHeartbeat();
     publishHeartbeat();
+    publishFreeMem();
+    publishWifiStrength();
+    publishIpAddress();
 }
 
 void connectToMqtt() {
@@ -342,6 +461,15 @@ static void mqttSchedulerTask(void*) {
 
         const uint32_t now = millis();
 
+        if (mqttStatus == ConnState::Connecting &&
+            static_cast<int32_t>(now - s_lastMqttConnectAttemptMs) >= static_cast<int32_t>(MQTT_CONNECT_TIMEOUT_MS)) {
+            Serial.println("MQTT connect timeout, retrying later");
+            addLogMessage("MQTT connect timeout, retrying later");
+            mqttClient.disconnect();
+            mqttStatus = ConnState::Disconnected;
+            updateDisplayStatus();
+        }
+
         if (mqttStatus == ConnState::Disconnected && WiFi.status() == WL_CONNECTED &&
             static_cast<int32_t>(now - s_lastMqttConnectAttemptMs) >= static_cast<int32_t>(MQTT_RECONNECT_INTERVAL_MS)) {
             connectToMqtt();
@@ -352,6 +480,8 @@ static void mqttSchedulerTask(void*) {
             s_nextHeartbeatAtMs.store(now + 60000UL);
             if (mqttStatus == ConnState::Connected && mqttClient.connected()) {
                 publishHeartbeat();
+                publishFreeMem();
+                publishWifiStrength();
             }
         }
     }
@@ -377,6 +507,78 @@ static void publishIohcFrameDiscovery() {
                        0, true, cfg.c_str(), cfgLen);
 }
 
+static void publishRadioLogDiscovery() {
+    JsonDocument doc;
+    doc["name"] = "IOHC Radio Log";
+    doc["unique_id"] = "iohc_radio_log";
+    doc["state_topic"] = RADIO_LOG_TOPIC;
+    JsonArray eventTypes = doc["event_types"].to<JsonArray>();
+    eventTypes.add("1w_rx");
+    eventTypes.add("1w_tx");
+    eventTypes.add("2w_rx");
+    eventTypes.add("2w_tx");
+    doc["availability_topic"] = AVAILABILITY_TOPIC;
+    doc["payload_available"] = "online";
+    doc["payload_not_available"] = "offline";
+    doc["icon"] = "mdi:radio-tower";
+    populateGatewayDevice(doc["device"]);
+
+    std::string payload;
+    const size_t length = serializeJson(doc, payload);
+    mqttClient.publish(
+        (mqtt_discovery_topic + "/event/iohc_radio_log/config").c_str(),
+        0, true, payload.c_str(), length);
+}
+
+static void publishFreeMemDiscovery() {
+    JsonDocument configDoc;
+    configDoc["name"] = "Free Memory";
+    configDoc["state_topic"] = FREE_MEM_TOPIC;
+    configDoc["unique_id"] = "free_mem";
+    configDoc["unit_of_measurement"] = "B";
+    configDoc["device_class"] = "data_size";
+    configDoc["entity_category"] = "diagnostic";
+    configDoc["icon"] = "mdi:memory";
+    populateGatewayDevice(configDoc["device"]);
+
+    std::string cfg;
+    size_t cfgLen = serializeJson(configDoc, cfg);
+    mqttClient.publish((mqtt_discovery_topic + "/sensor/iohc_free_mem/config").c_str(),
+                       0, true, cfg.c_str(), cfgLen);
+}
+
+static void publishIpAddressDiscovery() {
+    JsonDocument configDoc;
+    configDoc["name"] = "IP Address";
+    configDoc["state_topic"] = IP_ADDRESS_TOPIC;
+    configDoc["unique_id"] = "ip";
+    configDoc["native_value"] = "str";
+    configDoc["entity_category"] = "diagnostic";
+    configDoc["icon"] = "mdi:ip-network";
+    populateGatewayDevice(configDoc["device"]);
+
+    std::string cfg;
+    size_t cfgLen = serializeJson(configDoc, cfg);
+    mqttClient.publish((mqtt_discovery_topic + "/sensor/iohc_ip/config").c_str(),
+                       0, true, cfg.c_str(), cfgLen);
+}
+
+static void publishWifiStrengthDiscovery() {
+    JsonDocument configDoc;
+    configDoc["name"] = "WiFi RSSI";
+    configDoc["state_topic"] = WIFI_STRENGTH_TOPIC;
+    configDoc["unique_id"] = "wifi_rssi";
+    configDoc["native_value"] = "int";
+    configDoc["device_class"] = "signal_strength";
+    configDoc["entity_category"] = "diagnostic";
+    configDoc["icon"] = "mdi:wifi";
+    populateGatewayDevice(configDoc["device"]);
+
+    std::string cfg;
+    size_t cfgLen = serializeJson(configDoc, cfg);
+    mqttClient.publish((mqtt_discovery_topic + "/sensor/iohc_wifi_rssi/config").c_str(),
+                       0, true, cfg.c_str(), cfgLen);
+}
 
 void mqttFuncHandler(const char *cmd) {
     constexpr char delim = ' ';
@@ -390,9 +592,12 @@ void mqttFuncHandler(const char *cmd) {
                           segments.size() > 1 ? segments[1].c_str() : "No param",
                           _cmdHandler[idx]->description);
             _cmdHandler[idx]->handler(&segments);
+            addLogMessage(String("MQTT command executed: cmd=") + segments[0].c_str() +
+                          " param=" + (segments.size() > 1 ? String(segments[1].c_str()) : String("-")));
             return;
         }
     }
+    addLogMessage(String("MQTT unknown command: cmd=") + segments[0].c_str());
     Serial.printf("*> MQTT Unknown %s <*\n", segments[0].c_str());
 }
 
@@ -445,6 +650,11 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
             t.push_back(std::to_string(closeVal));
             t.push_back(it->description);
             IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Absolute, &t);
+            syncWebAction(id, it->movement == IOHC::iohcRemote1W::remote::Movement::Opening ? "OPENING" : (it->movement == IOHC::iohcRemote1W::remote::Movement::Closing ? "CLOSING" : "STOP"), static_cast<int>(it->positionTracker.getPosition()), static_cast<int>(it->targetPosition));
+            addLogMessage(String("MQTT position command: device=") + id.c_str() +
+                          " name=" + it->name.c_str() +
+                          " open=" + String(openVal) +
+                          " close=" + String(closeVal));
             mqttClient.publish(topicStr.c_str(), 0, true, "", 0);
         }
         return;
@@ -462,6 +672,10 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
             t.push_back(payloadStr);
             t.push_back(it->description);
             IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Absolute, &t);
+            syncWebAction(id, it->movement == IOHC::iohcRemote1W::remote::Movement::Opening ? "OPENING" : (it->movement == IOHC::iohcRemote1W::remote::Movement::Closing ? "CLOSING" : "STOP"), static_cast<int>(it->positionTracker.getPosition()), static_cast<int>(it->targetPosition));
+            addLogMessage(String("MQTT absolute command: device=") + id.c_str() +
+                          " name=" + it->name.c_str() +
+                          " value=" + payloadStr.c_str());
             mqttClient.publish(topicStr.c_str(), 0, true, "", 0);
         }
         return;
@@ -479,7 +693,6 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
             std::transform(payloadStr.begin(), payloadStr.end(), payloadStr.begin(), ::tolower);
             t.push_back(payloadStr);
             t.push_back(it->description);
-
             if (payloadStr == "open") {
                 IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Open, &t);
             } else if (payloadStr == "close") {
@@ -493,6 +706,10 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
             } else {
                 Serial.printf("*> MQTT Unknown %s <*\n", payloadStr.c_str());
             }
+            syncWebAction(id, payloadStr == "open" ? "OPENING" : (payloadStr == "close" ? "CLOSING" : "STOP"), static_cast<int>(it->positionTracker.getPosition()), static_cast<int>(it->targetPosition));
+            addLogMessage(String("MQTT cover command: device=") + id.c_str() +
+                          " name=" + it->name.c_str() +
+                          " action=" + payloadStr.c_str());
             // Clear retained set message
             mqttClient.publish(topicStr.c_str(), 0, true, "", 0);
         } else {
@@ -513,6 +730,7 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
             t.push_back("pair");
             t.push_back(it->description);
             IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Pair, &t);
+            addLogMessage(String("MQTT pair command: device=") + id.c_str() + " name=" + it->name.c_str());
             mqttClient.publish(topicStr.c_str(), 0, true, "", 0);
         }
         return;
@@ -530,6 +748,7 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
             t.push_back("add");
             t.push_back(it->description);
             IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Add, &t);
+            addLogMessage(String("MQTT add command: device=") + id.c_str() + " name=" + it->name.c_str());
             mqttClient.publish(topicStr.c_str(), 0, true, "", 0);
         }
         return;
@@ -547,6 +766,7 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
             t.push_back("remove");
             t.push_back(it->description);
             IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Remove, &t);
+            addLogMessage(String("MQTT remove command: device=") + id.c_str() + " name=" + it->name.c_str());
             mqttClient.publish(topicStr.c_str(), 0, true, "", 0);
         }
         return;

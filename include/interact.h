@@ -22,6 +22,7 @@
 #include <board-config.h>
 #include <user_config.h>
 
+#include <atomic>
 #include <vector>
 #include <sstream>
 #include <cstring>
@@ -59,6 +60,7 @@ namespace IOHC {
 enum class ConnState { Connecting, Connected, Disconnected };
 extern ConnState mqttStatus;
 void tokenize(std::string const &str, const char delim, Tokens &out);
+void resetTwoWPairingSession();
 
 struct _cmdEntry {
     char cmd[15];
@@ -80,9 +82,11 @@ extern uint8_t lastEntry;
 
 namespace Cmd {
 
-extern bool verbosity;
-extern bool pairMode;
-extern bool scanMode;
+extern std::atomic<bool> verbosity;
+extern std::atomic<bool> pairMode;
+extern std::atomic<bool> pairAltMode;
+extern std::atomic<bool> scanMode;
+void extendTwoWPairingWindow(uint32_t windowMs);
 
 #if defined(ESP32)
   extern TimersUS::TickerUsESP32 kbd_tick;

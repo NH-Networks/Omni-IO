@@ -1,256 +1,663 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title data-i18n="page.title">MiOpen.IO - Device Control</title>
-    <link rel="icon" href="img/logo.png">
-    <link rel="stylesheet" href="css/style.css?v=20260630a">
-</head>
+    <link rel="icon" href="img/logo.png" />
+    <link rel="stylesheet" href="css/style.css?v=20260630a" />
+  </head>
 
-<body>
+  <body>
     <header>
-        <img src="img/logo.png" alt="MiOpen.IO Logo" class="logo">
-        <h1 data-i18n="header.title">Device Control</h1>
-        <button id="menu-toggle" aria-label="Open menu" aria-expanded="false" type="button"><span></span><span></span><span></span></button>
-        <div id="menu-backdrop"></div>
-        <nav id="main-menu">
-            <button id="menu-close" aria-label="Close menu" type="button">&times;</button>
-            <a onclick="showPage('devices')" class="items" data-i18n="nav.devices">Devices</a>
-            <a onclick="showPage('help')" class="items" data-i18n="nav.help">Log</a>
-            <a onclick="showPage('settings')" class="items" data-i18n="nav.settings">Settings</a>
-            <select class="items" id="lang" onchange="setLang(this.value)">
-                <option value="nl">NL</option>
-                <option value="en">EN</option>
-                <option value="de">DE</option>
-                <option value="fr">FR</option>
-            </select>
-            <a class="items"id="toggle-theme"></a>
-        </nav>
-        
+      <img src="img/logo.png" alt="MiOpen.IO Logo" class="logo" />
+      <h1 data-i18n="header.title">Device Control</h1>
+      <button id="menu-toggle" aria-label="Open menu" aria-expanded="false" type="button">
+        <span></span><span></span><span></span>
+      </button>
+      <div id="menu-backdrop"></div>
+      <nav id="main-menu">
+        <button id="menu-close" aria-label="Close menu" type="button">
+          &times;
+        </button>
+        <a onclick="showPage('devices')" class="items nav-link">
+            <img class="nav-icon" src="img/devices.svg" alt="" />
+            <span data-i18n="nav.devices">Devices</span>
+        </a>
+        <a onclick="showPage('help')" class="items nav-link">
+            <img class="nav-icon" src="img/help.svg" alt="" />
+            <span data-i18n="nav.help">Log</span>
+        </a>
+        <a onclick="showPage('settings')" class="items nav-link">
+          <img class="nav-icon" src="img/settings.svg" alt="" />
+           <span data-i18n="nav.settings">Settings</span>
+        </a>
+        <select class="items" id="lang" onchange="setLang(this.value)">
+          <option value="nl">NL</option>
+          <option value="en">EN</option>
+          <option value="de">DE</option>
+          <option value="fr">FR</option>
+        </select>
+        <a class="items" id="toggle-theme"></a>
+      </nav>
     </header>
-
     <main>
-        <div id="devices-page">
-            <div class="left">
-                <section id="device-list-section">
-
-                    <div class="title">
-                        <h2 data-i18n="section.devices">Devices</h2>
-                        <div class="btn help" id="help-device"></div>
-                        <div class="btn add" id="add-popup"></div>
-                    </div>
-
-                    <div class="card">
-                        <ul id="device-list">
-                            <!-- Device items will be populated by JavaScript -->
-                            <!-- Example: <li>Device Name <button>On</button> <button>Off</button></li> -->
-                        </ul>
-                    </div>
-                </section>
-            </div>
-            <div class="right">
-                <section id="status-section">
-                    <div class="title">
-                        <h2 data-i18n="section.remotes">remote</h2>
-                        <div class="btn help" id="help-remote"></div>
-                        <div class="btn add" id="remote-popup"></div>
-                    </div>
-                    <div class="card">
-                        <table id="remote-table">
-                            <thead>
-                                <tr>
-                                    <th data-i18n="table.remote_id">Remote ID</th>
-                                    <th data-i18n="table.remote_name">Remote Name</th>
-                                    <th data-i18n="table.linked_devices">Linked Devices</th>
-                                    <th data-i18n="table.edit">Edit</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- rows komen hier -->
-                            </tbody>
-                        </table>
-
-                    </div>
-                </section>
-            </div>
-        </div>
-        <div id="help-page" style="display:none;">
-            <div class="left">
-                <section id="status-section">
-                    <div class="title">
-                        <h2 data-i18n="section.status_logs">Status / Log </h2>
-                        <select id="select-log">
-                            <option value="all" data-i18n="filter.all">All</option>
-                            <option value="info" data-i18n="filter.info">Info</option>
-                            <option value="warning" data-i18n="filter.warning">Warning</option>
-                            <option value="error" data-i18n="filter.error">Error</option>
-                        </select>
-                    </div>
-                    <div class="card">
-                        <div class="device-selection">
-                            <label for="device-select" data-i18n="label.select_device">Select Device:</label>
-                            <select id="device-select">
-                                <!-- Options will be populated by JavaScript -->
-                            </select>
-                            <label for="last-address" data-i18n="label.last_address">Last Address:</label>
-                            <input type="text" id="last-address" readonly>
-                        </div>
-
-                        <div id="status-messages">
-                            <!-- Status messages will be populated by JavaScript -->
-                        </div>
-                        <div class="send-messages">
-                            <input type="text" id="command-input" data-i18n-placeholder="placeholder.type_here" placeholder="Typ hier..." autocomplete="off">
-                            <select id="suggestions"></select>
-                            <button id="send-command-button" data-i18n="button.send">Send</button>
-                        </div>
-
-                    </div>
-                </section>
-            </div>
-        </div>
-        <div id="settings-page" style="display:none;">
-            <div class="settings-tabbar" role="tablist" aria-label="Settings sections">
-                <button class="settings-tab active" type="button" data-settings-tab="mqtt" data-i18n="section.mqtt_settings">MQTT settings</button>
-                <button class="settings-tab" type="button" data-settings-tab="display" data-i18n="section.display_settings">Display</button>
-                <button class="settings-tab" type="button" data-settings-tab="update" data-i18n="section.update">Update</button>
-                <span class="settings-tabbar-spacer"></span>
-                <button id="settings-restart" class="settings-tab settings-tab-action" type="button" data-i18n="button.restart">Restart</button>
-                <button id="settings-close" class="settings-tab settings-tab-action" type="button" data-i18n="button.close">Close</button>
-            </div>
-            <div class="settings-grid">
-                <section id="mqtt-settings-section" class="settings-panel active" data-settings-panel="mqtt">
-                    <div class="title">
-                        <h2 data-i18n="section.mqtt_settings">MQTT settings</h2>
-                    </div>
-                    <div class="card">
-                        <label for="mqtt-user" data-i18n="label.user">User:</label>
-                        <input type="text" id="mqtt-user" data-i18n-placeholder="placeholder.mqtt_user" placeholder="MQTT User">
-                        <label for="mqtt-server" data-i18n="label.server">Server:</label>
-                        <input type="text" id="mqtt-server" data-i18n-placeholder="placeholder.mqtt_server" placeholder="MQTT Server">
-                        <label for="mqtt-port" data-i18n="label.port">MQTT Port:</label>
-                        <input type="text" id="mqtt-port" data-i18n-placeholder="placeholder.mqtt_port" placeholder="MQTT Port">
-                        <label for="mqtt-password" data-i18n="label.password">Password:</label>
-                        <input type="password" id="mqtt-password" data-i18n-placeholder="placeholder.mqtt_password" placeholder="MQTT Password">
-                        <label for="mqtt-discovery" data-i18n="label.discovery_topic">Discovery Topic:</label>
-                        <input type="text" id="mqtt-discovery" data-i18n-placeholder="placeholder.discovery_topic" placeholder="Discovery Topic">
-                        <button id="mqtt-update" data-i18n="button.update">Update</button>
-                    </div>
-                </section>
-                <section id="display-settings-section" class="settings-panel" data-settings-panel="display">
-                    <div class="title">
-                        <h2 data-i18n="section.display_settings">Display</h2>
-                    </div>
-                    <div class="card">
-                        <label class="setting-toggle" for="display-enabled">
-                            <input type="checkbox" id="display-enabled" checked>
-                            <span data-i18n="label.enable_display">Enable OLED display</span>
-                        </label>
-                        <button id="display-update" data-i18n="button.update">Update</button>
-                        <p id="display-status" class="setting-status" data-i18n="status.display_loading">Display settings loading...</p>
-                    </div>
-                </section>
-
-                <section id="update-section" class="settings-panel" data-settings-panel="update">
-                    <div class="title">
-                        <h2 data-i18n="section.update">Update</h2>
-                    </div>
-                    <div class="card">
-                        <p id="github-update-status" class="setting-status" data-i18n="status.github_update_ready">GitHub update check ready</p>
-                        <label for="github-update-branch" data-i18n="label.github_update_branch">Branch:</label>
-                        <select id="github-update-branch">
-                            <option value="auto" data-i18n="option.current_branch">Current firmware branch</option>
-                            <option value="master">master</option>
-                            <option value="dev-main">dev-main</option>
-                            <option value="Beta">Beta</option>
-                        </select>
-                        <button id="github-update-check" data-i18n="button.check_github_update">Check GitHub update</button>
-                        <label for="firmware-file" data-i18n="label.firmware">Firmware:</label>
-                        <div class="firmware-line"><input type="file" id="firmware-file" accept=".bin">
-                        <button id="upload-firmware" data-i18n="button.upload_firmware">Upload Firmware</button></div>
-                        <label for="filesystem-file" data-i18n="label.filesystem">Filesystem:</label>
-                        <div class="filesystem-line"><input type="file" id="filesystem-file" accept=".bin">
-                        <button id="upload-filesystem" data-i18n="button.upload_filesystem">Upload Filesystem</button></div>
-                        <label for="devices-file" data-i18n="label.devices">Devices:</label>
-                        <div class="devices-line">
-                            <input type="file" id="devices-file" accept=".json"> 
-                            <button id="upload-devices" data-i18n="button.upload_devices">Upload Devices</button>
-                            <button id="download-devices" data-i18n="button.download_devices">Download Devices</button>
-                        </div>
-                        <label for="remotes-file" data-i18n="label.remotes">Remotes:</label>
-                        <div class="remotes-line">
-                            <input type="file" id="remotes-file" accept=".json">
-                            <button id="upload-remotes" data-i18n="button.upload_remotes">Upload Remotes</button>
-                            <button id="download-remotes" data-i18n="button.download_remotes">Download Remotes</button>
-                        </div>
-                    </div>
-                </section>
-            </div>
-        </div>
-
-
-    </main>
-
-    <footer>
-        <p data-i18n="footer.rights">MiOpen.IO 2025 - 2026 | djbenbe & rspaargaren. All Rights Reserved.</p>
-    </footer>
-    <!-- Popup container (standaard verborgen) -->
-    <div id="popup">
-        <div class="popup-container">
+      <div id="devices-page" class="grid">
+        <div class="left">
+          <section id="device-list-section">
             <div class="title">
-                <h2 id="popup-title" data-i18n="popup.title_default">Popup Title</h2>
-                <div class="btn close" onclick="closePopup()" data-i18n="button.close">Sluiten</div>
+              <h2 data-i18n="section.devices">Devices</h2>
+              <div class="btn help" id="help-device"></div>
+              <div class="btn add" id="add-popup"></div>
             </div>
-            <div class="card-popup">
-                <div id="left">
-                    <p id="popup-content-left">  </p>
-                    <label for="popup-input" id="label-input" data-i18n="popup.label_device">device:</label>
-                    <input type="text" id="popup-input" data-i18n-placeholder="placeholder.type_here" placeholder="Typ hier..." autocomplete="off">
-                    <label for="popup-input-timing" id="label-timing" data-i18n="popup.label_timing">timing:</label>
-                    <input type="text" id="popup-input-timing" data-i18n-placeholder="placeholder.type_here" placeholder="Typ hier..." autocomplete="off">
-                    <label id="popup-boolean-row" style="display:none; gap:8px; align-items:center;">
-                        <span id="popup-boolean-label" data-i18n="popup.boolean_label_default">active</span>
-                        <input type="checkbox" id="popup-boolean">
-                    </label>
-                    <label id="popup-repeat-row" style="display:none; gap:8px; align-items:center;">
-                        <span id="popup-repeat-label" data-i18n="popup.repeat_on_no_response">Herhaal commando als rolluik niet reageert</span>
-                        <input type="checkbox" id="popup-repeat">
-                    </label>
-                    <label for="select-device" class="device-popup-label" data-i18n="popup.device_select">device-select:</label>
-                    <select id="popup-device-select" class="device-popup">
-                        <!-- Options will be populated by JavaScript -->
-                    </select>  
-                    <button id="popup-save" class="save" data-i18n="button.save">Save</button>
-                    <p id="delete-info" style="display:none; color:red; font-weight:bold;"></p>
-                    <p id="pair-label" data-i18n="popup.pair_label_default">Pair / Unpair the device to the physical screen</p>
-                    <div class="popup-buttons">
-                            <button id="popup-add" class="pair" data-i18n="button.pair">pair</button>
-                            <button id="popup-remove" class="unpair" data-i18n="button.unpair">unpair</button>
-                            <button id="popup-delete" type="button" class="danger" data-i18n="button.delete">Delete</button>
-                            <button id="popup-confirm" type="button" data-i18n="button.confirm">OK</button>
-                            <button id="popup-cancel"  type="button" data-i18n="button.cancel">Cancel</button>
-                    </div>
-                </div>
-                <div id="right">
-                    <p id="popup-content">
-                        <!-- Dynamic content will be populated by JavaScript -->
-                    </p>
-                    
-                </div>                
+            <div class="card">
+              <ul id="device-list"></ul>
             </div>
+          </section>
         </div>
+        <div class="right">
+          <section id="status-section">
+            <div class="title">
+              <h2 data-i18n="section.remotes">remote</h2>
+              <div class="btn help" id="help-remote"></div>
+              <div class="btn add" id="remote-popup"></div>
+            </div>
+            <div class="card">
+              <table id="remote-table">
+                <thead>
+                  <tr>
+                    <th data-i18n="table.remote_id">Remote ID</th>
+                    <th data-i18n="table.remote_name">Remote Name</th>
+                    <th data-i18n="table.linked_devices">Linked Devices</th>
+                    <th data-i18n="table.edit">Edit</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </div>
+      <div id="help-page" style="display: none">
+        <div class="left">
+          <section id="status-section">
+            <div class="title">
+              <h2 data-i18n="section.status_logs">Status / Log</h2>
+              <select id="select-log">
+                <option value="all" data-i18n="filter.all">All</option>
+                <option value="info" data-i18n="filter.info">Info</option>
+                <option value="warning" data-i18n="filter.warning">
+                  Warning
+                </option>
+                <option value="error" data-i18n="filter.error">Error</option>
+              </select>
+            </div>
+            <div class="card">
+              <div class="device-selection">
+                <label for="device-select" data-i18n="label.select_device">
+                  Select Device:
+                </label>
+                <select id="device-select"></select>
+                <label for="last-address" data-i18n="label.last_address">
+                  Last Address:
+                </label>
+                <input id="last-address" readonly="readonly" />
+              </div>
+              <div id="status-messages"></div>
+              <div class="send-messages">
+                <input
+                  id="command-input"
+                  data-i18n-placeholder="placeholder.type_here"
+                  placeholder="Typ hier..."
+                  autocomplete="off"
+                />
+                <select id="suggestions"></select>
+                <button id="send-command-button" data-i18n="button.send">
+                  Send
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+      <div id="settings-page" style="display: none">
+        <div
+          class="settings-tabbar"
+          role="tablist"
+          aria-label="Settings sections"
+        >
+          <button
+            class="settings-tab active"
+            type="button"
+            data-settings-tab="integration"
+          >
+            <img class="settings-tab-icon" src="img/paperclip.svg" alt="" />
+            <span data-i18n="section.integration">Integration</span>
+          </button>
+          <button
+            class="settings-tab"
+            type="button"
+            data-settings-tab="network"
+          >
+            <img class="settings-tab-icon" src="img/wifi.svg" alt="" />
+            <span data-i18n="section.network_config">Network</span>
+          </button>          <button class="settings-tab" type="button" data-settings-tab="update">
+            <img class="settings-tab-icon" src="img/system.svg" alt="" />
+            <span data-i18n="section.system">System</span>
+          </button>
+          <span class="settings-tabbar-spacer"></span>
+          <button
+            id="settings-restart"
+            class="settings-tab settings-tab-action"
+            type="button"
+            data-i18n="button.restart"
+          >
+            Restart
+          </button>
+          <button
+            id="settings-close"
+            class="settings-tab settings-tab-action"
+            type="button"
+            data-i18n="button.close"
+          >
+            Close
+          </button>
+        </div>
+        <div class="settings-grid">
+          <section
+            id="integration-settings-section"
+            class="settings-panel active grid"
+            data-settings-panel="integration"
+          >
+            <section id="mqtt-settings-section">
+              <div class="title">
+                <h2 data-i18n="section.mqtt_settings">MQTT settings</h2>
+              </div>
+              <div class="card">
+                <label for="mqtt-user" data-i18n="label.user">User:</label>
+                <input
+                  id="mqtt-user"
+                  data-i18n-placeholder="placeholder.mqtt_user"
+                  placeholder="MQTT User"
+                />
+                <label for="mqtt-server" data-i18n="label.server"
+                  >Server:</label
+                >
+                <input
+                  id="mqtt-server"
+                  data-i18n-placeholder="placeholder.mqtt_server"
+                  placeholder="MQTT Server"
+                />
+                <label for="mqtt-port" data-i18n="label.port">MQTT Port:</label>
+                <input
+                  id="mqtt-port"
+                  data-i18n-placeholder="placeholder.mqtt_port"
+                  placeholder="MQTT Port"
+                />
+                <label for="mqtt-password" data-i18n="label.password"
+                  >Password:</label
+                >
+                <input
+                  type="password"
+                  id="mqtt-password"
+                  data-i18n-placeholder="placeholder.mqtt_password"
+                  placeholder="MQTT Password"
+                />
+                <label for="mqtt-discovery" data-i18n="label.discovery_topic"
+                  >Discovery Topic:</label
+                >
+                <input
+                  id="mqtt-discovery"
+                  data-i18n-placeholder="placeholder.discovery_topic"
+                  placeholder="Discovery Topic"
+                />
+                <button id="mqtt-update" data-i18n="button.update">
+                  Update
+                </button>
+              </div>
+            </section>
+            <section id="display-settings-section">
+              <div class="title">
+                <h2 data-i18n="section.display_settings">Display</h2>
+              </div>
+              <div class="card">
+                <label class="setting-toggle" for="display-enabled"
+                  ><input
+                    type="checkbox"
+                    id="display-enabled"
+                    checked="checked"
+                  />
+                  <span data-i18n="label.enable_display"
+                    >Enable OLED display</span
+                  ></label
+                >
+                <button id="display-update" data-i18n="button.update">
+                  Update
+                </button>
+                <p
+                  id="display-status"
+                  class="setting-status"
+                  data-i18n="status.display_loading"
+                >
+                  Display settings loading...
+                </p>
+              </div>
+            </section>
+            <section id="syslog-settings-section">
+              <div class="title">
+                <h2 data-i18n="section.syslog_settings">Syslog settings</h2>
+              </div>
+              <div class="card">
+                <label class="setting-toggle" for="syslog-enabled"
+                  ><input type="checkbox" id="syslog-enabled" />
+                  <span data-i18n="label.enable_syslog_forwarding"
+                    >Enable syslog forwarding</span
+                  ></label
+                >
+                <label for="syslog-server" data-i18n="label.server"
+                  >Server:</label
+                >
+                <input
+                  id="syslog-server"
+                  data-i18n-placeholder="placeholder.syslog_server"
+                  placeholder="Syslog Server"
+                />
+                <label for="syslog-port" data-i18n="label.port">Port:</label>
+                <input
+                  type="number"
+                  id="syslog-port"
+                  min="1"
+                  max="65535"
+                  data-i18n-placeholder="placeholder.syslog_port"
+                  placeholder="Syslog Port"
+                />
+                <label for="syslog-tag" data-i18n="label.syslog_tag"
+                  >Tag:</label
+                >
+                <input
+                  id="syslog-tag"
+                  maxlength="20"
+                  data-i18n-placeholder="placeholder.syslog_tag"
+                  placeholder="e.g. myhouse"
+                />
+                <div class="popup-buttons">
+                  <button id="syslog-update" data-i18n="button.update">
+                    Update
+                  </button>
+                  <button id="syslog-test" data-i18n="button.syslog_test">
+                    Send test
+                  </button>
+                </div>
+              </div>
+            </section>
+          </section>
+          <section
+            id="network-settings-section"
+            class="settings-panel grid"
+            data-settings-panel="network"
+          >
+            <section id="wifi-network-section">
+              <div class="title">
+                <h2>WiFi Network</h2>
+              </div>
+              <div class="card">
+                <label for="wifi-ssid">SSID:</label>
+                <div style="display: flex; gap: 6px; align-items: center">
+                  <input
+                    id="wifi-ssid"
+                    placeholder="Network name"
+                    maxlength="32"
+                    style="flex: 1; margin: 0"
+                  />
+                  <button id="wifi-scan-btn" style="white-space: nowrap">
+                    Scan
+                  </button>
+                </div>
+                <div id="wifi-scan-results" style="display: none"></div>
+                <label for="wifi-password">Password:</label>
+                <input
+                  type="password"
+                  id="wifi-password"
+                  placeholder="Leave blank to keep current"
+                />
+                <small class="field-hint"
+                  >Leave blank to keep the current password.</small
+                >
+                <p class="restart-notice">
+                  Note: The device will restart after saving.
+                </p>
+                <div id="wifi-config-status" class="field-status"></div>
+                <button id="wifi-config-save">Save</button>
+              </div>
+            </section>
+            <section id="wifi-fallback-section">
+              <div class="title">
+                <h2>WiFi Fallback AP</h2>
+              </div>
+              <div class="card">
+                <label
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin-bottom: 10px;
+                  "
+                  ><input type="checkbox" id="fallback-enabled" /> Enable
+                  fallback AP when connection is lost</label
+                >
+                <label for="fallback-retries-boot"
+                  >Retries before AP (fresh boot):</label
+                >
+                <input
+                  type="number"
+                  id="fallback-retries-boot"
+                  min="1"
+                  max="20"
+                  placeholder="3"
+                />
+                <label for="fallback-retries-running"
+                  >Retries before AP (after dropout):</label
+                >
+                <input
+                  type="number"
+                  id="fallback-retries-running"
+                  min="1"
+                  max="20"
+                  placeholder="3"
+                />
+                <label for="fallback-timeout"
+                  >AP auto-shutdown (seconds, 0=off):</label
+                >
+                <input
+                  type="number"
+                  id="fallback-timeout"
+                  min="0"
+                  max="3600"
+                  placeholder="600"
+                />
+                <div id="fallback-status" class="field-status">Loading...</div>
+                <button id="fallback-save">Save</button>
+              </div>
+            </section>
+            <section id="network-config-section">
+              <div class="title">
+                <h2>Network config</h2>
+              </div>
+              <div class="card">
+                <label for="net-hostname">Hostname:</label>
+                <input id="net-hostname" placeholder="io-rts" />
+                <label style="display: flex; align-items: center; gap: 8px"
+                  ><input type="checkbox" id="net-dhcp" /> DHCP</label
+                >
+                <label for="net-ip">IP / mask / gateway:</label>
+                <div class="compact-grid">
+                  <input id="net-ip" placeholder="192.168.1.50" />
+                  <input id="net-mask" placeholder="255.255.255.0" />
+                  <input id="net-gateway" placeholder="192.168.1.1" />
+                </div>
+                <label for="net-dns1">DNS / SNTP:</label>
+                <div class="compact-grid">
+                  <input id="net-dns1" placeholder="1.1.1.1" />
+                  <input id="net-dns2" placeholder="8.8.8.8" />
+                  <input id="net-sntp" placeholder="pool.ntp.org" />
+                </div>
+                <div
+                  id="network-status"
+                  class="field-status"
+                  style="color: #e74c3c"
+                >
+                  Network config load failed.
+                </div>
+                <button id="network-save">Save network config</button>
+              </div>
+            </section>
+          </section>
+<section
+            id="update-backup-section"
+            class="settings-panel grid"
+            data-settings-panel="update"
+          >
+            <section id="update-section">
+              <div class="title">
+                <h2 data-i18n="section.update">Update</h2>
+              </div>
+              <div class="card">
+                <p
+                  id="github-update-status"
+                  class="setting-status"
+                  data-i18n="status.github_update_ready"
+                >
+                  GitHub update check ready
+                </p>
+                <label
+                  for="github-update-branch"
+                  data-i18n="label.github_update_branch"
+                  >Branch:</label
+                >
+                <select id="github-update-branch">
+                  <option value="auto" data-i18n="option.current_branch">
+                    Current firmware branch
+                  </option>
+                  <option value="master" data-i18n="option.master">
+                    master
+                  </option>
+                  <option value="dev-main" data-i18n="option.dev_main">
+                    dev-main
+                  </option>
+                  <option value="Beta" data-i18n="option.beta">Beta</option>
+                </select>
+                <button
+                  id="github-update-check"
+                  data-i18n="button.check_github_update"
+                >
+                  Check GitHub update
+                </button>
+                <label for="firmware-file" data-i18n="label.firmware"
+                  >Firmware:</label
+                >
+                <div class="firmware-line">
+                  <input type="file" id="firmware-file" accept=".bin" />
+                  <button
+                    id="upload-firmware"
+                    data-i18n="button.upload_firmware"
+                  >
+                    Upload Firmware
+                  </button>
+                </div>
+                <label for="filesystem-file" data-i18n="label.filesystem"
+                  >Filesystem:</label
+                >
+                <div class="filesystem-line">
+                  <input type="file" id="filesystem-file" accept=".bin" />
+                  <button
+                    id="upload-filesystem"
+                    data-i18n="button.upload_filesystem"
+                  >
+                    Upload Filesystem
+                  </button>
+                </div>
+              </div>
+            </section>
+            <section id="backup-section">
+              <div class="title">
+                <h2 data-i18n="section.backup">Backup/Restore</h2>
+              </div>
+              <div class="card">
+                <label for="backup-file" data-i18n="label.full_backup">Full backup:</label>
+                <div class="backup-line">
+                  <input type="file" id="backup-file" accept=".json" />
+                  <button id="upload-backup" data-i18n="button.upload_backup">
+                    Upload Backup
+                  </button>
+                  <button
+                    id="download-backup"
+                    data-i18n="button.download_backup"
+                  >
+                    Download Backup
+                  </button>
+                </div>                <label for="devices-file" data-i18n="label.devices"
+                  >Devices:</label
+                >
+                <div class="devices-line">
+                  <input type="file" id="devices-file" accept=".json" />
+                  <button id="upload-devices" data-i18n="button.upload_devices">
+                    Upload Devices
+                  </button>
+                  <button
+                    id="download-devices"
+                    data-i18n="button.download_devices"
+                  >
+                    Download Devices
+                  </button>
+                </div>
+                <label for="remotes-file" data-i18n="label.remotes"
+                  >Remotes:</label
+                >
+                <div class="remotes-line">
+                  <input type="file" id="remotes-file" accept=".json" />
+                  <button id="upload-remotes" data-i18n="button.upload_remotes">
+                    Upload Remotes
+                  </button>
+                  <button
+                    id="download-remotes"
+                    data-i18n="button.download_remotes"
+                  >
+                    Download Remotes
+                  </button>
+                </div>
+              </div>
+            </section>
+          </section>
+        </div>
+      </div>
+    </main>
+    <footer>
+      <p data-i18n="footer.rights">
+        MiOpen.IO 2025 - 2026 | djbenbe & rspaargaren. All Rights Reserved.
+      </p>
+      <p id="firmware-version" style="font-size: 0.8em; opacity: 0.6"></p>
+    </footer>
+    <div id="popup">
+      <div class="popup-container">
+        <div class="title">
+          <h2 id="popup-title" data-i18n="popup.title_default">Popup Title</h2>
+          <div
+            class="btn close"
+            onclick="closePopup()"
+            data-i18n="button.close"
+          >
+            Sluiten
+          </div>
+        </div>
+        <div class="card-popup">
+          <div id="left">
+            <p id="popup-content-left"></p>
+            <label
+              for="popup-input"
+              id="label-input"
+              data-i18n="popup.label_device"
+              >device:</label
+            >
+            <input
+              id="popup-input"
+              data-i18n-placeholder="placeholder.type_here"
+              placeholder="Typ hier..."
+              autocomplete="off"
+            />
+            <label
+              for="popup-input-timing"
+              id="label-timing"
+              data-i18n="popup.label_timing"
+              >timing:</label
+            >
+            <input
+              id="popup-input-timing"
+              data-i18n-placeholder="placeholder.type_here"
+              placeholder="Typ hier..."
+              autocomplete="off"
+            />
+            <label
+              id="popup-boolean-row"
+              style="display: none; gap: 8px; align-items: center"
+              ><span
+                id="popup-boolean-label"
+                data-i18n="popup.boolean_label_default"
+                >active</span
+              >
+              <input type="checkbox" id="popup-boolean"
+            /></label>
+            <label
+              id="popup-repeat-row"
+              style="display: none; gap: 8px; align-items: center"
+              ><span
+                id="popup-repeat-label"
+                data-i18n="popup.repeat_on_no_response"
+                >Herhaal commando als rolluik niet reageert</span
+              >
+              <input type="checkbox" id="popup-repeat"
+            /></label>
+            <label
+              for="popup-device-select"
+              class="device-popup-label"
+              data-i18n="popup.device_select"
+              >device-select:</label
+            >
+            <select id="popup-device-select" class="device-popup"></select>
+            <button id="popup-save" class="save" data-i18n="button.save">
+              Save
+            </button>
+            <p
+              id="delete-info"
+              style="display: none; color: red; font-weight: 700"
+            ></p>
+            <p id="pair-label" data-i18n="popup.pair_label_default">
+              Pair / Unpair the device to the physical screen
+            </p>
+            <div class="popup-buttons">
+              <button id="popup-add" class="pair" data-i18n="button.pair">
+                pair
+              </button>
+              <button
+                id="popup-remove"
+                class="unpair"
+                data-i18n="button.unpair"
+              >
+                unpair
+              </button>
+              <button
+                id="popup-delete"
+                type="button"
+                class="danger"
+                data-i18n="button.delete"
+              >
+                Delete
+              </button>
+              <button
+                id="popup-confirm"
+                type="button"
+                data-i18n="button.confirm"
+              >
+                OK
+              </button>
+              <button id="popup-cancel" type="button" data-i18n="button.cancel">
+                Cancel
+              </button>
+            </div>
+          </div>
+          <div id="right">
+            <p id="popup-content"></p>
+          </div>
+        </div>
+      </div>
     </div>
-    <script src="js/i18n.js?v=20260526b"></script>
-    <script src="js/toast.js?v=20260630a"></script>
-    <script src="js/api.js?v=20260526b"></script>
-    <script src="js/popup.js?v=20260526b"></script>
-    <script src="js/devices.js?v=20260526b"></script>
-    <script src="js/remotes.js?v=20260526b"></script>
-    <script src="js/settings.js?v=20260630a"></script>
+    <script src="js/i18n.js?v=20260530a"></script>
+    <script src="js/toast.js?v=20260629a"></script>
+    <script src="js/api.js?v=20260530a"></script>
+    <script src="js/popup.js?v=20260530a"></script>
+    <script src="js/devices.js?v=20260530a"></script>
+    <script src="js/remotes.js?v=20260530a"></script>
+    <script src="js/settings.js?v=20260631a"></script>
     <script src="js/app.js?v=20260630a"></script>
     <script src="js/menu.js?v=20260630a"></script>
-</body>
-
+  </body>
 </html>

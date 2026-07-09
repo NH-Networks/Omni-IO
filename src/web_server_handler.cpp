@@ -8,9 +8,11 @@
 #include <atomic>
 #include <functional>
 #include <memory>
+#include <vector>
 #include <LittleFS.h>
 #include <Update.h>
 #include <cstdlib>
+#include <cctype>
 #include <interact.h>
 #include <iohcCryptoHelpers.h>
 #include <iohcRemote1W.h>
@@ -20,6 +22,8 @@
 #include <mqtt_handler.h>
 #include <nvs_helpers.h>
 #include <oled_display.h>
+#include <WiFi.h>
+#include <wifi_helper.h>
 #if defined(SYSLOG)
 #include <syslog_helper.h>
 #endif
@@ -31,6 +35,68 @@
 // If you use WebServer.h, the setup and request handling will be different.
 AsyncWebServer server(80); // Create AsyncWebServer object on port 80
 AsyncWebSocket ws("/ws");
+
+struct TwoWStatus {
+  String lastTxCommand = "";
+  String lastTxResult = "";
+  bool lastTxError = false;
+  String lastRxType = "";
+  String lastRxFrequency = "";
+  String lastRxFrom = "";
+  String lastRxTo = "";
+  String lastRxCmd = "";
+  String lastRxData = "";
+  uint32_t lastRxCounter = 0;
+};
+
+static TwoWStatus g_twoWStatus;
+
+struct TwoWFrameLog {
+  uint32_t counter = 0;
+  String type;
+  String frequency;
+  String from;
+  String to;
+  String cmd;
+  String data;
+};
+
+static std::vector<TwoWFrameLog> g_twoWFrameLog;
+static constexpr size_t TWO_W_FRAME_LOG_LIMIT = 30;
+
+static void fillTwoWStatus(JsonObject &obj) {
+  obj["lastTxCommand"] = g_twoWStatus.lastTxCommand;
+  obj["lastTxResult"] = g_twoWStatus.lastTxResult;
+  obj["lastTxError"] = g_twoWStatus.lastTxError;
+  obj["lastRxType"] = g_twoWStatus.lastRxType;
+  obj["lastRxFrequency"] = g_twoWStatus.lastRxFrequency;
+  obj["lastRxFrom"] = g_twoWStatus.lastRxFrom;
+  obj["lastRxTo"] = g_twoWStatus.lastRxTo;
+  obj["lastRxCmd"] = g_twoWStatus.lastRxCmd;
+  obj["lastRxData"] = g_twoWStatus.lastRxData;
+  obj["lastRxCounter"] = g_twoWStatus.lastRxCounter;
+  JsonArray frames = obj["frames"].to<JsonArray>();
+  for (const auto &frame : g_twoWFrameLog) {
+    JsonObject item = frames.add<JsonObject>();
+    item["counter"] = frame.counter;
+    item["type"] = frame.type;
+    item["frequency"] = frame.frequency;
+    item["from"] = frame.from;
+    item["to"] = frame.to;
+    item["cmd"] = frame.cmd;
+    item["data"] = frame.data;
+  }
+}
+
+static void broadcastTwoWStatus() {
+  JsonDocument doc;
+  doc["type"] = "twowstatus";
+  JsonObject status = doc["status"].to<JsonObject>();
+  fillTwoWStatus(status);
+  String payload;
+  serializeJson(doc, payload);
+  ws.textAll(payload);
+}
 
 static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
                       AwsEventType type, void *arg, uint8_t *data,
@@ -56,16 +122,13 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     serializeJson(doc, payload);
     client->text(payload);
 
-    // Stream cached log messages individually to avoid a large JSON payload
-    auto logMsgs = getLogMessages();
-    for (const auto &m : logMsgs) {
-      JsonDocument logDoc;
-      logDoc["type"] = "log";
-      logDoc["message"] = m;
-      String logPayload;
-      serializeJson(logDoc, logPayload);
-      client->text(logPayload);
-    }
+    JsonDocument twoWDoc;
+    twoWDoc["type"] = "twowstatus";
+    JsonObject status = twoWDoc["status"].to<JsonObject>();
+    fillTwoWStatus(status);
+    String twoWPayload;
+    serializeJson(twoWDoc, twoWPayload);
+    client->text(twoWPayload);
   }
 }
 
@@ -88,6 +151,19 @@ void broadcastDevicePosition(const String &id, int position) {
   ws.textAll(payload);
 }
 
+void broadcastDeviceAction(const String &id, const String &action, int position, int target, const String &source) {
+  JsonDocument doc;
+  doc["type"] = "deviceaction";
+  doc["id"] = id;
+  doc["action"] = action;
+  doc["position"] = position;
+  doc["target"] = target;
+  doc["source"] = source;
+  String payload;
+  serializeJson(doc, payload);
+  ws.textAll(payload);
+}
+
 void broadcastLastAddress(const String &addr) {
   JsonDocument doc;
   doc["type"] = "lastaddr";
@@ -95,6 +171,53 @@ void broadcastLastAddress(const String &addr) {
   String payload;
   serializeJson(doc, payload);
   ws.textAll(payload);
+}
+
+void updateTwoWTxStatus(const String &command, const String &result, bool isError) {
+  g_twoWStatus.lastTxCommand = command;
+  g_twoWStatus.lastTxResult = result;
+  g_twoWStatus.lastTxError = isError;
+  broadcastTwoWStatus();
+}
+
+void updateTwoWRxStatus(const String &packetType, const String &from,
+                        const String &to, const String &cmd,
+                        const String &data, const String &frequency) {
+  const bool isRawDebug = packetType.startsWith("RAW");
+  static uint32_t lastRawDebugMs = 0;
+  const uint32_t nowMs = millis();
+  if (isRawDebug && nowMs - lastRawDebugMs < 1000) {
+    return;
+  }
+  if (isRawDebug) {
+    lastRawDebugMs = nowMs;
+  }
+
+  String safeData = data;
+  if (safeData.length() > 180) {
+    safeData = safeData.substring(0, 180) + "...";
+  }
+
+  g_twoWStatus.lastRxType = packetType;
+  g_twoWStatus.lastRxFrequency = frequency;
+  g_twoWStatus.lastRxFrom = from;
+  g_twoWStatus.lastRxTo = to;
+  g_twoWStatus.lastRxCmd = cmd;
+  g_twoWStatus.lastRxData = safeData;
+  g_twoWStatus.lastRxCounter++;
+  TwoWFrameLog frame;
+  frame.counter = g_twoWStatus.lastRxCounter;
+  frame.type = packetType;
+  frame.frequency = frequency;
+  frame.from = from;
+  frame.to = to;
+  frame.cmd = cmd;
+  frame.data = safeData;
+  g_twoWFrameLog.push_back(frame);
+  while (g_twoWFrameLog.size() > TWO_W_FRAME_LOG_LIMIT) {
+    g_twoWFrameLog.erase(g_twoWFrameLog.begin());
+  }
+  broadcastTwoWStatus();
 }
 
 // Structure describing a device entry returned to the web UI
@@ -228,6 +351,148 @@ void handleApiRemotes(AsyncWebServerRequest *request, JsonArray &root) {
   }
 }
 
+static bool readLittleFsJsonFile(const char *path, JsonDocument &doc) {
+  if (!LittleFS.exists(path)) {
+    return false;
+  }
+  fs::File file = LittleFS.open(path, "r");
+  if (!file) {
+    return false;
+  }
+  DeserializationError err = deserializeJson(doc, file);
+  file.close();
+  return !err;
+}
+
+static bool writeLittleFsJsonFile(const char *path, JsonVariantConst value) {
+  fs::File file = LittleFS.open(path, "w");
+  if (!file) {
+    return false;
+  }
+  const size_t written = serializeJson(value, file);
+  file.close();
+  return written > 0;
+}
+
+static bool readLittleFsTextFile(const char *path, String &out) {
+  out = "";
+  if (!LittleFS.exists(path)) {
+    return false;
+  }
+  fs::File file = LittleFS.open(path, "r");
+  if (!file) {
+    return false;
+  }
+  out.reserve(file.size() + 1);
+  while (file.available()) {
+    out += static_cast<char>(file.read());
+  }
+  file.close();
+  return out.length() > 0;
+}
+
+static bool writeLittleFsTextFile(const char *path, const String &content) {
+  if (!content.length()) {
+    return false;
+  }
+  fs::File file = LittleFS.open(path, "w");
+  if (!file) {
+    return false;
+  }
+  const size_t written = file.print(content);
+  file.close();
+  return written == content.length();
+}
+
+static String s_preservedDevicesJson;
+static String s_preservedRemoteMapJson;
+static bool s_preservedDevicesJsonValid = false;
+static bool s_preservedRemoteMapJsonValid = false;
+
+static void preserveConfigBeforeFilesystemUpdate() {
+  s_preservedDevicesJsonValid = readLittleFsTextFile(IOHC_1W_REMOTE, s_preservedDevicesJson);
+  s_preservedRemoteMapJsonValid = readLittleFsTextFile(REMOTE_MAP_FILE, s_preservedRemoteMapJson);
+}
+
+static void restoreConfigAfterFilesystemUpdate() {
+  if (!LittleFS.begin()) {
+    Serial.println("Filesystem update: LittleFS remount failed; config not restored");
+    return;
+  }
+  if (s_preservedDevicesJsonValid && writeLittleFsTextFile(IOHC_1W_REMOTE, s_preservedDevicesJson)) {
+    Serial.println("Filesystem update: preserved 1W.json restored");
+  }
+  if (s_preservedRemoteMapJsonValid && writeLittleFsTextFile(REMOTE_MAP_FILE, s_preservedRemoteMapJson)) {
+    Serial.println("Filesystem update: preserved RemoteMap.json restored");
+  }
+}
+
+void handleDownloadBackup(AsyncWebServerRequest *request) {
+  JsonDocument backup;
+  backup["format"] = "miopen-backup";
+  backup["version"] = 1;
+
+  JsonDocument devices;
+  if (readLittleFsJsonFile(IOHC_1W_REMOTE, devices)) {
+    backup["devices"] = devices.as<JsonVariantConst>();
+  } else {
+    backup["devices"] = JsonArray();
+  }
+
+  JsonDocument remotes;
+  if (readLittleFsJsonFile(REMOTE_MAP_FILE, remotes)) {
+    backup["remotes"] = remotes.as<JsonVariantConst>();
+  } else {
+    backup["remotes"] = JsonArray();
+  }
+
+  AsyncResponseStream *response = request->beginResponseStream("application/json");
+  response->addHeader("Content-Disposition", "attachment; filename=miopen-backup.json");
+  serializeJson(backup, *response);
+  request->send(response);
+}
+
+void handleUploadBackupDone(AsyncWebServerRequest *request) {
+  bool ok = false;
+  if (request->_tempFile) {
+    request->_tempFile.close();
+  }
+
+  fs::File file = LittleFS.open("/backup-upload.json", "r");
+  if (file) {
+    JsonDocument backup;
+    DeserializationError err = deserializeJson(backup, file);
+    file.close();
+    if (!err && backup["devices"].is<JsonVariant>() && backup["remotes"].is<JsonVariant>()) {
+      ok = writeLittleFsJsonFile(IOHC_1W_REMOTE, backup["devices"].as<JsonVariantConst>()) &&
+           writeLittleFsJsonFile(REMOTE_MAP_FILE, backup["remotes"].as<JsonVariantConst>());
+    }
+  }
+  LittleFS.remove("/backup-upload.json");
+
+  if (!ok) {
+    request->send(400, "application/json", "{\"message\":\"Invalid backup file\"}");
+    return;
+  }
+
+  IOHC::iohcRemote1W::getInstance()->load();
+  IOHC::iohcRemoteMap::getInstance()->load();
+  request->send(200, "application/json", "{\"message\":\"Backup uploaded\"}");
+}
+
+void handleUploadBackupFile(AsyncWebServerRequest *request, String filename,
+                            size_t index, uint8_t *data, size_t len,
+                            bool final) {
+  if (!index) {
+    request->_tempFile = LittleFS.open("/backup-upload.json", "w");
+  }
+  if (len) {
+    request->_tempFile.write(data, len);
+  }
+  if (final) {
+    request->_tempFile.close();
+  }
+}
 void handleDownloadDevices(AsyncWebServerRequest *request) {
   if (LittleFS.exists(IOHC_1W_REMOTE)) {
     request->send(LittleFS, IOHC_1W_REMOTE, "application/json", true);
@@ -322,6 +587,18 @@ void handleApiCommand(AsyncWebServerRequest *request, JsonObject &doc, JsonObjec
 
   bool success = false;
   String message;
+  const bool isTwoWCommand =
+      segments[0] == "powerOn" || segments[0] == "setTemp" || segments[0] == "setMode" ||
+      segments[0] == "setPresence" || segments[0] == "setWindow" || segments[0] == "midnight" ||
+      segments[0] == "associate" || segments[0] == "ack" || segments[0] == "discover28" ||
+      segments[0] == "discover2A" || segments[0] == "pair2W" || segments[0] == "pair2Walt" || segments[0] == "listen2W" || segments[0] == "listen2Wslow" || segments[0] == "fake0" || segments[0] == "custom" ||
+      segments[0] == "custom60";
+  if (isTwoWCommand) {
+    request->send(400, "application/json",
+                  "{\"success\":false, \"message\":\"2W commands disabled in beta\"}");
+    return;
+  }
+
   for (uint8_t idx = 0; idx <= lastEntry; ++idx) {
     if (_cmdHandler[idx] == nullptr)
       continue;
@@ -332,10 +609,11 @@ void handleApiCommand(AsyncWebServerRequest *request, JsonObject &doc, JsonObjec
     }
   }
 
-  if (success)
-    message = "Command executed";
-  else
-    message = "Unknown command";
+  if (success) {
+    message = "Command executed: source=web cmd=" + command;
+  } else {
+    message = "Unknown command: source=web cmd=" + command;
+  }
 
   addLogMessage(message);
 
@@ -385,6 +663,10 @@ void handleApiAction(AsyncWebServerRequest *request, JsonObject &doc, JsonObject
   t.push_back(action.c_str());
   t.push_back(it->description);
   IOHC::iohcRemote1W::getInstance()->cmd(btn, &t);
+  const String state = action == "open" ? "OPENING" : (action == "close" ? "CLOSING" : "STOP");
+  broadcastDeviceAction(deviceId, state,
+                        static_cast<int>(it->positionTracker.getPosition()),
+                        static_cast<int>(it->targetPosition), "web");
   broadcastDevicePosition(deviceId,
                           static_cast<int>(it->positionTracker.getPosition()));
 
@@ -395,31 +677,205 @@ void handleApiAction(AsyncWebServerRequest *request, JsonObject &doc, JsonObject
   root["message"] = msg;
 }
 
+static void scheduleRestart(const char *taskName) {
+  static std::atomic<bool> rebootScheduled{false};
+  if (!rebootScheduled.exchange(true)) {
+    xTaskCreate(
+      [](void *) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        ESP.restart();
+      },
+      taskName,
+      2048,
+      nullptr,
+      5,
+      nullptr
+    );
+  }
+}
+
+
+static bool isValidHostname(const String &hostname) {
+  if (hostname.length() == 0 || hostname.length() > 31) {
+    return false;
+  }
+  for (size_t i = 0; i < hostname.length(); ++i) {
+    const char c = hostname.charAt(i);
+    if (!isalnum(c) && c != '-') {
+      return false;
+    }
+  }
+  return hostname.charAt(0) != '-' && hostname.charAt(hostname.length() - 1) != '-';
+}
+
+static bool isValidIpString(const String &value) {
+  IPAddress ip;
+  return value.length() > 0 && ip.fromString(value);
+}
+void handleApiNetworkGet(AsyncWebServerRequest *request, JsonObject &root) {
+  root["hostname"] = WiFi.getHostname() ? WiFi.getHostname() : "MiOpenIO";
+  root["dhcp"] = true;
+  root["connected"] = WiFi.status() == WL_CONNECTED;
+  root["ip"] = WiFi.localIP().toString();
+  root["mask"] = WiFi.subnetMask().toString();
+  root["gateway"] = WiFi.gatewayIP().toString();
+  root["dns1"] = WiFi.dnsIP(0).toString();
+  root["dns2"] = WiFi.dnsIP(1).toString();
+  root["sntp"] = "pool.ntp.org";
+}
+
+
+void handleApiNetworkSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
+  String hostname = doc["hostname"] | "MiOpenIO";
+  bool dhcp = doc["dhcp"] | true;
+  String ip = doc["ip"] | "";
+  String mask = doc["mask"] | "";
+  String gateway = doc["gateway"] | "";
+  String dns1 = doc["dns1"] | "";
+  String dns2 = doc["dns2"] | "";
+  String sntp = doc["sntp"] | "";
+  hostname.trim(); ip.trim(); mask.trim(); gateway.trim(); dns1.trim(); dns2.trim(); sntp.trim();
+
+  if (!isValidHostname(hostname)) {
+    request->send(400, "application/json", "{\"success\":false,\"message\":\"Invalid hostname\"}");
+    return;
+  }
+
+  if (!dhcp) {
+    if (!isValidIpString(ip) || !isValidIpString(mask) || !isValidIpString(gateway)) {
+      request->send(400, "application/json", "{\"success\":false,\"message\":\"Static IP, mask and gateway are required\"}");
+      return;
+    }
+    if ((!dns1.isEmpty() && !isValidIpString(dns1)) || (!dns2.isEmpty() && !isValidIpString(dns2))) {
+      request->send(400, "application/json", "{\"success\":false,\"message\":\"Invalid DNS address\"}");
+      return;
+    }
+  }
+
+  nvs_write_string(NVS_KEY_NET_HOST, std::string(hostname.c_str()));
+  nvs_write_bool(NVS_KEY_NET_DHCP, dhcp);
+  nvs_write_string(NVS_KEY_NET_IP, std::string(ip.c_str()));
+  nvs_write_string(NVS_KEY_NET_MASK, std::string(mask.c_str()));
+  nvs_write_string(NVS_KEY_NET_GW, std::string(gateway.c_str()));
+  nvs_write_string(NVS_KEY_NET_DNS1, std::string(dns1.c_str()));
+  nvs_write_string(NVS_KEY_NET_DNS2, std::string(dns2.c_str()));
+  nvs_write_string(NVS_KEY_NET_SNTP, std::string(sntp.c_str()));
+
+  root["success"] = true;
+  root["message"] = "Network config saved, rebooting";
+  root["dhcp"] = dhcp;
+  root["hostname"] = hostname;
+  scheduleRestart("net-reboot");
+}
+
+void handleApiFallbackGet(AsyncWebServerRequest *request, JsonObject &root) {
+  bool enabled = true;
+  uint16_t bootRetries = 3;
+  uint16_t runRetries = 3;
+  uint16_t timeout = 600;
+  nvs_read_bool(NVS_KEY_FB_ENABLED, enabled);
+  nvs_read_u16(NVS_KEY_FB_BOOT, bootRetries);
+  nvs_read_u16(NVS_KEY_FB_RUN, runRetries);
+  nvs_read_u16(NVS_KEY_FB_TIMEOUT, timeout);
+  root["enabled"] = enabled;
+  root["retriesBoot"] = bootRetries;
+  root["retriesRunning"] = runRetries;
+  root["timeout"] = timeout;
+}
+
+void handleApiFallbackSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
+  nvs_write_bool(NVS_KEY_FB_ENABLED, doc["enabled"] | true);
+  nvs_write_u16(NVS_KEY_FB_BOOT, static_cast<uint16_t>(doc["retriesBoot"] | 3));
+  nvs_write_u16(NVS_KEY_FB_RUN, static_cast<uint16_t>(doc["retriesRunning"] | 3));
+  nvs_write_u16(NVS_KEY_FB_TIMEOUT, static_cast<uint16_t>(doc["timeout"] | 600));
+  root["success"] = true;
+  root["message"] = "Fallback AP settings saved";
+}
+void handleApiWifiGet(AsyncWebServerRequest *request, JsonObject &root) {
+  root["ssid"] = getConfiguredWiFiSSID();
+  root["connected"] = WiFi.status() == WL_CONNECTED;
+  root["currentSsid"] = WiFi.SSID();
+  root["ip"] = WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : "";
+  root["rssi"] = wifiStatus.rssi.load();
+  root["quality"] = wifiStatus.signalStrengthPercent.load();
+}
+
+void handleApiWifiScan(AsyncWebServerRequest *request, JsonObject &root) {
+  WiFi.scanDelete();
+  WiFi.mode(WIFI_STA);
+
+  int count = WiFi.scanNetworks(false, false);
+  if (count <= 0) {
+    WiFi.scanDelete();
+    delay(250);
+    count = WiFi.scanNetworks(false, true);
+  }
+
+
+  root["count"] = count;
+  root["status"] = WiFi.status();
+  root["connected"] = WiFi.status() == WL_CONNECTED;
+  root["ssid"] = WiFi.SSID();
+  JsonArray networks = root["networks"].to<JsonArray>();
+
+  if (count < 0) {
+    WiFi.scanDelete();
+    return;
+  }
+
+  for (int i = 0; i < count; ++i) {
+    const String ssid = WiFi.SSID(i);
+    if (ssid.isEmpty()) {
+      continue;
+    }
+    JsonObject item = networks.add<JsonObject>();
+    item["ssid"] = ssid;
+    item["rssi"] = WiFi.RSSI(i);
+    item["secure"] = WiFi.encryptionType(i) != WIFI_AUTH_OPEN;
+    item["channel"] = WiFi.channel(i);
+  }
+  WiFi.scanDelete();
+}
+void handleApiWifiSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
+  String ssid = doc["ssid"] | "";
+  String password = doc["password"] | "";
+  ssid.trim();
+
+  if (ssid.isEmpty() || ssid.length() > 32) {
+    request->send(400, "application/json",
+                  "{\"success\":false,\"message\":\"SSID is required and must be 32 characters or less\"}");
+    return;
+  }
+  if (password.length() > 64) {
+    request->send(400, "application/json",
+                  "{\"success\":false,\"message\":\"Password is too long\"}");
+    return;
+  }
+
+  saveWiFiCredentials(ssid, password);
+  root["success"] = true;
+  root["message"] = "WiFi settings saved, rebooting";
+  root["ssid"] = ssid;
+  scheduleRestart("wifi-reboot");
+}
+
 void handleApiInfo(AsyncWebServerRequest *request, JsonObject &root) {
 #ifdef FIRMWARE_VERSION
   root["version"] = FIRMWARE_VERSION;
 #else
   root["version"] = "dev";
 #endif
-#ifdef FIRMWARE_BRANCH
-  root["branch"] = FIRMWARE_BRANCH;
-#else
-  root["branch"] = "unknown";
+  root["uptimeMs"] = millis();
+  root["freeHeap"] = ESP.getFreeHeap();
+  root["wifiConnected"] = WiFi.status() == WL_CONNECTED;
+  root["wifiRssi"] = wifiStatus.rssi.load();
+  root["wifiQuality"] = wifiStatus.signalStrengthPercent.load();
+  root["ip"] = WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : "";
+#if defined(MQTT)
+  root["mqttConnected"] = mqttClient.connected();
+  root["mqttState"] = mqttStatus == ConnState::Connected ? "connected" :
+                      (mqttStatus == ConnState::Connecting ? "connecting" : "disconnected");
 #endif
-}
-
-void handleApiReboot(AsyncWebServerRequest *request) {
-  request->send(200, "application/json",
-                "{\"success\":true,\"message\":\"Restarting...\"}");
-  static std::atomic<bool> rebootScheduled{false};
-  if (!rebootScheduled.exchange(true)) {
-    xTaskCreate(
-        [](void *) {
-          vTaskDelay(pdMS_TO_TICKS(750));
-          ESP.restart();
-        },
-        "apiReboot", 2048, nullptr, 1, nullptr);
-  }
 }
 
 void handleApiLogs(AsyncWebServerRequest *request, JsonArray &root) {
@@ -430,7 +886,8 @@ void handleApiLogs(AsyncWebServerRequest *request, JsonArray &root) {
 }
 
 void handleApiLastAddr(AsyncWebServerRequest *request, JsonObject &root) {
-  root["address"] = bytesToHexString(IOHC::lastFromAddress, sizeof(IOHC::lastFromAddress)).c_str();
+  const auto _a = IOHC::lastFromAddress.load();
+  root["address"] = bytesToHexString(_a.b, sizeof(_a.b)).c_str();
 }
 
 static bool jsonToBool(JsonVariant variant, bool &value) {
@@ -468,7 +925,6 @@ static bool jsonToBool(JsonVariant variant, bool &value) {
 void handleApiDisplayGet(AsyncWebServerRequest *request, JsonObject &root) {
   const bool enabled = isDisplayEnabled();
   root["enabled"] = enabled;
-  Serial.printf("Display config requested: %s\n", enabled ? "enabled" : "disabled");
 }
 
 void handleApiDisplaySet(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
@@ -480,7 +936,6 @@ void handleApiDisplaySet(AsyncWebServerRequest *request, JsonObject &doc, JsonOb
   }
 
   setDisplayEnabled(enabled);
-  Serial.printf("Display config updated: %s\n", enabled ? "enabled" : "disabled");
 
   root["success"] = true;
   root["message"] = "Display configuration updated";
@@ -495,6 +950,7 @@ void handleApiSyslogGet(AsyncWebServerRequest *request, JsonObject &root) {
   root["enabled"] = syslog_enabled;
   root["server"] = syslog_server.c_str();
   root["port"] = syslog_port;
+  root["tag"] = syslog_tag.c_str();
 }
 
 void handleApiSyslogSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
@@ -550,6 +1006,20 @@ void handleApiSyslogSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObj
     }
   }
 
+  if (doc["tag"].is<JsonVariant>()) {
+    String newTag = doc["tag"] | "";
+    // Sanitise: keep only alphanumeric and hyphen, truncate to 20 chars
+    String sanitised;
+    for (char c : newTag) {
+      if (isalnum(c) || c == '-') sanitised += c;
+      if (sanitised.length() >= 20) break;
+    }
+    if (sanitised != syslog_tag.c_str()) {
+      syslog_tag = sanitised.c_str();
+      nvs_write_string(NVS_KEY_SYSLOG_TAG, syslog_tag);
+    }
+  }
+
   if (enabledChanged || serverChanged || portChanged) {
     resetSyslog();
     if (syslog_enabled) {
@@ -562,9 +1032,25 @@ void handleApiSyslogSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObj
   root["enabled"] = syslog_enabled;
   root["server"] = syslog_server.c_str();
   root["port"] = syslog_port;
+  root["tag"] = syslog_tag.c_str();
+}
+
+void handleApiSyslogTest(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
+  if (!syslog_enabled) {
+    root["success"] = false;
+    root["message"] = "Syslog is disabled";
+    return;
+  }
+  if (WiFi.status() != WL_CONNECTED) {
+    root["success"] = false;
+    root["message"] = "WiFi not connected";
+    return;
+  }
+  sendSyslog("Test message from web UI", 6);
+  root["success"] = true;
+  root["message"] = "Test message sent";
 }
 #endif
-
 #if defined(MQTT)
 void handleApiMqttGet(AsyncWebServerRequest *request, JsonObject &root) {
   root["server"] = mqtt_server.c_str();
@@ -649,17 +1135,20 @@ void handleFirmwareUpdate(AsyncWebServerRequest *request) {
   } else {
     request->send(200, "application/json",
                   "{\"message\":\"Firmware update successful, rebooting\"}");
-    xTaskCreate(
-      [](void *) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        ESP.restart();
-      },
-      "reboot",
-      2048,
-      nullptr,
-      1,
-      nullptr
-    );
+    static std::atomic<bool> rebootScheduled{false};
+    if (!rebootScheduled.exchange(true)) {
+      xTaskCreate(
+        [](void *) {
+          vTaskDelay(pdMS_TO_TICKS(1000));
+          ESP.restart();
+        },
+        "reboot",
+        2048,
+        nullptr,
+        5,
+        nullptr
+      );
+    }
   }
 }
 
@@ -686,23 +1175,29 @@ void handleFirmwareUpload(AsyncWebServerRequest *request, String filename,
 
 void handleFilesystemUpdate(AsyncWebServerRequest *request) {
   if (Update.hasError()) {
-    request->send(500, "application/json",
-                  "{\"message\":\"Filesystem update failed\"}");
+    String message = "Filesystem update failed";
+    if (Update.getError() != 0) {
+      message += ": error=" + String(Update.getError());
+    }
+    request->send(500, "application/json", String("{\"message\":\"") + message + "\"}");
     LittleFS.begin();
   } else {
     request->send(200, "application/json",
                   "{\"message\":\"Filesystem update successful, rebooting\"}");
-    xTaskCreate(
-      [](void *) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        ESP.restart();
-      },
-      "reboot",
-      2048,
-      nullptr,
-      1,
-      nullptr
-    );
+    static std::atomic<bool> rebootScheduled{false};
+    if (!rebootScheduled.exchange(true)) {
+      xTaskCreate(
+        [](void *) {
+          vTaskDelay(pdMS_TO_TICKS(1000));
+          ESP.restart();
+        },
+        "reboot",
+        2048,
+        nullptr,
+        5,
+        nullptr
+      );
+    }
   }
 }
 
@@ -711,6 +1206,7 @@ void handleFilesystemUpload(AsyncWebServerRequest *request, String filename,
                             bool final) {
   if (!index) {
     Serial.printf("Filesystem upload start: %s\n", filename.c_str());
+    preserveConfigBeforeFilesystemUpdate();
     LittleFS.end();
     if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS)) {
       Update.printError(Serial);
@@ -727,6 +1223,7 @@ void handleFilesystemUpload(AsyncWebServerRequest *request, String filename,
       Update.printError(Serial);
     } else {
       Serial.printf("Filesystem upload complete: %u bytes\n", index + len);
+      restoreConfigAfterFilesystemUpdate();
     }
   }
 }
@@ -743,11 +1240,16 @@ void setupWebServer() {
   }
 
   // API Endpoints
+  server.on("/api/info", HTTP_GET, jsonGet(handleApiInfo));
   server.on("/api/devices", HTTP_GET, jsonGet(handleApiDevices));
   server.on("/api/remotes", HTTP_GET, jsonGet(handleApiRemotes));
-  server.on("/api/info", HTTP_GET, jsonGet(handleApiInfo));
   server.on("/api/logs", HTTP_GET, jsonGet(handleApiLogs));
   server.on("/api/lastaddr", HTTP_GET, jsonGet(handleApiLastAddr));
+  server.on("/api/wifi-scan", HTTP_GET, jsonGet(handleApiWifiScan));
+  server.on("/api/wifi/scan", HTTP_GET, jsonGet(handleApiWifiScan));
+  server.on("/api/wifi", HTTP_GET, jsonGet(handleApiWifiGet));
+  server.on("/api/network", HTTP_GET, jsonGet(handleApiNetworkGet));
+  server.on("/api/fallback", HTTP_GET, jsonGet(handleApiFallbackGet));
 #if defined(SSD1306_DISPLAY)
   server.on("/api/display", HTTP_GET, jsonGet(handleApiDisplayGet));
 #endif
@@ -759,7 +1261,9 @@ void setupWebServer() {
 #endif
   server.on("/api/command", HTTP_POST, jsonPost(handleApiCommand));
   server.on("/api/action", HTTP_POST, jsonPost(handleApiAction));
-  server.on("/api/reboot", HTTP_POST, handleApiReboot);
+  server.on("/api/wifi", HTTP_POST, jsonPost(handleApiWifiSet));
+  server.on("/api/network", HTTP_POST, jsonPost(handleApiNetworkSet));
+  server.on("/api/fallback", HTTP_POST, jsonPost(handleApiFallbackSet));
 #if defined(SSD1306_DISPLAY)
   server.on("/api/display", HTTP_POST, jsonPost(handleApiDisplaySet));
 #endif
@@ -767,14 +1271,18 @@ void setupWebServer() {
   server.on("/api/mqtt", HTTP_POST, jsonPost(handleApiMqttSet));
 #endif
 #if defined(SYSLOG)
+  server.on("/api/syslog/test", HTTP_POST, jsonPost(handleApiSyslogTest));
   server.on("/api/syslog", HTTP_POST, jsonPost(handleApiSyslogSet));
 #endif
   server.on("/api/firmware", HTTP_POST, handleFirmwareUpdate,
             handleFirmwareUpload);
   server.on("/api/filesystem", HTTP_POST, handleFilesystemUpdate,
             handleFilesystemUpload);
+  server.on("/api/download/backup", HTTP_GET, handleDownloadBackup);
   server.on("/api/download/devices", HTTP_GET, handleDownloadDevices);
   server.on("/api/download/remotes", HTTP_GET, handleDownloadRemotes);
+  server.on("/api/upload/backup", HTTP_POST, handleUploadBackupDone,
+            handleUploadBackupFile);
   server.on("/api/upload/devices", HTTP_POST, handleUploadDevicesDone,
             handleUploadDevicesFile);
   server.on("/api/upload/remotes", HTTP_POST, handleUploadRemotesDone,
@@ -816,3 +1324,4 @@ void loopWebServer() {
 }
 
 #endif // defined(WEBSERVER)
+

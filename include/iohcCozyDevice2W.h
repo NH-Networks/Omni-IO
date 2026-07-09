@@ -69,7 +69,9 @@ namespace IOHC {
         void cmd(DeviceButton cmd, Tokens *data);
         bool load() override;
         bool save() override;
+        void initializeValid();
         static void forgePacket(iohcPacket *packet, const std::vector<uint8_t> &vector);
+        std::map<uint8_t, int> mapValid;
 
     private:
         iohcCozyDevice2W();
@@ -84,7 +86,6 @@ namespace IOHC {
         };
 
         std::vector<device> devices;
-        std::vector<iohcPacket *> packets2send{};
     };
 }
 #endif

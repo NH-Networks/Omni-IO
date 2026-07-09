@@ -19,16 +19,18 @@
 
 #include <interact.h>
 #include <WiFi.h>
-#include <WiFiManager.h>
 #include <atomic>
 
 extern struct WiFiStatus {
   std::atomic<ConnState> connectionStatus;
   std::atomic<int> signalStrengthPercent;
+  std::atomic<int> rssi;
 } wifiStatus;
 
 
 void initWifi();
 void clearWifi();
+String getConfiguredWiFiSSID();
+void saveWiFiCredentials(const String &ssid, const String &password);
 
 #endif // WIFI_HELPER_H

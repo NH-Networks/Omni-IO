@@ -14,7 +14,20 @@ static constexpr char NVS_KEY_MQTT_PORT[] = "mqtt_port";
 static constexpr char NVS_KEY_SYSLOG_ENABLED[] = "syslog_enabled";
 static constexpr char NVS_KEY_SYSLOG_SERVER[] = "syslog_server";
 static constexpr char NVS_KEY_SYSLOG_PORT[] = "syslog_port";
+static constexpr char NVS_KEY_SYSLOG_TAG[] = "syslog_tag";
 static constexpr char NVS_KEY_DISPLAY_ENABLED[] = "display_on";
+static constexpr char NVS_KEY_NET_HOST[] = "net_host";
+static constexpr char NVS_KEY_NET_DHCP[] = "net_dhcp";
+static constexpr char NVS_KEY_NET_IP[] = "net_ip";
+static constexpr char NVS_KEY_NET_MASK[] = "net_mask";
+static constexpr char NVS_KEY_NET_GW[] = "net_gw";
+static constexpr char NVS_KEY_NET_DNS1[] = "net_dns1";
+static constexpr char NVS_KEY_NET_DNS2[] = "net_dns2";
+static constexpr char NVS_KEY_NET_SNTP[] = "net_sntp";
+static constexpr char NVS_KEY_FB_ENABLED[] = "fb_enabled";
+static constexpr char NVS_KEY_FB_BOOT[] = "fb_boot";
+static constexpr char NVS_KEY_FB_RUN[] = "fb_run";
+static constexpr char NVS_KEY_FB_TIMEOUT[] = "fb_timeout";
 
 
 bool nvs_init();
