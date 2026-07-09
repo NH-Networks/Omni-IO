@@ -4,17 +4,62 @@
             deviceId: deviceId,
             action: action
         });
-        app.logStatus(result.message || ("Action " + action + " sent."));
     }
 
-    function updateDeviceFill(deviceId, percent) {
+    function updateDeviceFill(deviceId, percent, durationSeconds) {
         const deviceEl = document.querySelector('.device[data-id="' + deviceId + '"]');
         if (!deviceEl) {
             return;
         }
 
+        if (typeof durationSeconds === "number" && durationSeconds > 0) {
+            deviceEl.style.transitionDuration = durationSeconds.toFixed(2) + "s";
+        }
+
+        const clamped = Math.max(0, Math.min(100, Number(percent) || 0));
         deviceEl.style.background = "linear-gradient(to top, var(--color-input) " +
-            percent + "%, var(--color-accent3) " + percent + "%)";
+            clamped + "%, var(--color-accent3) " + clamped + "%)";
+    }
+
+    function setDeviceState(deviceId, state, source) {
+        const deviceEl = document.querySelector('.device[data-id="' + deviceId + '"]');
+        if (!deviceEl) {
+            return;
+        }
+
+        const stateEl = deviceEl.querySelector(".device-state");
+        if (!stateEl) {
+            return;
+        }
+
+        const normalizedState = state || "STOP";
+        const normalizedSource = source || "gateway";
+        stateEl.textContent = normalizedState + " - " + normalizedSource;
+        deviceEl.dataset.state = normalizedState;
+        deviceEl.dataset.source = normalizedSource;
+    }
+
+    function applyDeviceAction(app, data) {
+        if (!data || !data.id) {
+            return;
+        }
+
+        const cached = app.state.devicesCache.find(function (device) {
+            return device.id === data.id;
+        });
+        const action = String(data.action || "").toLowerCase();
+        const state = data.state || data.action || "STOP";
+        const source = data.source || "gateway";
+        const current = typeof data.position !== "undefined" ? data.position : (cached ? cached.position : data.target);
+
+        updateDeviceFill(data.id, current, action === "stop" ? 0.2 : undefined);
+        setDeviceState(data.id, state, source);
+
+        if (cached && typeof current !== "undefined") {
+            cached.position = Math.max(0, Math.min(100, Number(current) || 0));
+            cached.state = state;
+            cached.source = source;
+        }
     }
 
     function createDeviceButton(label, className, onClick) {
@@ -37,7 +82,6 @@
             deviceSelect.textContent = "";
 
             if (devices.length === 0) {
-                app.logStatus("No devices found.");
                 const listItem = document.createElement("li");
                 listItem.textContent = "No devices available.";
                 deviceList.appendChild(listItem);
@@ -55,19 +99,16 @@
 
                 listItem.appendChild(createDeviceButton("up", "open", function () {
                     runAction(app, device.id, "open").catch(function (error) {
-                        app.logStatus(error.message, true);
                     });
                 }));
 
                 listItem.appendChild(createDeviceButton("stop", "stop", function () {
                     runAction(app, device.id, "stop").catch(function (error) {
-                        app.logStatus(error.message, true);
                     });
                 }));
 
                 listItem.appendChild(createDeviceButton("down", "down", function () {
                     runAction(app, device.id, "close").catch(function (error) {
-                        app.logStatus(error.message, true);
                     });
                 }));
 
@@ -82,7 +123,6 @@
                             device = freshDevice;
                         }
                     } catch (error) {
-                        app.logStatus("Error refreshing device: " + error.message, true);
                     }
 
                     app.openPopup(
@@ -128,7 +168,6 @@
                                             deviceId: device.id,
                                             command: "edit1W " + newName
                                         });
-                                        app.logStatus(renameResult.message || "Device renamed.");
                                     }
 
                                     const parsedTiming = parseInt(newTiming, 10);
@@ -137,7 +176,6 @@
                                             deviceId: device.id,
                                             command: "time1W " + parsedTiming
                                         });
-                                        app.logStatus(timeResult.message || "Travel time updated.");
                                     }
 
                                     if (typeof repeatOnNoResponse === "boolean" &&
@@ -146,12 +184,10 @@
                                             deviceId: device.id,
                                             command: "repeat1W " + (repeatOnNoResponse ? "1" : "0")
                                         });
-                                        app.logStatus(repeatResult.message || "Repeat setting updated.");
                                     }
 
                                     await fetchAndDisplayDevices(app);
                                 } catch (error) {
-                                    app.logStatus("Error updating device: " + error.message, true);
                                 }
                             },
                             onPair: async function () {
@@ -160,10 +196,8 @@
                                         deviceId: device.id,
                                         command: "add"
                                     });
-                                    app.logStatus(result.message || "Device added.");
                                     await fetchAndDisplayDevices(app);
                                 } catch (error) {
-                                    app.logStatus("Error adding device: " + error.message, true);
                                 }
                             },
                             onUnpair: async function () {
@@ -172,10 +206,8 @@
                                         deviceId: device.id,
                                         command: "remove"
                                     });
-                                    app.logStatus(result.message || "Device unpaired.");
                                     await fetchAndDisplayDevices(app);
                                 } catch (error) {
-                                    app.logStatus("Error unpairing device: " + error.message, true);
                                 }
                             },
                             onDelete: async function () {
@@ -183,7 +215,6 @@
                                     deviceId: device.id,
                                     command: "del1W"
                                 });
-                                app.logStatus(result.message || "Device deleted.");
                                 await fetchAndDisplayDevices(app);
                             }
                         }
@@ -200,7 +231,6 @@
             });
 
         } catch (error) {
-            app.logStatus("Error fetching devices: " + error.message, true);
             console.error("Error fetching devices:", error);
         }
     }
@@ -210,15 +240,12 @@
         const commandStr = app.elements.commandInput.value.trim();
 
         if (!selectedDeviceId) {
-            app.logStatus("Please select a device.", true);
             return;
         }
         if (!commandStr) {
-            app.logStatus("Please enter a command.", true);
             return;
         }
 
-        app.logStatus('Sending command "' + commandStr + '" to device ID ' + selectedDeviceId + "...");
 
         try {
             const result = await window.MiOpenApi.postJson("/api/command", {
@@ -227,12 +254,9 @@
             });
 
             if (result.success) {
-                app.logStatus("Command success: " + (result.message || "Command processed."));
             } else {
-                app.logStatus("Command failed: " + (result.message || "Unknown error."), true);
             }
         } catch (error) {
-            app.logStatus("Error sending command: " + error.message, true);
             console.error("Error sending command:", error);
         }
     }
@@ -257,10 +281,8 @@
                         const result = await window.MiOpenApi.postJson("/api/command", {
                             command: "new1W " + newName
                         });
-                        app.logStatus(result.message || "Device added.");
                         await fetchAndDisplayDevices(app);
                     } catch (error) {
-                        app.logStatus("Error adding device: " + error.message, true);
                     }
                 }
             }
@@ -275,6 +297,9 @@
             return sendCommand(app);
         };
         app.updateDeviceFill = updateDeviceFill;
+        app.applyDeviceAction = function (data) {
+            applyDeviceAction(app, data);
+        };
         app.openAddDevicePopup = function () {
             openAddDevicePopup(app);
         };

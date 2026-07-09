@@ -237,23 +237,6 @@ static bool authenticateTransferredKey(
     AES_ECB_encrypt(&ctx, initialValue);
     return memcmp(initialValue, answer, 6) == 0;
 }
-
-static void persistTwoWSystemKey(const std::array<uint8_t, 16> &key) {
-    memcpy(system_key, key.data(), key.size());
-    nvs_write_string(NVS_KEY_2W_SYSTEM,
-                     bytesToHexString(key.data(), static_cast<uint8_t>(key.size())));
-}
-
-static void loadTwoWSystemKey() {
-    std::string encoded;
-    uint8_t storedKey[16] = {};
-    if (nvs_read_string(NVS_KEY_2W_SYSTEM, encoded) &&
-        hexStringToBytes(encoded, storedKey) == sizeof(storedKey)) {
-        memcpy(system_key, storedKey, sizeof(storedKey));
-        addLogMessage("Stored 2W system key loaded");
-    }
-}
-
 // Custom log vprintf that also stores to buffer
 int log_to_buffer_and_serial(const char *format, va_list args) {
     char buf[256];
@@ -289,7 +272,6 @@ void setup() {
     Serial.println("LittleFS mounted successfully");
 #endif
     nvs_init();
-    loadTwoWSystemKey();
 
     // Load 1W device definitions before starting network services so
     // that /api/devices can immediately return the configured remotes.
@@ -814,8 +796,6 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
                 break;
             }
 
-            persistTwoWSystemKey(
-                twoWPairSession.candidateKeys[authenticatedCandidate]);
 
             uint8_t actuator[2] = {
                 twoWPairSession.metadata[0],

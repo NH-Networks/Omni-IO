@@ -66,7 +66,6 @@
             tbody.appendChild(fragment);
         } catch (error) {
             console.error("Error fetching remotes:", error);
-            app.logStatus("Error fetching remotes: " + error.message, true);
         }
     }
 
@@ -93,10 +92,8 @@
                         const result = await window.MiOpenApi.postJson("/api/command", {
                             command: "linkRemote " + remoteId + " " + deviceId
                         });
-                        app.logStatus(result.message || "Device linked.");
                         await fetchAndDisplayRemotes(app);
                     } catch (error) {
-                        app.logStatus("Error linking device: " + error.message, true);
                     }
                 },
                 onUnpair: async function (deviceId) {
@@ -104,10 +101,8 @@
                         const result = await window.MiOpenApi.postJson("/api/command", {
                             command: "unlinkRemote " + remoteId + " " + deviceId
                         });
-                        app.logStatus(result.message || "Device unlinked.");
                         await fetchAndDisplayRemotes(app);
                     } catch (error) {
-                        app.logStatus("Error unlinking device: " + error.message, true);
                     }
                 },
                 onSave: async function (newName) {
@@ -120,11 +115,9 @@
                             RemoteId: remoteId,
                             command: "editRemote " + newName
                         });
-                        app.logStatus(result.message || "Remote renamed.");
                         await fetchAndDisplayRemotes(app);
                     } catch (error) {
                         console.error("Error renaming remote:", error);
-                        app.logStatus("Error renaming remote.", true);
                     }
                 },
                 onDelete: async function () {
@@ -132,10 +125,8 @@
                         const result = await window.MiOpenApi.postJson("/api/command", {
                             command: "delRemote " + remoteId
                         });
-                        app.logStatus(result.message || "Remote removed.");
                         await fetchAndDisplayRemotes(app);
                     } catch (error) {
-                        app.logStatus("Error removing remote: " + error.message, true);
                     }
                 }
             }
@@ -159,11 +150,9 @@
                 onSave: async function (addr, newName) {
                     const id = addr.trim();
                     if (!id) {
-                        app.logStatus("Please provide a remote ID.", true);
                         return;
                     }
                     if (!newName.trim()) {
-                        app.logStatus("Please provide a remote name.", true);
                         return;
                     }
 
@@ -171,10 +160,8 @@
                         const result = await window.MiOpenApi.postJson("/api/command", {
                             command: "newRemote " + id + " " + newName
                         });
-                        app.logStatus(result.message || "Remote added.");
                         await fetchAndDisplayRemotes(app);
                     } catch (error) {
-                        app.logStatus("Error adding remote: " + error.message, true);
                     }
                 }
             }

@@ -1,4 +1,4 @@
-﻿{
+{
     "page.title":  "MiOpen.IO - Geraetesteuerung",
     "header.title":  "Geraetesteuerung",
     "nav.devices":  "Geraete",
@@ -251,5 +251,8 @@
     "label.io_system_key":  "System key:",
     "status.io_key_load_error":  "IO system key konnte nicht geladen werden",
     "status.io_key_invalid":  "Genau 32 hexadezimale Zeichen verwenden",
-    "section.io_system_key":  "IO System Key"
+    "section.io_system_key":  "IO System Key",
+    "button.upload_backup":  "Backup hochladen",
+    "label.full_backup":  "Vollstaendiges Backup:",
+    "button.download_backup":  "Backup herunterladen"
 }

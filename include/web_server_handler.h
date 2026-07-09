@@ -12,6 +12,7 @@ void setupWebServer();
 void loopWebServer(); // If any loop processing is needed for the web server
 void broadcastLog(const String &msg);
 void broadcastDevicePosition(const String &id, int position);
+void broadcastDeviceAction(const String &id, const String &action, int position, int target, const String &source = "gateway");
 void broadcastLastAddress(const String &addr);
 void updateTwoWTxStatus(const String &command, const String &result, bool isError = false);
 void updateTwoWRxStatus(const String &packetType, const String &from,
@@ -20,6 +21,7 @@ void updateTwoWRxStatus(const String &packetType, const String &from,
 #else
 inline void setupWebServer() {}
 inline void loopWebServer() {}
+inline void broadcastDeviceAction(const String &, const String &, int, int, const String & = "gateway") {}
 inline void updateTwoWTxStatus(const String &, const String &, bool = false) {}
 inline void updateTwoWRxStatus(const String &, const String &, const String &,
                                const String &, const String &, const String & = "") {}

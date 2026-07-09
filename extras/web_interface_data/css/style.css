@@ -83,6 +83,13 @@ nav .nav-link {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    color: var(--color-text);
+    text-decoration: none;
+    cursor: pointer;
+}
+nav .nav-link:visited, nav .nav-link:hover, nav .nav-link:active {
+    color: var(--color-text);
+    text-decoration: none;
 }
 .nav-icon {
     width: 14px;
@@ -170,6 +177,12 @@ ul#device-list span {
   text-align: center;
   margin: auto;
   color: #fff;
+}
+
+ul#device-list .device-state {
+  font-size: 0.75rem;
+  opacity: 0.78;
+  padding-top: 0;
 }
 table {
   border-collapse: collapse;
@@ -292,43 +305,6 @@ input, select {
   color: var(--color-text);
   opacity: 0.7;
 }
-.settings-statusbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid #72b36a;
-  border-left: 5px solid #2f8f2f;
-  border-radius: var(--radius);
-  background: rgba(47, 143, 47, 0.14);
-  color: var(--color-text);
-  font-weight: 600;
-}
-.settings-statusbar[hidden] {
-  display: none;
-}
-.settings-statusbar.error {
-  border-color: #d97070;
-  border-left-color: #d62828;
-  background: rgba(214, 40, 40, 0.14);
-}
-.settings-statusbar-close {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  margin: 0;
-  padding: 0;
-  border: 1px solid var(--color7);
-  border-radius: 50%;
-  background: var(--color-input);
-  color: var(--color-text);
-  font-size: 18px;
-  line-height: 1;
-}
-.settings-statusbar-close:hover {
-  background: var(--color-accent2);
-}
 .settings-tabbar {
   grid-column: 1 / -1;
   display: flex;
@@ -436,9 +412,7 @@ input, select {
   gap: 10px;
   align-items: center;
 }
-.control-row label,
-.control-row input,
-.control-row select {
+.control-row label, .control-row input, .control-row select {
   margin: 0;
 }
 .twow-log {
@@ -493,28 +467,19 @@ input, select {
   align-items: center;
   margin-top: 12px;
 }
-#command-input,
-#suggestions,
-#send-command-button {
+#command-input, #suggestions, #send-command-button {
   width: 100%;
   min-width: 0;
 }
-.firmware-line,
-.filesystem-line,
-.devices-line,
-.remotes-line,
-.popup-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
+.firmware-line, .filesystem-line, .devices-line, .backup-line, .remotes-line, .popup-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
 }
-.firmware-line input,
-.filesystem-line input,
-.devices-line input,
-.remotes-line input {
-  flex: 1 1 220px;
-  min-width: 0;
+.firmware-line input, .filesystem-line input, .devices-line input, .backup-line input, .remotes-line input {
+    flex: 1 1 220px;
+    min-width: 0;
 }
 footer {
   text-align: center;
@@ -755,4 +720,22 @@ header h1 {
       white-space: normal;
       word-spacing: 100vw;
     }
+}
+#wifi-scan-results {
+  gap: 6px;
+  margin: 8px 0 12px;
+}
+.wifi-scan-result {
+  width: 100%;
+  text-align: left;
+  background-color: rgba(255, 255, 255, 0.12);
+  color: var(--color-text);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+}
+.wifi-scan-result:hover {
+  background-color: rgba(255, 255, 255, 0.18);
+}
+.wifi-scan-modal-list {
+  display: grid;
+  gap: 8px;
 }

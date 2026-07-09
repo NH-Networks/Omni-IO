@@ -42,7 +42,7 @@
         }
         hideTimer = setTimeout(function () {
             hideElement(toast);
-        }, timeoutMs || 4000);
+        }, timeoutMs || 7000);
     };
 
     window.hideToast = function () {

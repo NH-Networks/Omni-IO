@@ -1,4 +1,4 @@
-﻿{
+{
     "page.title":  "MiOpen.IO - Device Control",
     "header.title":  "Device Control",
     "nav.devices":  "Devices",
@@ -252,5 +252,8 @@
     "label.io_system_key":  "System key:",
     "status.io_key_load_error":  "Could not load IO system key",
     "status.io_key_invalid":  "Use exactly 32 hexadecimal characters",
-    "section.io_system_key":  "IO System Key"
+    "section.io_system_key":  "IO System Key",
+    "button.upload_backup":  "Upload Backup",
+    "label.full_backup":  "Full backup:",
+    "button.download_backup":  "Download Backup"
 }

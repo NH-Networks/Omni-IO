@@ -30,5 +30,7 @@ extern struct WiFiStatus {
 
 void initWifi();
 void clearWifi();
+String getConfiguredWiFiSSID();
+void saveWiFiCredentials(const String &ssid, const String &password);
 
 #endif // WIFI_HELPER_H

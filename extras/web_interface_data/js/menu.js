@@ -50,6 +50,7 @@
             backdrop.addEventListener("click", closeMobileMenu);
         }
 
+
         if (!pageElement("devices") || pageElement("devices").style.display === "none") {
             window.showPage("devices");
         }

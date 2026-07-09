@@ -71,6 +71,16 @@ static void syncWebPosition(const std::string &id, int position) {
 #endif
 }
 
+static void syncWebAction(const std::string &id, const char *state, int position, int target) {
+#if defined(WEBSERVER)
+    broadcastDeviceAction(id.c_str(), state, position, target, "mqtt");
+#else
+    (void)id;
+    (void)state;
+    (void)position;
+    (void)target;
+#endif
+}
 static void startHeartbeat() {
     s_heartbeatEnabled.store(true);
     s_nextHeartbeatAtMs.store(millis() + 60000UL);
@@ -358,7 +368,7 @@ static void handleMqttConnectImpl() {
     publishFreeMemDiscovery();
     publishIpAddressDiscovery();
     publishWifiStrengthDiscovery();
-    // Discovery van de ‘frame’ sensor eerst, zodat state pub direct een entity heeft
+    // Discovery van de â€˜frameâ€™ sensor eerst, zodat state pub direct een entity heeft
     publishIohcFrameDiscovery();
     publishRadioLogDiscovery();
     const auto &remotes = IOHC::iohcRemote1W::getInstance()->getRemotes();
@@ -582,9 +592,12 @@ void mqttFuncHandler(const char *cmd) {
                           segments.size() > 1 ? segments[1].c_str() : "No param",
                           _cmdHandler[idx]->description);
             _cmdHandler[idx]->handler(&segments);
+            addLogMessage(String("MQTT command executed: cmd=") + segments[0].c_str() +
+                          " param=" + (segments.size() > 1 ? String(segments[1].c_str()) : String("-")));
             return;
         }
     }
+    addLogMessage(String("MQTT unknown command: cmd=") + segments[0].c_str());
     Serial.printf("*> MQTT Unknown %s <*\n", segments[0].c_str());
 }
 
@@ -637,6 +650,11 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
             t.push_back(std::to_string(closeVal));
             t.push_back(it->description);
             IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Absolute, &t);
+            syncWebAction(id, it->movement == IOHC::iohcRemote1W::remote::Movement::Opening ? "OPENING" : (it->movement == IOHC::iohcRemote1W::remote::Movement::Closing ? "CLOSING" : "STOP"), static_cast<int>(it->positionTracker.getPosition()), static_cast<int>(it->targetPosition));
+            addLogMessage(String("MQTT position command: device=") + id.c_str() +
+                          " name=" + it->name.c_str() +
+                          " open=" + String(openVal) +
+                          " close=" + String(closeVal));
             mqttClient.publish(topicStr.c_str(), 0, true, "", 0);
         }
         return;
@@ -654,6 +672,10 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
             t.push_back(payloadStr);
             t.push_back(it->description);
             IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Absolute, &t);
+            syncWebAction(id, it->movement == IOHC::iohcRemote1W::remote::Movement::Opening ? "OPENING" : (it->movement == IOHC::iohcRemote1W::remote::Movement::Closing ? "CLOSING" : "STOP"), static_cast<int>(it->positionTracker.getPosition()), static_cast<int>(it->targetPosition));
+            addLogMessage(String("MQTT absolute command: device=") + id.c_str() +
+                          " name=" + it->name.c_str() +
+                          " value=" + payloadStr.c_str());
             mqttClient.publish(topicStr.c_str(), 0, true, "", 0);
         }
         return;
@@ -684,6 +706,10 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
             } else {
                 Serial.printf("*> MQTT Unknown %s <*\n", payloadStr.c_str());
             }
+            syncWebAction(id, payloadStr == "open" ? "OPENING" : (payloadStr == "close" ? "CLOSING" : "STOP"), static_cast<int>(it->positionTracker.getPosition()), static_cast<int>(it->targetPosition));
+            addLogMessage(String("MQTT cover command: device=") + id.c_str() +
+                          " name=" + it->name.c_str() +
+                          " action=" + payloadStr.c_str());
             // Clear retained set message
             mqttClient.publish(topicStr.c_str(), 0, true, "", 0);
         } else {
@@ -704,6 +730,7 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
             t.push_back("pair");
             t.push_back(it->description);
             IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Pair, &t);
+            addLogMessage(String("MQTT pair command: device=") + id.c_str() + " name=" + it->name.c_str());
             mqttClient.publish(topicStr.c_str(), 0, true, "", 0);
         }
         return;
@@ -721,6 +748,7 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
             t.push_back("add");
             t.push_back(it->description);
             IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Add, &t);
+            addLogMessage(String("MQTT add command: device=") + id.c_str() + " name=" + it->name.c_str());
             mqttClient.publish(topicStr.c_str(), 0, true, "", 0);
         }
         return;
@@ -738,6 +766,7 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
             t.push_back("remove");
             t.push_back(it->description);
             IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Remove, &t);
+            addLogMessage(String("MQTT remove command: device=") + id.c_str() + " name=" + it->name.c_str());
             mqttClient.publish(topicStr.c_str(), 0, true, "", 0);
         }
         return;

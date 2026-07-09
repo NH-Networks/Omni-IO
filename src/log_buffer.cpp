@@ -84,9 +84,7 @@ void addLogMessage(const String &msg) {
     const String storedMessage(logRing[slot]);
     Serial.printf("[%10lu ms] %s\n", now, storedMessage.c_str());
 #if defined(WEBSERVER)
-    if (shouldBroadcastLog(storedMessage)) {
-        broadcastLog(storedMessage);
-    }
+    broadcastLog(storedMessage);
 #endif
 #if defined(SYSLOG)
     sendSyslog(storedMessage);

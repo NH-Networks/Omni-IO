@@ -1,4 +1,4 @@
-﻿{
+{
     "page.title":  "MiOpen.IO - Controle des appareils",
     "header.title":  "Controle des appareils",
     "nav.devices":  "Appareils",
@@ -251,5 +251,8 @@
     "label.io_system_key":  "Cle systeme:",
     "status.io_key_load_error":  "Impossible de charger la IO system key",
     "status.io_key_invalid":  "Utilisez exactement 32 caracteres hexadecimaux",
-    "section.io_system_key":  "IO System Key"
+    "section.io_system_key":  "IO System Key",
+    "button.upload_backup":  "Televerser sauvegarde",
+    "label.full_backup":  "Sauvegarde complete:",
+    "button.download_backup":  "Telecharger sauvegarde"
 }

@@ -1,4 +1,4 @@
-﻿{
+{
     "page.title":  "MiOpen.IO - Apparaatbeheer",
     "header.title":  "Apparaatbeheer",
     "nav.devices":  "Schermen",
@@ -252,5 +252,8 @@
     "label.io_system_key":  "System key:",
     "status.io_key_load_error":  "IO system key kon niet geladen worden",
     "status.io_key_invalid":  "Gebruik exact 32 hexadecimale tekens",
-    "section.io_system_key":  "IO System Key"
+    "section.io_system_key":  "IO System Key",
+    "button.upload_backup":  "Backup uploaden",
+    "label.full_backup":  "Volledige backup:",
+    "button.download_backup":  "Backup downloaden"
 }

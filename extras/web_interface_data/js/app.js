@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
     function ensureApiModule() {
         if (window.MiOpenApi) {
             return;
@@ -73,6 +73,9 @@
             commandDeviceSelect: document.querySelector("#help-page #device-select"),
             commandInput: document.getElementById("command-input"),
             deviceList: document.getElementById("device-list"),
+            backupFileInput: document.getElementById("backup-file"),
+            backupUploadButton: document.getElementById("upload-backup"),
+            downloadBackupButton: document.getElementById("download-backup"),
             devicesFileInput: document.getElementById("devices-file"),
             devicesUploadButton: document.getElementById("upload-devices"),
             downloadDevicesButton: document.getElementById("download-devices"),
@@ -90,9 +93,28 @@
             mqttServerInput: document.getElementById("mqtt-server"),
             mqttUpdateButton: document.getElementById("mqtt-update"),
             mqttUserInput: document.getElementById("mqtt-user"),
-            settingsStatus: document.getElementById("settings-status"),
-            settingsStatusText: document.getElementById("settings-status-text"),
-            settingsStatusCloseButton: document.getElementById("settings-status-close"),
+            wifiSsidInput: document.getElementById("wifi-ssid"),
+            wifiPasswordInput: document.getElementById("wifi-password"),
+            wifiScanButton: document.getElementById("wifi-scan-btn"),
+            wifiScanResults: document.getElementById("wifi-scan-results"),
+            wifiConfigSaveButton: document.getElementById("wifi-config-save"),
+            wifiConfigStatus: document.getElementById("wifi-config-status"),
+            networkHostnameInput: document.getElementById("net-hostname"),
+            networkDhcpInput: document.getElementById("net-dhcp"),
+            networkIpInput: document.getElementById("net-ip"),
+            networkMaskInput: document.getElementById("net-mask"),
+            networkGatewayInput: document.getElementById("net-gateway"),
+            networkDns1Input: document.getElementById("net-dns1"),
+            networkDns2Input: document.getElementById("net-dns2"),
+            networkSntpInput: document.getElementById("net-sntp"),
+            networkStatus: document.getElementById("network-status"),
+            networkSaveButton: document.getElementById("network-save"),
+            fallbackEnabledInput: document.getElementById("fallback-enabled"),
+            fallbackRetriesBootInput: document.getElementById("fallback-retries-boot"),
+            fallbackRetriesRunningInput: document.getElementById("fallback-retries-running"),
+            fallbackTimeoutInput: document.getElementById("fallback-timeout"),
+            fallbackStatus: document.getElementById("fallback-status"),
+            fallbackSaveButton: document.getElementById("fallback-save"),
             displayEnabledInput: document.getElementById("display-enabled"),
             displayUpdateButton: document.getElementById("display-update"),
             displayStatus: document.getElementById("display-status"),
@@ -102,39 +124,6 @@
             syslogTagInput: document.getElementById("syslog-tag"),
             syslogUpdateButton: document.getElementById("syslog-update"),
             syslogTestButton: document.getElementById("syslog-test"),
-            ioSystemKeyInput: document.getElementById("io-system-key"),
-            ioKeyStatus: document.getElementById("io-key-status"),
-            ioKeySaveButton: document.getElementById("io-key-save"),
-            ioKeyClearButton: document.getElementById("io-key-clear"),
-            twowStatus: document.getElementById("twow-status"),
-            twowLastTx: document.getElementById("twow-last-tx"),
-            twowLastResult: document.getElementById("twow-last-result"),
-            twowLastRx: document.getElementById("twow-last-rx"),
-            twowLastData: document.getElementById("twow-last-data"),
-            twowLog: document.getElementById("twow-log"),
-            twowPowerOnButton: document.getElementById("twow-poweron"),
-            twowMidnightButton: document.getElementById("twow-midnight"),
-            twowAssociateButton: document.getElementById("twow-associate"),
-            twowAckButton: document.getElementById("twow-ack"),
-            twowTempInput: document.getElementById("twow-temp"),
-            twowSetTempButton: document.getElementById("twow-settemp"),
-            twowModeInput: document.getElementById("twow-mode"),
-            twowSetModeButton: document.getElementById("twow-setmode"),
-            twowPresenceInput: document.getElementById("twow-presence"),
-            twowSetPresenceButton: document.getElementById("twow-setpresence"),
-            twowWindowInput: document.getElementById("twow-window"),
-            twowSetWindowButton: document.getElementById("twow-setwindow"),
-            twowPairButton: document.getElementById("twow-pair"),
-            twowPairAltButton: document.getElementById("twow-pair-alt"),
-            twowListenButton: document.getElementById("twow-listen"),
-            twowListenSlowButton: document.getElementById("twow-listen-slow"),
-            twowDiscover28Button: document.getElementById("twow-discover28"),
-            twowDiscover2AButton: document.getElementById("twow-discover2a"),
-            twowFake0Button: document.getElementById("twow-fake0"),
-            twowCustomInput: document.getElementById("twow-custom"),
-            twowSendCustomButton: document.getElementById("twow-sendcustom"),
-            twowCustom60Input: document.getElementById("twow-custom60"),
-            twowSendCustom60Button: document.getElementById("twow-sendcustom60"),
             remotePopupButton: document.getElementById("remote-popup"),
             remotesFileInput: document.getElementById("remotes-file"),
             remotesUploadButton: document.getElementById("upload-remotes"),
@@ -156,13 +145,11 @@
     }
 
     function logStatus(app, message, isError) {
-        const now = Date.now();
-        if (app.state.lastStatusMessage === message && now - (app.state.lastStatusAt || 0) < 5000) {
-            app.state.lastStatusAt = now;
+        if (!app.elements.statusMessages || !message) {
             return;
         }
-        app.state.lastStatusMessage = message;
-        app.state.lastStatusAt = now;
+
+
 
         const logEntry = document.createElement("p");
         logEntry.textContent = message;
@@ -172,8 +159,25 @@
 
         app.elements.statusMessages.appendChild(logEntry);
         app.elements.statusMessages.scrollTop = app.elements.statusMessages.scrollHeight;
-        while (app.elements.statusMessages.children.length > 20) {
+        while (app.elements.statusMessages.children.length > 300) {
             app.elements.statusMessages.removeChild(app.elements.statusMessages.firstChild);
+        }
+    }
+
+    async function loadLogBuffer(app) {
+        if (!app.elements.statusMessages || !window.MiOpenApi) {
+            return;
+        }
+        try {
+            const logs = await window.MiOpenApi.requestJson("/api/logs");
+            app.elements.statusMessages.textContent = "";
+            if (Array.isArray(logs)) {
+                logs.forEach(function (message) {
+                    logStatus(app, message);
+                });
+            }
+        } catch (error) {
+            logStatus(app, "Could not load log buffer", true);
         }
     }
 
@@ -258,10 +262,10 @@
                 app.logStatus(data.message);
             } else if (data.type === "position") {
                 app.updateDeviceFill(data.id, data.position);
+            } else if (data.type === "deviceaction") {
+                app.applyDeviceAction(data);
             } else if (data.type === "init") {
                 app.fetchAndDisplayDevices();
-            } else if (data.type === "twowstatus") {
-                app.applyTwoWStatus(data.status || {});
             } else if (data.type === "lastaddr") {
                 app.elements.lastAddrInput.value = data.address || "";
             }
@@ -289,6 +293,15 @@
         if (app.elements.mqttUpdateButton) {
             app.elements.mqttUpdateButton.addEventListener("click", app.updateMqttConfig);
         }
+        if (app.elements.wifiScanButton) {
+            app.elements.wifiScanButton.addEventListener("click", app.scanWifiNetworks);
+        }
+        if (app.elements.wifiConfigSaveButton) {
+            app.elements.wifiConfigSaveButton.addEventListener("click", app.saveWifiConfig);
+        }
+        if (app.elements.networkSaveButton) {
+            app.elements.networkSaveButton.addEventListener("click", app.saveNetworkConfig);
+        }
         if (app.elements.displayUpdateButton) {
             app.elements.displayUpdateButton.addEventListener("click", app.updateDisplayConfig);
         }
@@ -304,16 +317,14 @@
         if (app.elements.ioKeyClearButton) {
             app.elements.ioKeyClearButton.addEventListener("click", app.clearIoSystemKey);
         }
-        if (app.elements.settingsStatusCloseButton) {
-            app.elements.settingsStatusCloseButton.addEventListener("click", function () {
-                app.hideSettingsStatus();
-            });
-        }
         if (app.elements.firmwareUploadButton) {
             app.elements.firmwareUploadButton.addEventListener("click", app.uploadFirmware);
         }
         if (app.elements.filesystemUploadButton) {
             app.elements.filesystemUploadButton.addEventListener("click", app.uploadFilesystem);
+        }
+        if (app.elements.backupUploadButton) {
+            app.elements.backupUploadButton.addEventListener("click", app.uploadBackup);
         }
         if (app.elements.devicesUploadButton) {
             app.elements.devicesUploadButton.addEventListener("click", app.uploadDevices);
@@ -321,17 +332,21 @@
         if (app.elements.remotesUploadButton) {
             app.elements.remotesUploadButton.addEventListener("click", app.uploadRemotes);
         }
+        if (app.elements.downloadBackupButton) {
+            app.elements.downloadBackupButton.addEventListener("click", function () {
+                window.MiOpenApi.downloadFile("/api/download/backup", "miopen-backup.json").catch(function (error) {
+                });
+            });
+        }
         if (app.elements.downloadDevicesButton) {
             app.elements.downloadDevicesButton.addEventListener("click", function () {
                 window.MiOpenApi.downloadFile("/api/download/devices", "1W.json").catch(function (error) {
-                    app.logStatus("Error downloading file: " + error.message, true);
                 });
             });
         }
         if (app.elements.downloadRemotesButton) {
             app.elements.downloadRemotesButton.addEventListener("click", function () {
                 window.MiOpenApi.downloadFile("/api/download/remotes", "RemoteMap.json").catch(function (error) {
-                    app.logStatus("Error downloading file: " + error.message, true);
                 });
             });
         }
@@ -352,6 +367,9 @@
             logStatus: function (message, isError) {
                 logStatus(app, message, isError);
             },
+            loadLogBuffer: function () {
+                return loadLogBuffer(app);
+            },
             state: {
                 devicesCache: [],
                 ws: null
@@ -361,7 +379,6 @@
         window.MiOpenPopup.init(app);
         window.MiOpenDevices.init(app);
         window.MiOpenRemotes.init(app);
-        window.MiOpenTwoW.init(app);
         window.MiOpenSettings.init(app);
         window.MiOpenApp = app;
 
@@ -383,16 +400,16 @@
             }
         }).catch(function () {});
 
-        app.logStatus("System started");
-        app.logStatus("Loading devices...");
+        app.loadLogBuffer();
         app.loadMqttConfig();
+        app.loadWifiConfig();
+        app.loadNetworkConfig();
+        app.loadFallbackConfig();
         app.loadDisplayConfig();
         app.loadSyslogConfig();
-        app.loadIoSystemKey();
         app.fetchAndDisplayDevices();
         app.fetchAndDisplayRemotes();
         app.loadLastAddress();
     });
 })();
-
 
