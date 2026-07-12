@@ -35,10 +35,10 @@ jobs:
         run: pip install -U esptool
 
       - name: Build PlatformIO project
-        run: pio run
+        run: pio run -e LilyGoLoraESP32 -e HeltecLoraV2ESP32
 
       - name: Build filesystem
-        run: pio run -t buildfs
+        run: pio run -e LilyGoLoraESP32 -e HeltecLoraV2ESP32 -t buildfs
 
       - name: Merge bin files together for LilyGoLoraESP32
         run: esptool --chip esp32 merge-bin -o LilyGoLoraESP32.bin --flash-size 4MB 0x1000 .pio/build/LilyGoLoraESP32/bootloader.bin 0x8000 .pio/build/LilyGoLoraESP32/partitions.bin 0x10000 .pio/build/LilyGoLoraESP32/firmware.bin 0x210000 .pio/build/LilyGoLoraESP32/littlefs.bin
