@@ -42,8 +42,8 @@ jobs:
             ${{ runner.os }}-pio-${{ matrix.env }}-
             ${{ runner.os }}-pio-
 
-      - name: Install PlatformIO
-        run: pip install -U platformio
+      - name: Install PlatformIO and esptool
+        run: pip install -U platformio esptool
 
       - name: Build firmware
         run: pio run -e ${{ matrix.env }}
@@ -54,6 +54,16 @@ jobs:
       - name: Prepare artifacts
         run: |
           mkdir -p artifacts
+          CHIP="esp32"
+          FLASH_SIZE="4MB"
+          FS_OFFSET="0x210000"
+          if [ "${{ matrix.env }}" = "HeltecLoraV2ESP32" ]; then
+            FLASH_SIZE="8MB"
+            FS_OFFSET="0x670000"
+          elif [ "${{ matrix.env }}" = "LilyGoT3S3" ]; then
+            CHIP="esp32s3"
+          fi
+          esptool --chip "$CHIP" merge-bin -o artifacts/${{ matrix.env }}_${{ github.ref_name }}_${{ github.sha }}.bin --flash-size "$FLASH_SIZE" 0x1000 .pio/build/${{ matrix.env }}/bootloader.bin 0x8000 .pio/build/${{ matrix.env }}/partitions.bin 0x10000 .pio/build/${{ matrix.env }}/firmware.bin "$FS_OFFSET" .pio/build/${{ matrix.env }}/littlefs.bin
           cp .pio/build/${{ matrix.env }}/firmware.bin artifacts/${{ matrix.env }}_${{ github.ref_name }}_${{ github.sha }}_firmware.bin
           cp .pio/build/${{ matrix.env }}/littlefs.bin artifacts/${{ matrix.env }}_${{ github.ref_name }}_${{ github.sha }}_filesystem.bin
           cat > artifacts/${{ matrix.env }}_${{ github.ref_name }}_${{ github.sha }}_info.json <<EOF
