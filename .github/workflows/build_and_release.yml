@@ -53,13 +53,19 @@ jobs:
           mv .pio/build/HeltecLoraV2ESP32/firmware.bin HeltecLoraV2ESP32_firmware.bin
           mv .pio/build/HeltecLoraV2ESP32/littlefs.bin HeltecLoraV2ESP32_filesystem.bin
 
-      - name: "✏️ Generate release changelog"
-        uses: janheinrichmerker/action-github-changelog-generator@v2.4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          output: changelog.md
-          onlyLastTag: true
-          stripHeaders: true
+      - name: Generate release notes
+        run: |
+          cat > changelog.md <<EOF
+          Beta release build for `${{ github.ref_name }}`.
+
+          Commit: `${{ github.sha }}`
+
+          Included files:
+          - LilyGoLoraESP32 combined firmware image
+          - LilyGoLoraESP32 firmware and filesystem images
+          - HeltecLoraV2ESP32 combined firmware image
+          - HeltecLoraV2ESP32 firmware and filesystem images
+          EOF
 
       - name: Generate release tag
         id: generate_release_tag
