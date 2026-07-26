@@ -274,7 +274,9 @@ static void maintainWiFiConnection() {
         triggerWiFiReconnect();
     }
 
-    if (readFallbackEnabled() && s_wifiReconnectAttempts >= readFallbackU16(NVS_KEY_FB_RUN, 3)) {
+    const uint16_t runtimeFallbackRetries = readFallbackU16(NVS_KEY_FB_RUN, 0);
+    if (readFallbackEnabled() && runtimeFallbackRetries > 0 &&
+        s_wifiReconnectAttempts >= runtimeFallbackRetries) {
         Serial.println("WiFi: opening fallback AP after reconnect retries");
         addLogMessage("WiFi: opening fallback AP after reconnect retries");
         s_wifiReconnectAttempts = 0;
