@@ -96,9 +96,9 @@ jobs:
       - name: Create release notes
         run: |
           cat > release-notes.md <<EOF
-          Automated branch build for `${{ github.ref_name }}`.
+          Automated branch build for ${{ github.ref_name }}.
 
-          Commit: `${{ github.sha }}`
+          Commit: ${{ github.sha }}
 
           Included files:
           - Firmware binaries

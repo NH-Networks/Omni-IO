@@ -75,9 +75,9 @@ jobs:
       - name: Generate release notes
         run: |
           cat > changelog.md <<EOF
-          Beta release build for `${{ github.ref_name }}`.
+          Beta release build for ${{ github.ref_name }}.
 
-          Commit: `${{ github.sha }}`
+          Commit: ${{ github.sha }}
 
           Included files:
           - LilyGoLoraESP32 combined firmware image
