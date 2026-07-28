@@ -599,13 +599,8 @@ bool addHandler(char *cmd, char *description, void (*handler)(Tokens*)) {
 
       _cmdHandler[idx] = static_cast<_cmdEntry *>(alloc);
       memset(alloc, 0, sizeof(struct _cmdEntry));
-      strncpy(_cmdHandler[idx]->cmd, cmd,
-              strlen(cmd) < sizeof(_cmdHandler[idx]->cmd) ? strlen(cmd)
-                                                          : sizeof(_cmdHandler[idx]->cmd) - 1);
-      strncpy(_cmdHandler[idx]->description, description,
-              strlen(cmd) < sizeof(_cmdHandler[idx]->description)
-                  ? strlen(description)
-                  : sizeof(_cmdHandler[idx]->description) - 1);
+      snprintf(_cmdHandler[idx]->cmd, sizeof(_cmdHandler[idx]->cmd), "%s", cmd);
+      snprintf(_cmdHandler[idx]->description, sizeof(_cmdHandler[idx]->description), "%s", description);
       _cmdHandler[idx]->handler = handler;
 
       if (idx > lastEntry)

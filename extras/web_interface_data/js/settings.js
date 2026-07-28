@@ -1,7 +1,7 @@
 (function () {
-    function setSettingsStatus(app, message, isError) {
+    function setSettingsStatus(app, message, isError, timeoutMs) {
         if (typeof window.showToast === "function") {
-            window.showToast(message, isError);
+            window.showToast(message, isError, timeoutMs);
         }
     }
 
@@ -455,23 +455,75 @@
     function normaliseIoKey(value) {
         return (value || "").replace(/[^0-9a-fA-F]/g, "").toLowerCase();
     }
+    function uploadFileWithProgress(file, url, onProgress) {
+        return new Promise(function (resolve, reject) {
+            const xhr = new XMLHttpRequest();
+            let uploadComplete = false;
+            const formData = new FormData();
+            formData.append("file", file);
+
+            xhr.upload.addEventListener("progress", function (event) {
+                if (event.lengthComputable && onProgress) {
+                    const percent = Math.round((event.loaded / event.total) * 100);
+                    uploadComplete = percent >= 100;
+                    onProgress(percent);
+                }
+            });
+
+            xhr.addEventListener("load", function () {
+                let result = {};
+                try {
+                    result = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+                } catch (_error) {
+                    result = {};
+                }
+
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve(result);
+                    return;
+                }
+                reject(new Error(result.message || ("HTTP error " + xhr.status)));
+            });
+
+            xhr.addEventListener("error", function () {
+                if (uploadComplete && (url === "/api/firmware" || url === "/api/filesystem")) {
+                    resolve({ message: "Upload sent to device, rebooting..." });
+                    return;
+                }
+                reject(new Error("Upload connection failed"));
+            });
+            xhr.addEventListener("abort", function () {
+                reject(new Error("Upload cancelled"));
+            });
+
+            xhr.open("POST", url);
+            xhr.send(formData);
+        });
+    }
     async function uploadSelectedFile(app, input, url, missingMessage, successMessage, refreshFn) {
         const file = input.files[0];
         if (!file) {
-            setSettingsStatus(app, missingMessage, true);
+            setSettingsStatus(app, missingMessage, true, 8000);
             return;
         }
 
+        setSettingsStatus(app, "Upload started...", false, 20000);
         try {
-            const result = await window.MiOpenApi.uploadFile(url, file);
+            const result = await uploadFileWithProgress(file, url, function (percent) {
+                const message = percent >= 100
+                    ? "Upload sent to device, writing flash..."
+                    : "Uploading " + percent + "%...";
+                setSettingsStatus(app, message, false, 20000);
+            });
             const message = result.message || successMessage;
-            setSettingsStatus(app, message);
+            setSettingsStatus(app, message, false, 20000);
+            input.value = "";
             if (refreshFn) {
                 await refreshFn();
             }
         } catch (error) {
             const message = error.message || successMessage;
-            setSettingsStatus(app, message, true);
+            setSettingsStatus(app, message, true, 20000);
         }
     }
 

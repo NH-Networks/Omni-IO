@@ -1,72 +1,4 @@
 (function () {
-    function ensureApiModule() {
-        if (window.MiOpenApi) {
-            return;
-        }
-
-        function ensureJson(response) {
-            return response.json().catch(function () {
-                return {};
-            });
-        }
-
-        async function requestJson(url, options) {
-            const requestOptions = options || {};
-            const method = (requestOptions.method || "GET").toUpperCase();
-            const requestUrl = method === "GET"
-                ? url + (url.indexOf("?") === -1 ? "?" : "&") + "_=" + Date.now()
-                : url;
-
-            if (method === "GET") {
-                requestOptions.cache = "no-store";
-            }
-
-            let response;
-            try {
-                response = await fetch(requestUrl, requestOptions);
-            } catch (error) {
-                throw new Error("ESP niet bereikbaar. Controleer of het toestel online is of net herstart.");
-            }
-            const data = await ensureJson(response);
-            if (!response.ok) {
-                throw new Error(data.message || ("HTTP error " + response.status));
-            }
-            return data;
-        }
-
-        window.MiOpenApi = {
-            downloadFile: async function (url, filename) {
-                const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error("Network response was not ok");
-                }
-
-                const blob = await response.blob();
-                const link = document.createElement("a");
-                link.href = window.URL.createObjectURL(blob);
-                link.download = filename;
-                link.click();
-                window.URL.revokeObjectURL(link.href);
-            },
-            postJson: function (url, payload) {
-                return requestJson(url, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                });
-            },
-            requestJson: requestJson,
-            uploadFile: function (url, file) {
-                const formData = new FormData();
-                formData.append("file", file);
-                return requestJson(url, {
-                    method: "POST",
-                    body: formData
-                });
-            }
-        };
-    }
-
     function createElements() {
         return {
             addPopupButton: document.getElementById("add-popup"),
@@ -359,8 +291,6 @@
     }
 
     document.addEventListener("DOMContentLoaded", function () {
-        ensureApiModule();
-
         const app = {
             elements: createElements(),
             i18nText: i18nText,
@@ -396,7 +326,7 @@
         window.MiOpenApi.requestJson("/api/info").then(function (info) {
             const el = document.getElementById("firmware-version");
             if (el && info.version) {
-                el.textContent = "Firmware: " + info.version;
+                el.textContent = "Firmware: " + info.version + (info.branch ? " (" + info.branch + ")" : "");
             }
         }).catch(function () {});
 

@@ -682,7 +682,7 @@ static void scheduleRestart(const char *taskName) {
   if (!rebootScheduled.exchange(true)) {
     xTaskCreate(
       [](void *) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(3000));
         ESP.restart();
       },
       taskName,
@@ -862,6 +862,11 @@ void handleApiWifiSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObjec
 void handleApiInfo(AsyncWebServerRequest *request, JsonObject &root) {
 #ifdef FIRMWARE_VERSION
   root["version"] = FIRMWARE_VERSION;
+#ifdef FIRMWARE_BRANCH
+  root["branch"] = FIRMWARE_BRANCH;
+#else
+  root["branch"] = "unknown";
+#endif
 #else
   root["version"] = "dev";
 #endif
@@ -1139,7 +1144,7 @@ void handleFirmwareUpdate(AsyncWebServerRequest *request) {
     if (!rebootScheduled.exchange(true)) {
       xTaskCreate(
         [](void *) {
-          vTaskDelay(pdMS_TO_TICKS(1000));
+          vTaskDelay(pdMS_TO_TICKS(3000));
           ESP.restart();
         },
         "reboot",
@@ -1188,7 +1193,7 @@ void handleFilesystemUpdate(AsyncWebServerRequest *request) {
     if (!rebootScheduled.exchange(true)) {
       xTaskCreate(
         [](void *) {
-          vTaskDelay(pdMS_TO_TICKS(1000));
+          vTaskDelay(pdMS_TO_TICKS(3000));
           ESP.restart();
         },
         "reboot",
@@ -1294,6 +1299,7 @@ void setupWebServer() {
   auto &staticHandler =
       server.serveStatic("/", LittleFS, "/web_interface_data/");
   staticHandler.setDefaultFile("index.html");
+  staticHandler.setTryGzipFirst(false);
   staticHandler.setFilter([](AsyncWebServerRequest *request) {
     return !request->url().startsWith("/api");
   });
