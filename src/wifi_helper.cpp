@@ -106,6 +106,10 @@ static void handleWifiConnected() {
             WiFi.mode(WIFI_STA);
         }
 
+        std::string sntp_server = "pool.ntp.org";
+        nvs_read_string(NVS_KEY_NET_SNTP, sntp_server);
+        configTime(0, 0, sntp_server.c_str());
+
         wifiReconnectTimer.detach();
         rssiTimer.attach(5, rssiTimerCb);
         updateDisplayStatus();
