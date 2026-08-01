@@ -285,7 +285,7 @@ void drawHeader() {
     display.drawBitmap(127-8, 3, wifiIcon, 8, 7, SSD1306_WHITE);
 
     // CPU Temperature
-    display.setCursor(75, 4);
+    display.setCursor(82, 4);
     display.printf("%.0fC", temperatureRead());
 }
 
