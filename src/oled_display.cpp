@@ -283,6 +283,10 @@ void drawHeader() {
     // wifi icon is 8x7
     const auto wifiIcon = wifiIcons[min(wifiStatus.signalStrengthPercent.load(), 99) / 25];
     display.drawBitmap(127-8, 3, wifiIcon, 8, 7, SSD1306_WHITE);
+
+    // CPU Temperature
+    display.setCursor(75, 4);
+    display.printf("%.0fC", temperatureRead());
 }
 
 void drawFooter() {
