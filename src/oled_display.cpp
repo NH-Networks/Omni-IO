@@ -349,7 +349,7 @@ void displayTask(void *) {
     // Dirty tracking state
     time_t lastDrawnTime = 0;
     int lastRssi = 0;
-    bool lastMqtt = false;
+    int lastMqttIcon = -1;
     std::vector<std::string> lastLines;
     
     while (true) {
@@ -384,7 +384,10 @@ void displayTask(void *) {
             if (isDimmed) dirty = true; // Needs undimming
             if (now != lastDrawnTime) dirty = true;
             if (wifiStatus.rssi != lastRssi) dirty = true;
-            if (mqttConnected != lastMqtt) dirty = true;
+#if defined(MQTT)
+            int currentMqttIcon = mqttStatusToIconIndex();
+            if (currentMqttIcon != lastMqttIcon) dirty = true;
+#endif
 
             // To avoid flickering and I2C spam, we only want to redraw if data is dirty, 
             // but we must call drawContents to get the lines and check.
@@ -409,7 +412,9 @@ void displayTask(void *) {
                 
                 lastDrawnTime = now;
                 lastRssi = wifiStatus.rssi;
-                lastMqtt = mqttConnected;
+#if defined(MQTT)
+                lastMqttIcon = currentMqttIcon;
+#endif
                 lastLines = currentLines;
             }
         } else if (secondsSinceNoData < SECONDS_BEFORE_SCREEN_OFF) {
