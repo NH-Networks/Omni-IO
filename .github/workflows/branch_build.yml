@@ -57,13 +57,15 @@ jobs:
           CHIP="esp32"
           FLASH_SIZE="4MB"
           FS_OFFSET="0x210000"
+          BOOT_OFFSET="0x1000"
           if [ "${{ matrix.env }}" = "HeltecLoraV2ESP32" ]; then
             FLASH_SIZE="8MB"
             FS_OFFSET="0x670000"
           elif [ "${{ matrix.env }}" = "LilyGoT3S3" ]; then
             CHIP="esp32s3"
+            BOOT_OFFSET="0x0"
           fi
-          esptool --chip "$CHIP" merge-bin -o artifacts/${{ matrix.env }}_${{ github.ref_name }}_${{ github.sha }}.bin --flash-size "$FLASH_SIZE" 0x1000 .pio/build/${{ matrix.env }}/bootloader.bin 0x8000 .pio/build/${{ matrix.env }}/partitions.bin 0x10000 .pio/build/${{ matrix.env }}/firmware.bin "$FS_OFFSET" .pio/build/${{ matrix.env }}/littlefs.bin
+          esptool --chip "$CHIP" merge-bin -o artifacts/${{ matrix.env }}_${{ github.ref_name }}_${{ github.sha }}.bin --flash-size "$FLASH_SIZE" "$BOOT_OFFSET" .pio/build/${{ matrix.env }}/bootloader.bin 0x8000 .pio/build/${{ matrix.env }}/partitions.bin 0x10000 .pio/build/${{ matrix.env }}/firmware.bin "$FS_OFFSET" .pio/build/${{ matrix.env }}/littlefs.bin
           cp .pio/build/${{ matrix.env }}/firmware.bin artifacts/${{ matrix.env }}_${{ github.ref_name }}_${{ github.sha }}_firmware.bin
           cp .pio/build/${{ matrix.env }}/littlefs.bin artifacts/${{ matrix.env }}_${{ github.ref_name }}_${{ github.sha }}_filesystem.bin
           cat > artifacts/${{ matrix.env }}_${{ github.ref_name }}_${{ github.sha }}_info.json <<EOF
