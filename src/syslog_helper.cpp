@@ -156,9 +156,12 @@ void sendSyslog(const String &msg, int severity) {
     const String base = currentHostIdent();
     const String ho = syslog_tag.empty() ? base : (syslog_tag.c_str() + String("-") + base);
 
-    // No timestamp — device has no NTP so Jan 1 epoch would be rejected by syslog servers.
-    // The receiver timestamps the message on arrival instead.
-    const String header = "<" + String(p) + ">" + ho + " " + SYSLOG_APP + ": ";
+    String ts = "";
+    time_t now = time(nullptr);
+    if (now > 1600000000) {
+        ts = rfc3164Timestamp() + " ";
+    }
+    const String header = "<" + String(p) + ">" + ts + ho + " " + SYSLOG_APP + ": ";
     const String wire   = header + "[" SYSLOG_SECRET "] " + msg;
 
     syslogUdp.beginPacket(syslogIP, syslog_port);
