@@ -162,7 +162,8 @@ bool initDisplay() {
     }
     
     // Dim the screen to reduce power consumption and heat
-    display.dim(true);
+    display.ssd1306_command(SSD1306_SETCONTRAST);
+    display.ssd1306_command(1); // Set contrast to a low value instead of 0
 
     if (xTaskCreatePinnedToCore(displayTask, "DisplayTask", 4096, nullptr, 1,
                                 &displayTaskHandle, tskNO_AFFINITY) != pdPASS) {
@@ -382,7 +383,8 @@ void displayTask(void *) {
             drawData();
         } else {
             if (!isDimmed) {
-                display.dim(true);
+                display.ssd1306_command(SSD1306_SETCONTRAST);
+                display.ssd1306_command(1); // Set contrast to 1 instead of using dim(true) to keep it visible
                 isDimmed = true;
             }
             drawLogo();
