@@ -303,27 +303,21 @@ void drawFooter() {
     }
 }
 
-bool drawContents() {
-    const int width = SCREEN_WIDTH / 6; // char width is 5 + 1 pixel space
-    const int height = (SCREEN_HEIGHT - 20 - 8) / 8; // char height is 7 + 1 pixel space and 20 pixels (12 pixels + an empty line) for the header + 8 for the footer
-
-    xSemaphoreTake(displayBufferMutex, portMAX_DELAY);
-    const auto lines = displayBuffer.getTextToDisplay(width, height);
-    xSemaphoreGive(displayBufferMutex);
-    for(auto &line : lines) {
+bool drawContents(const std::vector<std::string>& inLines) {
+    for(auto &line : inLines) {
         display.println(line.c_str());
     }
-    return lines.size() > 0;
+    return inLines.size() > 0;
 }
 
-void drawData() {
+void drawData(const std::vector<std::string>& currentLines) {
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
 
     drawHeader();
 
     display.setCursor(0, 20);
-    const bool hasData = drawContents();
+    const bool hasData = drawContents(currentLines);
     if (!hasData) {
         setTimerSpeed(slow);
     }
@@ -351,6 +345,13 @@ void drawLogo() {
 void displayTask(void *) {
     bool taskDisplayOn = true;
     bool isDimmed = true;
+    
+    // Dirty tracking state
+    time_t lastDrawnTime = 0;
+    int lastRssi = 0;
+    bool lastMqtt = false;
+    std::vector<std::string> lastLines;
+    
     while (true) {
         const bool showData = timerIsFast.load();
         const TickType_t waitTicks = pdMS_TO_TICKS(showData ? MILLIS_BETWEEN_DISPLAY_UPDATE_FAST
@@ -372,20 +373,45 @@ void displayTask(void *) {
             continue;
         }
 
-        display.clearDisplay();
-
         const auto secondsSinceNoData = getSecondsSinceNoData();
+        time_t now = time(nullptr);
 
         if (showData || secondsSinceNoData < SECONDS_BEFORE_SCREENSAVER) {
-            if (!taskDisplayOn) {
-                display.ssd1306_command(SSD1306_DISPLAYON);
-                taskDisplayOn = true;
+            std::vector<std::string> currentLines;
+            
+            // Check dirty conditions for data screen
+            bool dirty = false;
+            if (isDimmed) dirty = true; // Needs undimming
+            if (now != lastDrawnTime) dirty = true;
+            if (wifiStatus.rssi != lastRssi) dirty = true;
+            if (mqttConnected != lastMqtt) dirty = true;
+
+            // To avoid flickering and I2C spam, we only want to redraw if data is dirty, 
+            // but we must call drawContents to get the lines and check.
+            // A simpler way: we prepare a dummy call to see if lines changed? No, 
+            // we will just call getTextToDisplay directly.
+            int width = SCREEN_WIDTH / 6;
+            int height = (SCREEN_HEIGHT - 20 - 8) / 8;
+            xSemaphoreTake(displayBufferMutex, portMAX_DELAY);
+            currentLines = displayBuffer.getTextToDisplay(width, height);
+            xSemaphoreGive(displayBufferMutex);
+            
+            if (currentLines != lastLines) dirty = true;
+
+            if (dirty) {
+                if (isDimmed) {
+                    display.dim(false);
+                    isDimmed = false;
+                }
+                display.clearDisplay();
+                drawData(currentLines);
+                display.display();
+                
+                lastDrawnTime = now;
+                lastRssi = wifiStatus.rssi;
+                lastMqtt = mqttConnected;
+                lastLines = currentLines;
             }
-            if (isDimmed) {
-                display.dim(false);
-                isDimmed = false;
-            }
-            drawData();
         } else if (secondsSinceNoData < SECONDS_BEFORE_SCREEN_OFF) {
             if (!taskDisplayOn) {
                 display.ssd1306_command(SSD1306_DISPLAYON);
@@ -393,10 +419,17 @@ void displayTask(void *) {
             }
             if (!isDimmed) {
                 display.ssd1306_command(SSD1306_SETCONTRAST);
-                display.ssd1306_command(1); // Set contrast to 1 instead of using dim(true) to keep it visible
+                display.ssd1306_command(1);
                 isDimmed = true;
             }
+            // Screensaver is drawn every SLOW tick (5000ms), so it's fine to redraw
+            display.clearDisplay();
             drawLogo();
+            display.display();
+            
+            // Reset dirty tracking for when we wake up
+            lastDrawnTime = 0;
+            lastLines.clear();
         } else {
             if (taskDisplayOn) {
                 display.clearDisplay();
@@ -406,8 +439,6 @@ void displayTask(void *) {
             }
             continue;
         }
-
-        display.display();
     }
 }
 

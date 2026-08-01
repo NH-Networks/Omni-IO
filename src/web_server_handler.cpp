@@ -19,6 +19,8 @@
 #include <iohcRemoteMap.h>
 #include <iohcPacket.h>
 #include <log_buffer.h>
+
+constexpr time_t MIN_VALID_NTP_EPOCH = 1600000000; // ~Sept 2020
 #include <mqtt_handler.h>
 #include <nvs_helpers.h>
 #include <oled_display.h>
@@ -736,7 +738,7 @@ void handleApiNetworkGet(AsyncWebServerRequest *request, JsonObject &root) {
   struct tm tmnow;
   localtime_r(&now, &tmnow);
   char timeBuf[64];
-  if (now > 1600000000) { // Valid time after year 2020 (NTP synced)
+  if (now > MIN_VALID_NTP_EPOCH) { // Valid time after year 2020 (NTP synced)
     strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%d %H:%M:%S", &tmnow);
   } else {
     snprintf(timeBuf, sizeof(timeBuf), "Not synchronized");

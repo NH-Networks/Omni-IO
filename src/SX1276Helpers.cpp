@@ -75,11 +75,16 @@ namespace Radio {
         pinMode(RADIO_RESET, INPUT); // Connected to Reset; floating for POR
 
         // Check the availability of the Radio
+        uint32_t startWait = millis();
         while (!digitalRead(RADIO_RESET)) {
+            if (millis() - startWait > 500) {
+                Serial.println("Error: Radio reset timeout. Is the radio chip connected?");
+                break;
+            }
 #if defined(ESP32)
             esp_task_wdt_reset();
 #endif
-            delayMicroseconds(1);
+            delayMicroseconds(100);
         }
         delayMicroseconds(BOARD_READY_AFTER_POR);
 
