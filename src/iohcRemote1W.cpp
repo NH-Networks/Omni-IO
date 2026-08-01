@@ -775,12 +775,6 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
                 r.paired = false;
                 updateFile = true;
             }
-            if (jobj["repeatOnNoResponse"].is<bool>()) {
-                r.repeatOnNoResponse = jobj["repeatOnNoResponse"].as<bool>();
-            } else {
-                r.repeatOnNoResponse = false;
-                updateFile = true;
-            }
             r.positionTracker.setTravelTime(r.travelTime);
             if (jobj["position"].is<float>() || jobj["position"].is<int>()) {
                 r.positionTracker.setPosition(
@@ -853,7 +847,7 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
             jobj["position"] = static_cast<int>(std::round(r.positionTracker.getPosition()));
 
             jobj["paired"] = r.paired;
-            jobj["repeatOnNoResponse"] = r.repeatOnNoResponse;
+
         }
         const size_t written = serializeJson(doc, f);
         f.flush();
@@ -911,7 +905,7 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
         r.name = name;
         r.travelTime = DEFAULT_TRAVEL_TIME_SEC;
         r.paired = false;
-        r.repeatOnNoResponse = false;
+
 
         // Generate unique description
         const char letters[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -962,7 +956,7 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
             learned.type = {type, 0};
             learned.manufacturer = manufacturer;
             learned.paired = true;
-            learned.repeatOnNoResponse = false;
+
             learned.travelTime = DEFAULT_TRAVEL_TIME_SEC;
             learned.positionTracker.setTravelTime(learned.travelTime);
 

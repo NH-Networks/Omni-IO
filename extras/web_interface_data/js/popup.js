@@ -57,17 +57,7 @@
             });
         }
 
-        const showBoolean = !!popupOptions.showBoolean;
-        boolRow.style.display = showBoolean ? "flex" : "none";
-        boolInput.checked = !!popupOptions.defaultBoolean;
-        boolLabel.textContent = popupOptions.booleanLabel || app.i18nText("popup.boolean_label_default", "solar energy");
-        boolInput.onchange = null;
 
-        const showRepeat = !!popupOptions.showRepeatOnNoResponse;
-        repeatRow.style.display = showRepeat ? "flex" : "none";
-        repeatInput.checked = !!popupOptions.defaultRepeatOnNoResponse;
-        repeatLabel.textContent = popupOptions.repeatOnNoResponseLabel ||
-            app.i18nText("popup.repeat_on_no_response", "Repeat command if shutter does not respond");
 
         const showInput = !!popupOptions.showInput;
         input.style.display = showInput ? "block" : "none";
@@ -98,29 +88,12 @@
             pairLabelEl.style.display = "none";
         }
 
-        const destructiveActionsBlocked = function () {
-            return !!popupOptions.blockDestructiveWhenBoolean && showBoolean && boolInput.checked;
-        };
-        const showProtectedMessage = function () {
-            deleteInfo.style.display = "block";
-            deleteInfo.textContent = protectedMessage;
-        };
         const updateDestructiveButtons = function () {
-            const blocked = destructiveActionsBlocked();
-            unPairBtn.disabled = blocked;
-            deleteBtn.disabled = blocked;
-            unPairBtn.title = blocked ? protectedMessage : "";
-            deleteBtn.title = blocked ? protectedMessage : "";
-            if (blocked) {
-                showProtectedMessage();
-            } else if (deleteInfo.textContent === protectedMessage) {
-                deleteInfo.style.display = "none";
-                deleteInfo.textContent = "";
-            }
+            unPairBtn.disabled = false;
+            deleteBtn.disabled = false;
+            unPairBtn.title = "";
+            deleteBtn.title = "";
         };
-        if (showBoolean && popupOptions.blockDestructiveWhenBoolean) {
-            boolInput.onchange = updateDestructiveButtons;
-        }
 
         if (popupOptions.onPair) {
             pairBtn.style.display = "block";
@@ -139,10 +112,6 @@
             unPairBtn.style.display = "block";
             unPairBtn.textContent = popupOptions.unpairBtnName || "Unpair";
             unPairBtn.onclick = function () {
-                if (destructiveActionsBlocked()) {
-                    showProtectedMessage();
-                    return;
-                }
                 const selectedDevice = showDevicePopup ? devicePopup.value : undefined;
                 closePopup();
                 popupOptions.onUnpair(selectedDevice);
@@ -204,11 +173,10 @@
             const value = showInput ? input.value : true;
             const timingValue = showTiming ? inputTiming.value : undefined;
             const deviceValue = showDevicePopup ? devicePopup.value : undefined;
-            const repeatValue = showRepeat ? repeatInput.checked : undefined;
-            closePopup();
             if (popupOptions.onSave) {
-                popupOptions.onSave(value, timingValue, deviceValue, repeatValue);
+                popupOptions.onSave(value, timingValue, deviceValue);
             }
+            closePopup();
         };
 
         popup.classList.add("open");

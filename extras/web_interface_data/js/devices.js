@@ -145,23 +145,9 @@
                             btnShowDelete: true,
                             defaultValue: device.name,
                             defaultTiming: device.travel_time,
-                            showBoolean: true,
-                            booleanLabel: app.i18nText("popup.active", "Active"),
-                            defaultBoolean: !!device.active,
-                            blockDestructiveWhenBoolean: true,
-                            showRepeatOnNoResponse: true,
-                            repeatOnNoResponseLabel: app.i18nText(
-                                "popup.repeat_on_no_response",
-                                "Repeat command if shutter does not respond"
-                            ),
-                            defaultRepeatOnNoResponse: !!device.repeatOnNoResponse,
-                            protectedMessage: app.i18nText(
-                                "popup.active_blocks_destructive",
-                                "Disable Active before unpairing or deleting."
-                            ),
                             pairLabel: app.i18nText("popup.pair_label_device", "Add / Remove the device to the physical screen"),
                             deleteInfo: app.i18nText("popup.delete_device_info", "Only use when the device is not linked to a physical screen."),
-                            onSave: async function (newName, newTiming, _deviceValue, repeatOnNoResponse) {
+                            onSave: async function (newName, newTiming) {
                                 try {
                                     if (newName.trim() && newName !== device.name) {
                                         const renameResult = await window.MiOpenApi.postJson("/api/command", {
@@ -175,14 +161,6 @@
                                         const timeResult = await window.MiOpenApi.postJson("/api/command", {
                                             deviceId: device.id,
                                             command: "time1W " + parsedTiming
-                                        });
-                                    }
-
-                                    if (typeof repeatOnNoResponse === "boolean" &&
-                                            repeatOnNoResponse !== !!device.repeatOnNoResponse) {
-                                        const repeatResult = await window.MiOpenApi.postJson("/api/command", {
-                                            deviceId: device.id,
-                                            command: "repeat1W " + (repeatOnNoResponse ? "1" : "0")
                                         });
                                     }
 
