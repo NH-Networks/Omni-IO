@@ -160,6 +160,9 @@ bool initDisplay() {
     if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDRESS)) {
         return false;
     }
+    
+    // Dim the screen to reduce power consumption and heat
+    display.dim(true);
 
     if (xTaskCreatePinnedToCore(displayTask, "DisplayTask", 4096, nullptr, 1,
                                 &displayTaskHandle, tskNO_AFFINITY) != pdPASS) {
