@@ -330,14 +330,25 @@ void drawData() {
 }
 
 void drawLogo() {
-    // draw logo at random position to avoid burn-in
+    // draw logo and text at random position to avoid burn-in
     const int x = 50.0 * std::rand() / RAND_MAX; // number between 0 and 50
-    const int y = 48.0 * std::rand() / RAND_MAX; // number between 0 and 48
+    const int y = 30.0 * std::rand() / RAND_MAX; // adjusted max y to 30 to fit text
     drawLogo(x, y);
+    
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(x, y + 16);
+    display.printf("CPU: %.0fC", temperatureRead());
+    
+    if (wifiStatus.connectionStatus == ConnState::Connected) {
+        display.setCursor(x, y + 26);
+        display.print(WiFi.localIP().toString().c_str());
+    }
 }
 
 void displayTask(void *) {
     bool taskDisplayOn = true;
+    bool isDimmed = true;
     while (true) {
         const bool showData = timerIsFast.load();
         const TickType_t waitTicks = pdMS_TO_TICKS(showData ? MILLIS_BETWEEN_DISPLAY_UPDATE_FAST
@@ -364,8 +375,16 @@ void displayTask(void *) {
         const auto secondsSinceNoData = getSecondsSinceNoData();
 
         if (showData || secondsSinceNoData < SECONDS_BEFORE_SCREENSAVER) {
+            if (isDimmed) {
+                display.dim(false);
+                isDimmed = false;
+            }
             drawData();
         } else {
+            if (!isDimmed) {
+                display.dim(true);
+                isDimmed = true;
+            }
             drawLogo();
         }
 
