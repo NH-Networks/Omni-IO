@@ -721,7 +721,14 @@ void handleApiNetworkGet(AsyncWebServerRequest *request, JsonObject &root) {
   root["gateway"] = WiFi.gatewayIP().toString();
   root["dns1"] = WiFi.dnsIP(0).toString();
   root["dns2"] = WiFi.dnsIP(1).toString();
-  root["sntp"] = "pool.ntp.org";
+  
+  std::string sntp_server = "pool.ntp.org";
+  nvs_read_string(NVS_KEY_NET_SNTP, sntp_server);
+  root["sntp"] = sntp_server.c_str();
+
+  std::string tz = "CET-1CEST,M3.5.0,M10.5.0/3";
+  nvs_read_string(NVS_KEY_NET_TZ, tz);
+  root["tz"] = tz.c_str();
 }
 
 
@@ -734,7 +741,8 @@ void handleApiNetworkSet(AsyncWebServerRequest *request, JsonObject &doc, JsonOb
   String dns1 = doc["dns1"] | "";
   String dns2 = doc["dns2"] | "";
   String sntp = doc["sntp"] | "";
-  hostname.trim(); ip.trim(); mask.trim(); gateway.trim(); dns1.trim(); dns2.trim(); sntp.trim();
+  String tz = doc["tz"] | "";
+  hostname.trim(); ip.trim(); mask.trim(); gateway.trim(); dns1.trim(); dns2.trim(); sntp.trim(); tz.trim();
 
   if (!isValidHostname(hostname)) {
     request->send(400, "application/json", "{\"success\":false,\"message\":\"Invalid hostname\"}");
@@ -760,6 +768,7 @@ void handleApiNetworkSet(AsyncWebServerRequest *request, JsonObject &doc, JsonOb
   nvs_write_string(NVS_KEY_NET_DNS1, std::string(dns1.c_str()));
   nvs_write_string(NVS_KEY_NET_DNS2, std::string(dns2.c_str()));
   nvs_write_string(NVS_KEY_NET_SNTP, std::string(sntp.c_str()));
+  nvs_write_string(NVS_KEY_NET_TZ, std::string(tz.c_str()));
 
   root["success"] = true;
   root["message"] = "Network config saved, rebooting";

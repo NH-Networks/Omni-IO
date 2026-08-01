@@ -110,6 +110,11 @@ static void handleWifiConnected() {
         nvs_read_string(NVS_KEY_NET_SNTP, sntp_server);
         configTime(0, 0, sntp_server.c_str());
 
+        std::string tz = "CET-1CEST,M3.5.0,M10.5.0/3"; // Default: Europe/Amsterdam
+        nvs_read_string(NVS_KEY_NET_TZ, tz);
+        setenv("TZ", tz.c_str(), 1);
+        tzset();
+
         wifiReconnectTimer.detach();
         rssiTimer.attach(5, rssiTimerCb);
         updateDisplayStatus();

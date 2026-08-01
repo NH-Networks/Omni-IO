@@ -123,6 +123,7 @@
             app.elements.networkDns1Input.value = config.dns1 || "";
             app.elements.networkDns2Input.value = config.dns2 || "";
             app.elements.networkSntpInput.value = config.sntp || "";
+            app.elements.networkTzInput.value = config.tz || "";
             setNetworkStatus(app, config.connected ? "Network config loaded" : "Network config loaded, WiFi not connected", !config.connected);
         } catch (error) {
             console.error("Error fetching network config", error);
@@ -144,7 +145,8 @@
                 gateway: app.elements.networkGatewayInput.value,
                 dns1: app.elements.networkDns1Input.value,
                 dns2: app.elements.networkDns2Input.value,
-                sntp: app.elements.networkSntpInput.value
+                sntp: app.elements.networkSntpInput.value,
+                tz: app.elements.networkTzInput.value
             });
             setNetworkStatus(app, result.message || "Network config saved, rebooting");
             setSettingsStatus(app, result.message || "Network config saved, rebooting");

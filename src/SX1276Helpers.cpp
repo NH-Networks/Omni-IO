@@ -67,14 +67,11 @@ namespace Radio {
  * the availability of the radio, configures SPI settings, and puts the radio chip in standby mode.
  */
     void initHardware() {
-        printf("\nSPI Init");
-
-        //gpio_pullup_en((gpio_num_t) RADIO_MISO);
+        Serial.println("SPI Init");
 
         pinMode(RADIO_MISO, INPUT_PULLUP);
 
         // SPI pins configuration
-
         pinMode(RADIO_RESET, INPUT); // Connected to Reset; floating for POR
 
         // Check the availability of the Radio
@@ -90,9 +87,6 @@ namespace Radio {
 #if defined(ESP32)
         SPI.begin(RADIO_SCLK, RADIO_MISO, RADIO_MOSI, RADIO_NSS);
 #endif
-        // SPI.setFrequency(SPI_CLK_FRQ);
-        // SPI.setDataMode(SPI_MODE0);
-        // SPI.setBitOrder(MSBFIRST);
         SPI.setHwCs(true);
 
         // Disable SPI device
@@ -103,20 +97,17 @@ namespace Radio {
         digitalWrite(RADIO_NSS, HIGH);
         delayMicroseconds(BOARD_READY_AFTER_POR);
 
-        // SPI.beginTransaction(Radio::SpiSettings);
-        // SPI.endTransaction();
-
         writeByte(REG_OPMODE, RF_OPMODE_STANDBY); // Put Radio in Standby mode
 
         pinMode(SCAN_LED, OUTPUT);
         digitalWrite(SCAN_LED, 1);
-        printf("\nRadio Chip is ready\n");
+        Serial.println("Radio Chip is ready");
     }
 
 void setPreambleLength(uint16_t preambleLen) {
     writeByte(REG_PREAMBLEMSB, (preambleLen >> 8) & 0xFF);
     writeByte(REG_PREAMBLELSB, preambleLen & 0xFF);
-    ets_printf("Radio: Preamble length set to %u symbols\n", preambleLen);
+    Serial.printf("Radio: Preamble length set to %u symbols\n", preambleLen);
 }
 
 /**
@@ -247,43 +238,7 @@ void setPreambleLength(uint16_t preambleLen) {
         writeByte(REG_PACONFIG, regPaConfigInitVal);
     }
 
-    /*!
-     * Performs the Rx chain calibration for LF and HF bands
-     * \remark Must be called just after the reset so all registers are at their
-     *         default values
-     */
-    // void RxChainCalibration( void ) {
-    //     uint8_t regPaConfigInitVal;
-    //     uint32_t initialFreq;
 
-    //     // Save context
-    //     regPaConfigInitVal = readByte( REG_PACONFIG );
-    //     initialFreq = ( double )( ( ( uint32_t )readByte( REG_FRFMSB ) << 16 ) |
-    //                               ( ( uint32_t )readByte( REG_FRFMID ) << 8 ) |
-    //                               ( ( uint32_t )readByte( REG_FRFLSB ) ) ) * ( double )FREQ_STEP;
-
-    //     // Cut the PA just in case, RFO output, power = -1 dBm
-    //     writeByte( REG_PACONFIG, 0x00 );
-
-    //     // Launch Rx chain calibration for LF band
-    //     writeByte ( REG_IMAGECAL, ( readByte( REG_IMAGECAL ) & RF_IMAGECAL_IMAGECAL_MASK ) | RF_IMAGECAL_IMAGECAL_START );
-    //     while( ( readByte( REG_IMAGECAL ) & RF_IMAGECAL_IMAGECAL_RUNNING ) == RF_IMAGECAL_IMAGECAL_RUNNING )
-    //     {
-    //     }
-
-    //     // Sets a Frequency in HF band
-    //     SetChannel( 868000000 );
-
-    //     // Launch Rx chain calibration for HF band
-    //     writeByte ( REG_IMAGECAL, ( readByte( REG_IMAGECAL ) & RF_IMAGECAL_IMAGECAL_MASK ) | RF_IMAGECAL_IMAGECAL_START );
-    //     while( ( readByte( REG_IMAGECAL ) & RF_IMAGECAL_IMAGECAL_RUNNING ) == RF_IMAGECAL_IMAGECAL_RUNNING )
-    //     {
-    //     }
-
-    //     // Restore context
-    //     writeByte( REG_PACONFIG, regPaConfigInitVal );
-    //     SetChannel( initialFreq );
-    // }
     void IRAM_ATTR setStandby() {
         writeByte(REG_OPMODE, (readByte(REG_OPMODE) & RF_OPMODE_MASK) | RF_OPMODE_STANDBY);
     }
@@ -319,11 +274,8 @@ void setPreambleLength(uint16_t preambleLen) {
         for (uint8_t i = 0; i < size; ++i) {
             buffer[i] = readByte(regAddr + i);
         }
-    } // Clears FIFO at startup to avoid dirty reads
-    // void clearBuffer() {
-    //     for (uint8_t idx=0; idx <= 64; ++idx)
-    //         readByte(REG_FIFO);
-    // }
+    } 
+    // Clears FIFO at startup to avoid dirty reads
     void clearBuffer() {
         // Taille du buffer FIFO du SX1276
         const uint8_t bufferSize = 64;
@@ -335,15 +287,7 @@ void setPreambleLength(uint16_t preambleLen) {
         }
     }
 
-    //     void clearFlags() {
-    //         uint8_t out[2] = {0xff, 0xff};
-    //         writeBytes(REG_IRQFLAGS1, out, 2);
-    //     }
-    // void clearFlags_A() {
-    //   uint8_t flags = readByte(REG_IRQFLAGS1);
-    //   flags &= ~0xFF; // Efface tous les drapeaux
-    //   writeByte(REG_IRQFLAGS1, flags);
-    // }
+
     void IRAM_ATTR clearFlags() {
         uint16_t flags = readWord(REG_IRQFLAGS1);
         // SX1276 FSK IRQ flags are cleared by writing back the latched 1 bits.

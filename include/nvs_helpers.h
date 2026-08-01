@@ -24,6 +24,7 @@ static constexpr char NVS_KEY_NET_GW[] = "net_gw";
 static constexpr char NVS_KEY_NET_DNS1[] = "net_dns1";
 static constexpr char NVS_KEY_NET_DNS2[] = "net_dns2";
 static constexpr char NVS_KEY_NET_SNTP[] = "net_sntp";
+static constexpr char NVS_KEY_NET_TZ[] = "net_tz";
 static constexpr char NVS_KEY_FB_ENABLED[] = "fb_enabled";
 static constexpr char NVS_KEY_FB_BOOT[] = "fb_boot";
 static constexpr char NVS_KEY_FB_RUN[] = "fb_run";
