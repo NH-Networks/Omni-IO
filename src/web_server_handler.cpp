@@ -731,6 +731,17 @@ void handleApiNetworkGet(AsyncWebServerRequest *request, JsonObject &root) {
     tz = "CET-1CEST,M3.5.0,M10.5.0/3";
   }
   root["tz"] = tz.c_str();
+
+  time_t now = time(nullptr);
+  struct tm tmnow;
+  localtime_r(&now, &tmnow);
+  char timeBuf[64];
+  if (now > 1600000000) { // Valid time after year 2020 (NTP synced)
+    strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%d %H:%M:%S", &tmnow);
+  } else {
+    snprintf(timeBuf, sizeof(timeBuf), "Not synchronized");
+  }
+  root["time"] = timeBuf;
 }
 
 

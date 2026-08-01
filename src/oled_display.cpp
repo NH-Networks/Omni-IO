@@ -43,6 +43,7 @@ void displayTask(void *);
 const int MILLIS_BETWEEN_DISPLAY_UPDATE_SLOW = 5000;
 const int MILLIS_BETWEEN_DISPLAY_UPDATE_FAST = 100;
 const int SECONDS_BEFORE_SCREENSAVER = 60;
+const int SECONDS_BEFORE_SCREEN_OFF = 3600; // 60 minutes
 
 const uint8_t PROGMEM miopenioLogo[] =
 {
@@ -376,18 +377,34 @@ void displayTask(void *) {
         const auto secondsSinceNoData = getSecondsSinceNoData();
 
         if (showData || secondsSinceNoData < SECONDS_BEFORE_SCREENSAVER) {
+            if (!taskDisplayOn) {
+                display.ssd1306_command(SSD1306_DISPLAYON);
+                taskDisplayOn = true;
+            }
             if (isDimmed) {
                 display.dim(false);
                 isDimmed = false;
             }
             drawData();
-        } else {
+        } else if (secondsSinceNoData < SECONDS_BEFORE_SCREEN_OFF) {
+            if (!taskDisplayOn) {
+                display.ssd1306_command(SSD1306_DISPLAYON);
+                taskDisplayOn = true;
+            }
             if (!isDimmed) {
                 display.ssd1306_command(SSD1306_SETCONTRAST);
                 display.ssd1306_command(1); // Set contrast to 1 instead of using dim(true) to keep it visible
                 isDimmed = true;
             }
             drawLogo();
+        } else {
+            if (taskDisplayOn) {
+                display.clearDisplay();
+                display.display();
+                display.ssd1306_command(SSD1306_DISPLAYOFF);
+                taskDisplayOn = false;
+            }
+            continue;
         }
 
         display.display();

@@ -40,6 +40,7 @@
             networkDns2Input: document.getElementById("net-dns2"),
             networkSntpInput: document.getElementById("net-sntp"),
             networkTzInput: document.getElementById("net-tz"),
+            networkTimeInput: document.getElementById("net-time"),
             networkStatus: document.getElementById("network-status"),
             networkSaveButton: document.getElementById("network-save"),
             fallbackEnabledInput: document.getElementById("fallback-enabled"),
