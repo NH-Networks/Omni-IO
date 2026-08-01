@@ -727,7 +727,9 @@ void handleApiNetworkGet(AsyncWebServerRequest *request, JsonObject &root) {
   root["sntp"] = sntp_server.c_str();
 
   std::string tz = "CET-1CEST,M3.5.0,M10.5.0/3";
-  nvs_read_string(NVS_KEY_NET_TZ, tz);
+  if (!nvs_read_string(NVS_KEY_NET_TZ, tz) || tz.empty()) {
+    tz = "CET-1CEST,M3.5.0,M10.5.0/3";
+  }
   root["tz"] = tz.c_str();
 }
 

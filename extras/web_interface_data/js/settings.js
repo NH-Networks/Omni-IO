@@ -123,7 +123,7 @@
             app.elements.networkDns1Input.value = config.dns1 || "";
             app.elements.networkDns2Input.value = config.dns2 || "";
             app.elements.networkSntpInput.value = config.sntp || "";
-            app.elements.networkTzInput.value = config.tz || "";
+            app.elements.networkTzInput.value = config.tz || "CET-1CEST,M3.5.0,M10.5.0/3";
             setNetworkStatus(app, config.connected ? "Network config loaded" : "Network config loaded, WiFi not connected", !config.connected);
         } catch (error) {
             console.error("Error fetching network config", error);

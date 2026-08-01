@@ -111,7 +111,9 @@ static void handleWifiConnected() {
         configTime(0, 0, sntp_server.c_str());
 
         std::string tz = "CET-1CEST,M3.5.0,M10.5.0/3"; // Default: Europe/Amsterdam
-        nvs_read_string(NVS_KEY_NET_TZ, tz);
+        if (!nvs_read_string(NVS_KEY_NET_TZ, tz) || tz.empty()) {
+            tz = "CET-1CEST,M3.5.0,M10.5.0/3";
+        }
         setenv("TZ", tz.c_str(), 1);
         tzset();
 
