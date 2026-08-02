@@ -34,5 +34,6 @@ except NameError:
 else:
     env.Append(CPPDEFINES=[
         ("FIRMWARE_VERSION", f'\\"{version}\\"'),
-        ("FIRMWARE_BRANCH", f'\\"{branch}\\"')
+        ("FIRMWARE_BRANCH", f'\\"{branch}\\"'),
+        ("FIRMWARE_ENVIRONMENT", f'\\"{env["PIOENV"]}\\"')
     ])

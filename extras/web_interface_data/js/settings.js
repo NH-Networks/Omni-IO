@@ -530,6 +530,75 @@
         }
     }
 
+    async function checkGithubUpdate(app) {
+        let branch = app.elements.githubUpdateBranch ? app.elements.githubUpdateBranch.value : "auto";
+        const githubUpdateStatus = app.elements.githubUpdateStatus;
+        if (githubUpdateStatus) githubUpdateStatus.innerText = "Fetching current info...";
+
+        try {
+            const infoResponse = await fetch("/api/info");
+            const info = await infoResponse.json();
+            const currentBranch = info.branch;
+            const envName = info.environment;
+            
+            if (branch === "auto") {
+                branch = currentBranch;
+            }
+            if (!branch || branch === "unknown") {
+                branch = "Beta"; 
+            }
+
+            if (githubUpdateStatus) githubUpdateStatus.innerText = "Checking " + branch + " releases for " + envName + "...";
+
+            const releaseResponse = await fetch("https://api.github.com/repos/NH-Networks/miopen.io/releases/tags/" + branch + "-latest");
+            if (!releaseResponse.ok) {
+                throw new Error("Release not found for branch: " + branch);
+            }
+            const releaseData = await releaseResponse.json();
+            
+            const firmwareAsset = releaseData.assets.find(a => a.name.startsWith(envName + "_" + branch) && a.name.endsWith("_firmware.bin"));
+            
+            if (!firmwareAsset) {
+                throw new Error("Firmware not found in the latest release for " + envName);
+            }
+
+            if (!confirm("Found release for " + branch + " (" + new Date(releaseData.published_at).toLocaleString() + ").\nDo you want to download and install the firmware update?")) {
+                if (githubUpdateStatus) githubUpdateStatus.innerText = "Update cancelled.";
+                return;
+            }
+
+            if (githubUpdateStatus) githubUpdateStatus.innerText = "Found update. Downloading firmware...";
+
+            let fwResponse;
+            try {
+                fwResponse = await fetch(firmwareAsset.url, {
+                    headers: { "Accept": "application/octet-stream" }
+                });
+                if (!fwResponse.ok) throw new Error();
+            } catch (_err) {
+                fwResponse = await fetch(firmwareAsset.browser_download_url);
+            }
+            if (!fwResponse.ok) throw new Error("Failed to download firmware binary from GitHub");
+            const fwBlob = await fwResponse.blob();
+
+            if (githubUpdateStatus) githubUpdateStatus.innerText = "Uploading firmware to device...";
+
+            const fwFile = new File([fwBlob], firmwareAsset.name);
+            await uploadFileWithProgress(fwFile, "/api/firmware", function(percent) {
+                 const message = percent >= 100
+                     ? "Firmware uploaded, writing to flash..."
+                     : "Uploading firmware " + percent + "%...";
+                 if (githubUpdateStatus) githubUpdateStatus.innerText = message;
+            });
+
+            if (githubUpdateStatus) githubUpdateStatus.innerText = "Firmware update successful! Rebooting...";
+
+        } catch (error) {
+            if (githubUpdateStatus) githubUpdateStatus.innerText = "Error: " + error.message;
+            console.error(error);
+        }
+    }
+
     function initSettingsTabs() {
         const tabs = Array.from(document.querySelectorAll("[data-settings-tab]"));
         const panels = Array.from(document.querySelectorAll("[data-settings-panel]"));
@@ -636,6 +705,9 @@
         };
         app.sendSyslogTest = function () {
             return sendSyslogTest(app);
+        };
+        app.checkGithubUpdate = function () {
+            return checkGithubUpdate(app);
         };
         app.uploadFirmware = function () {
             return uploadSelectedFile(

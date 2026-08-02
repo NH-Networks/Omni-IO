@@ -17,6 +17,9 @@
             filesystemUploadButton: document.getElementById("upload-filesystem"),
             firmwareFileInput: document.getElementById("firmware-file"),
             firmwareUploadButton: document.getElementById("upload-firmware"),
+            githubUpdateButton: document.getElementById("github-update-check"),
+            githubUpdateBranch: document.getElementById("github-update-branch"),
+            githubUpdateStatus: document.getElementById("github-update-status"),
             helpDeviceButton: document.getElementById("help-device"),
             helpRemoteButton: document.getElementById("help-remote"),
             lastAddrInput: document.getElementById("last-address"),
@@ -260,6 +263,9 @@
         }
         if (app.elements.firmwareUploadButton) {
             app.elements.firmwareUploadButton.addEventListener("click", app.uploadFirmware);
+        }
+        if (app.elements.githubUpdateButton) {
+            app.elements.githubUpdateButton.addEventListener("click", app.checkGithubUpdate);
         }
         if (app.elements.filesystemUploadButton) {
             app.elements.filesystemUploadButton.addEventListener("click", app.uploadFilesystem);

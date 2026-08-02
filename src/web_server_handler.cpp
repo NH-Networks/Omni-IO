@@ -893,6 +893,11 @@ void handleApiInfo(AsyncWebServerRequest *request, JsonObject &root) {
 #else
   root["branch"] = "unknown";
 #endif
+#ifdef FIRMWARE_ENVIRONMENT
+  root["environment"] = FIRMWARE_ENVIRONMENT;
+#else
+  root["environment"] = "unknown";
+#endif
 #else
   root["version"] = "dev";
 #endif

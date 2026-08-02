@@ -88,6 +88,7 @@ static void startTwoWPairingWindow(uint32_t windowMs) {
     setCrashMarker("pair2W: start 2W scan");
     addLogMessage("2W pair trace: starting scan");
     extendTwoWPairingWindow(windowMs);
+    setDiscoveryDisplay(windowMs / 1000);
     setCrashMarker("pair2W: send discover28");
     addLogMessage("2W pair trace: sending discover28");
     IOHC::iohcOtherDevice2W::getInstance()->cmd(IOHC::Other2WButton::discover28, nullptr);
@@ -102,6 +103,7 @@ static void startTwoWPairingWindowAlt(uint32_t windowMs) {
     setCrashMarker("pair2Walt: start 2W scan");
     addLogMessage("2W alt pair trace: starting scan");
     extendTwoWPairingWindow(windowMs);
+    setDiscoveryDisplay(windowMs / 1000);
 
     setCrashMarker("pair2Walt: send discover28");
     addLogMessage("2W alt pair trace: sending discover28");
@@ -120,6 +122,7 @@ static void startOneWPairingWindow(uint32_t windowMs) {
     resetTwoWPairingSession();
     addLogMessage("1W (solar) pairing window opened");
     extendTwoWPairingWindow(windowMs);
+    setDiscoveryDisplay(windowMs / 1000);
 }
 
 static void startOneWPairingTask(void *param) {
