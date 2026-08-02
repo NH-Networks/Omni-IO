@@ -26,6 +26,8 @@ void display1WPosition(const uint8_t *remote, float position, const char *name =
 void displayCustomMessage(const char* message, const char* status = nullptr);
 void clearDisplayMessages();
 void updateDisplayStatus();
+void wakeDisplay();
+void setDiscoveryDisplay(int seconds);
 bool isDisplayEnabled();
 void setDisplayEnabled(bool enabled);
 #else
@@ -34,6 +36,8 @@ inline void display1WAction(const uint8_t *, const char *, const char *, const c
 inline void display1WPosition(const uint8_t *, float, const char * = nullptr) {}
 
 inline void updateDisplayStatus() {}
+inline void wakeDisplay() {}
+inline void setDiscoveryDisplay(int) {}
 inline void displayCustomMessage(const char*, const char* = nullptr) {}
 inline void clearDisplayMessages() {}
 inline bool isDisplayEnabled() { return false; }

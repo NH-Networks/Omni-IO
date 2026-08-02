@@ -38,6 +38,7 @@ TaskHandle_t displayTaskHandle = nullptr;
 std::chrono::time_point<std::chrono::system_clock> startTime;
 std::atomic<int64_t> lastDataTime = 0;
 std::atomic<bool> displayEnabled = true;
+std::atomic<int64_t> discoveryEndMicros{0};
 void displayTask(void *);
 
 const int MILLIS_BETWEEN_DISPLAY_UPDATE_SLOW = 5000;
@@ -240,6 +241,19 @@ void updateDisplayStatus() {
     notifyDisplayTask();
 }
 
+void wakeDisplay() {
+    if (!displayEnabled.load()) return;
+    lastDataTime.store(esp_timer_get_time());
+    setTimerSpeed(fast);
+    notifyDisplayTask();
+}
+
+void setDiscoveryDisplay(int seconds) {
+    if (!displayEnabled.load()) return;
+    discoveryEndMicros.store(esp_timer_get_time() + seconds * 1000000LL);
+    wakeDisplay();
+}
+
 bool isDisplayEnabled() {
     return displayEnabled.load();
 }
@@ -316,10 +330,20 @@ void drawData(const std::vector<std::string>& currentLines) {
 
     drawHeader();
 
-    display.setCursor(0, 20);
-    const bool hasData = drawContents(currentLines);
-    if (!hasData) {
-        setTimerSpeed(slow);
+    if (esp_timer_get_time() < discoveryEndMicros.load()) {
+        display.setCursor(10, 25);
+        display.setTextSize(2);
+        display.println("DISCOVERY");
+        display.setCursor(10, 45);
+        display.setTextSize(1);
+        display.println("Mode Active...");
+        setTimerSpeed(fast);
+    } else {
+        display.setCursor(0, 20);
+        const bool hasData = drawContents(currentLines);
+        if (!hasData) {
+            setTimerSpeed(slow);
+        }
     }
 
     drawFooter();
@@ -418,6 +442,7 @@ void displayTask(void *) {
                 lastLines = currentLines;
             }
         } else if (secondsSinceNoData < SECONDS_BEFORE_SCREEN_OFF) {
+            setTimerSpeed(slow);
             if (!taskDisplayOn) {
                 display.ssd1306_command(SSD1306_DISPLAYON);
                 taskDisplayOn = true;
@@ -436,6 +461,7 @@ void displayTask(void *) {
             lastDrawnTime = 0;
             lastLines.clear();
         } else {
+            setTimerSpeed(slow);
             if (taskDisplayOn) {
                 display.clearDisplay();
                 display.display();

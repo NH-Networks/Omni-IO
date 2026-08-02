@@ -16,6 +16,7 @@
 
 #include <iohcOtherDevice2W.h>
 #include <LittleFS.h>
+#include <oled_display.h>
 #include <ArduinoJson.h>
 #include <iohcCryptoHelpers.h>
 #include <string>
@@ -81,6 +82,7 @@ namespace IOHC {
         switch (cmd) {
             case Other2WButton::discovery: {
                 int bec = 0;
+                setDiscoveryDisplay(65);
 
                 std::vector<iohcPacket *> packets2send;
                 for (int j = 0; j < 255; j++) {
@@ -207,6 +209,7 @@ namespace IOHC {
             }
             case Other2WButton::discover28: {
                 std::vector<uint8_t> toSend = {};
+                setDiscoveryDisplay(5);
 
                 address broadcast = {0x00, 0x00, 0x3B};
                 std::vector<iohcPacket *> packets2send;
@@ -235,6 +238,7 @@ namespace IOHC {
                 break;
             }
             case Other2WButton::discover2A: {
+                setDiscoveryDisplay(5);
                 //(20) 2W S 1 E 1 [LPM]    FROM EF3712 TO 00003B CMD 2A +0.000         DATA(12)  a0b438d25f27286fedd2ad1f
                 // 00003b 5cd68f 2a  9332d618de2a0fa6250e2c7e
                 //                std::vector<uint8_t>  toSend = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x10, 0x11, 0x12};
