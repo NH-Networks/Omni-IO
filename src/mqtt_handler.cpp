@@ -133,7 +133,11 @@ void initMqtt() {
 
     mqttClient.setWill(AVAILABILITY_TOPIC, 0, true, "offline");
     mqttClient.setClientId(mqtt_client_id.c_str());
-    mqttClient.setCredentials(mqtt_user.c_str(), mqtt_password.c_str());
+    if (!mqtt_user.empty()) {
+        mqttClient.setCredentials(mqtt_user.c_str(), mqtt_password.empty() ? nullptr : mqtt_password.c_str());
+    } else {
+        mqttClient.setCredentials(nullptr, nullptr);
+    }
     mqttClient.setServer(mqtt_server.c_str(), mqtt_port);
     mqttClient.onConnect(onMqttConnect);
     mqttClient.onDisconnect(onMqttDisconnect);
