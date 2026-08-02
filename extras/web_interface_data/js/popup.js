@@ -28,12 +28,6 @@
         const cancelBtn = document.getElementById("popup-cancel");
         const input = document.getElementById("popup-input");
         const saveBtn = document.getElementById("popup-save");
-        const boolRow = document.getElementById("popup-boolean-row");
-        const boolInput = document.getElementById("popup-boolean");
-        const boolLabel = document.getElementById("popup-boolean-label");
-        const repeatRow = document.getElementById("popup-repeat-row");
-        const repeatInput = document.getElementById("popup-repeat");
-        const repeatLabel = document.getElementById("popup-repeat-label");
         const contentText = document.getElementById("popup-content");
         const leftContent = document.getElementById("popup-content-left");
         const popupTitle = document.getElementById("popup-title");
@@ -41,8 +35,7 @@
         const popupOptions = options || {};
         popupTitle.textContent = title;
         labelInput.textContent = label;
-        const protectedMessage = popupOptions.protectedMessage ||
-            app.i18nText("popup.active_blocks_destructive", "Disable Active before unpairing or deleting.");
+
 
         const showDevicePopup = !!popupOptions.showDevicePopup;
         devicePopupLabel.style.display = showDevicePopup ? "block" : "none";
@@ -133,10 +126,6 @@
             };
 
             deleteBtn.onclick = function () {
-                if (destructiveActionsBlocked()) {
-                    showProtectedMessage();
-                    return;
-                }
                 pairBtn.style.display = "none";
                 unPairBtn.style.display = "none";
                 deleteBtn.style.display = "none";
@@ -146,11 +135,6 @@
                 confirmBtn.style.display = "inline-block";
                 confirmBtn.textContent = "Confirm";
                 confirmBtn.onclick = async function () {
-                    if (destructiveActionsBlocked()) {
-                        showProtectedMessage();
-                        exitDeleteMode();
-                        return;
-                    }
                     try {
                         await popupOptions.onDelete();
                         closePopup();
