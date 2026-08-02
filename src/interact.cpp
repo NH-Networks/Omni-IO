@@ -113,6 +113,22 @@ static void startTwoWPairingWindowAlt(uint32_t windowMs) {
     IOHC::iohcOtherDevice2W::getInstance()->cmd(IOHC::Other2WButton::discover2A, nullptr);
 }
 
+static void startOneWPairingWindow(uint32_t windowMs) {
+    setCrashMarker("discover1W: open pairing window");
+    pairMode = true;
+    pairAltMode = false;
+    resetTwoWPairingSession();
+    addLogMessage("1W (solar) pairing window opened");
+    extendTwoWPairingWindow(windowMs);
+}
+
+static void startOneWPairingTask(void *param) {
+    const uint32_t windowMs = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(param));
+    vTaskDelay(pdMS_TO_TICKS(100));
+    startOneWPairingWindow(windowMs);
+    vTaskDelete(nullptr);
+}
+
 static void startTwoWPairingTask(void *param) {
     const uint32_t windowMs = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(param));
     vTaskDelay(pdMS_TO_TICKS(100));
@@ -371,6 +387,31 @@ void createCommands() {
             startTwoWPairingWindow(windowMs);
         } else {
             addLogMessage("2W pair trace: scheduled");
+        }
+    });
+
+    Cmd::addHandler((char *) "discover1W", (char *) "Start 1W (solar) discover window", [](Tokens *cmd)-> void {
+        setCrashMarker("command: discover1W");
+        uint32_t windowMs = 60000;
+        if (cmd && cmd->size() > 1) {
+            const uint32_t seconds = strtoul(cmd->at(1).c_str(), nullptr, 10);
+            if (seconds >= 10 && seconds <= 180) {
+                windowMs = seconds * 1000UL;
+            }
+        }
+        BaseType_t taskCreated = xTaskCreate(
+            startOneWPairingTask,
+            "discover1W",
+            4096,
+            reinterpret_cast<void *>(static_cast<uintptr_t>(windowMs)),
+            1,
+            nullptr
+        );
+        if (taskCreated != pdPASS) {
+            addLogMessage("1W discover trace: task create failed, running inline");
+            startOneWPairingWindow(windowMs);
+        } else {
+            addLogMessage("1W discover trace: scheduled");
         }
     });
 

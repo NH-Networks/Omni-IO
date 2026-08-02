@@ -2,6 +2,7 @@
     function createElements() {
         return {
             addPopupButton: document.getElementById("add-popup"),
+            discoverPopupButton: document.getElementById("discover-popup"),
             commandDeviceSelect: document.querySelector("#help-page #device-select"),
             commandInput: document.getElementById("command-input"),
             deviceList: document.getElementById("device-list"),
@@ -286,6 +287,9 @@
         }
         if (app.elements.addPopupButton) {
             app.elements.addPopupButton.addEventListener("click", app.openAddDevicePopup);
+        }
+        if (app.elements.discoverPopupButton) {
+            app.elements.discoverPopupButton.addEventListener("click", app.openDiscoverPopup);
         }
         if (app.elements.remotePopupButton) {
             app.elements.remotePopupButton.addEventListener("click", app.openAddRemotePopup);

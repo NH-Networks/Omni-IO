@@ -239,11 +239,17 @@ th, td {
 .btn.close {
   background: url("../img/close.svg") no-repeat;
 }
+.btn.discover {
+  background: url("../img/radio.svg") no-repeat;
+}
 .btn.help {
   background: url("../img/help.svg") no-repeat;
 }
-.title .help {
+.title .discover {
     right: 50px;
+}
+.title .help {
+    right: 100px;
 }
 .device-selection label {
     line-height: 50px;

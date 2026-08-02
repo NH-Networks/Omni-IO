@@ -267,6 +267,51 @@
         );
     }
 
+    function openDiscoverPopup(app) {
+        app.openPopup(
+            app.i18nText("popup.discover_title", "Discover Solar Screens & Remotes"),
+            "",
+            [app.i18nText("popup.discover_info", "Put your solar screen or physical remote into pairing mode (e.g., press the PROG button on the back of the remote). The screen will jog. Click 'Start Listening' to search for it.")],
+            [""],
+            {
+                showSave: false,
+                showInput: false,
+                btnShowDelete: false,
+                btnShowCancel: true,
+                pairBtnName: app.i18nText("button.start_listening", "Start Listening"),
+                onPair: async function () {
+                    try {
+                        const result = await window.MiOpenApi.postJson("/api/command", {
+                            command: "discover1W 60"
+                        });
+                        app.openPopup(
+                            app.i18nText("popup.discovering_title", "Discovering..."),
+                            "",
+                            [app.i18nText("popup.discovering_info", "Listening for screens for 60 seconds. Newly discovered devices will automatically appear in your device list.")],
+                            [""],
+                            {
+                                showSave: false,
+                                showInput: false,
+                                btnShowDelete: false,
+                                btnShowCancel: true
+                            }
+                        );
+                        // Poll 12 times (every 5 seconds for 60 seconds)
+                        let polls = 0;
+                        const pollInterval = setInterval(async function () {
+                            polls++;
+                            if (polls >= 12) {
+                                clearInterval(pollInterval);
+                            }
+                            await fetchAndDisplayDevices(app);
+                        }, 5000);
+                    } catch (error) {
+                    }
+                }
+            }
+        );
+    }
+
     function init(app) {
         app.fetchAndDisplayDevices = function () {
             return fetchAndDisplayDevices(app);
@@ -280,6 +325,9 @@
         };
         app.openAddDevicePopup = function () {
             openAddDevicePopup(app);
+        };
+        app.openDiscoverPopup = function () {
+            openDiscoverPopup(app);
         };
     }
 
