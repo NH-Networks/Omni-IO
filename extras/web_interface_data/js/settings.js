@@ -581,27 +581,37 @@
 
             let fwResponse;
             try {
-                fwResponse = await fetch(firmwareAsset.url, {
-                    headers: { "Accept": "application/octet-stream" }
-                });
+                // Try corsproxy.io to bypass GitHub's strict CORS policy
+                fwResponse = await fetch("https://corsproxy.io/?" + encodeURIComponent(firmwareAsset.browser_download_url));
                 if (!fwResponse.ok) throw new Error();
+                
+                const fwBlob = await fwResponse.blob();
+                if (githubUpdateStatus) githubUpdateStatus.innerText = "Uploading firmware to device...";
+
+                const fwFile = new File([fwBlob], firmwareAsset.name);
+                await uploadFileWithProgress(fwFile, "/api/firmware", function(percent) {
+                     const message = percent >= 100
+                         ? "Firmware uploaded, writing to flash..."
+                         : "Uploading firmware " + percent + "%...";
+                     if (githubUpdateStatus) githubUpdateStatus.innerText = message;
+                });
+
+                if (githubUpdateStatus) githubUpdateStatus.innerText = "Firmware update successful! Rebooting...";
             } catch (_err) {
-                fwResponse = await fetch(firmwareAsset.browser_download_url);
+                console.warn("CORS proxy failed, falling back to direct user download.");
+                if (githubUpdateStatus) githubUpdateStatus.innerText = "Automatic OTA blocked by browser security (CORS). Downloading file to your computer instead...";
+                
+                // Fallback: Trigger direct download to the user's PC
+                const a = document.createElement('a');
+                a.href = firmwareAsset.browser_download_url;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                
+                setTimeout(() => {
+                    if (githubUpdateStatus) githubUpdateStatus.innerText = "Firmware downloaded! Please select the downloaded file in the 'Upload Firmware' section below to flash it.";
+                }, 1000);
             }
-            if (!fwResponse.ok) throw new Error("Failed to download firmware binary from GitHub");
-            const fwBlob = await fwResponse.blob();
-
-            if (githubUpdateStatus) githubUpdateStatus.innerText = "Uploading firmware to device...";
-
-            const fwFile = new File([fwBlob], firmwareAsset.name);
-            await uploadFileWithProgress(fwFile, "/api/firmware", function(percent) {
-                 const message = percent >= 100
-                     ? "Firmware uploaded, writing to flash..."
-                     : "Uploading firmware " + percent + "%...";
-                 if (githubUpdateStatus) githubUpdateStatus.innerText = message;
-            });
-
-            if (githubUpdateStatus) githubUpdateStatus.innerText = "Firmware update successful! Rebooting...";
 
         } catch (error) {
             if (githubUpdateStatus) githubUpdateStatus.innerText = "Error: " + error.message;
