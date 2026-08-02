@@ -57,7 +57,7 @@ jobs:
           COMMIT_TIME=$(git show -s --format=%cd --date=format:'%Y%m%d_%H%M' HEAD)
           CHIP="esp32"
           FLASH_SIZE="4MB"
-          FS_OFFSET="0x210000"
+          FS_OFFSET="0x390000"
           BOOT_OFFSET="0x1000"
           if [ "${{ matrix.env }}" = "HeltecLoraV2ESP32" ]; then
             FLASH_SIZE="8MB"
