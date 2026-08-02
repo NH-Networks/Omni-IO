@@ -342,24 +342,31 @@
 
                         let secondsRemaining = 60;
                         let pollCounter = 0;
+                        let isChecking = false;
 
                         async function checkForNewDevices() {
-                            await fetchAndDisplayDevices(app);
-                            const currentDevices = app.state.devicesCache || [];
-                            currentDevices.forEach(function (device) {
-                                if (!existingDeviceIds.has(device.id) && !discoveredDeviceIds.has(device.id)) {
-                                    discoveredDeviceIds.add(device.id);
-                                    if (emptyPlaceholder.parentNode) {
-                                        emptyPlaceholder.parentNode.removeChild(emptyPlaceholder);
-                                    }
-                                    const badge = document.createElement("div");
-                                    badge.className = "discovered-device-badge";
-                                    badge.textContent = "✓ " + device.name + " (ID: " + device.id + ")";
-                                    discList.appendChild(badge);
+                            if (isChecking) return;
+                            isChecking = true;
+                            try {
+                                await fetchAndDisplayDevices(app);
+                                const currentDevices = app.state.devicesCache || [];
+                                currentDevices.forEach(function (device) {
+                                    if (!existingDeviceIds.has(device.id) && !discoveredDeviceIds.has(device.id)) {
+                                        discoveredDeviceIds.add(device.id);
+                                        if (emptyPlaceholder.parentNode) {
+                                            emptyPlaceholder.parentNode.removeChild(emptyPlaceholder);
+                                        }
+                                        const badge = document.createElement("div");
+                                        badge.className = "discovered-device-badge";
+                                        badge.textContent = "✓ " + device.name + " (ID: " + device.id + ")";
+                                        discList.appendChild(badge);
 
-                                    appendLog("✓ DISCOVERED: " + device.name + " (" + device.id + ")", true);
-                                }
-                            });
+                                        appendLog("✓ DISCOVERED: " + device.name + " (" + device.id + ")", true);
+                                    }
+                                });
+                            } finally {
+                                isChecking = false;
+                            }
                         }
 
                         app.onLogMessage = function (msg, isErr) {
