@@ -97,6 +97,12 @@
         while (app.elements.statusMessages.children.length > 300) {
             app.elements.statusMessages.removeChild(app.elements.statusMessages.firstChild);
         }
+
+        if (typeof app.onLogMessage === "function") {
+            try {
+                app.onLogMessage(message, isError);
+            } catch (e) {}
+        }
     }
 
     async function loadLogBuffer(app) {

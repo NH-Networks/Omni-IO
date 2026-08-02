@@ -1,14 +1,27 @@
 (function () {
+    let currentPopupOptions = null;
+
     function createParagraphs(container, items) {
         container.textContent = "";
+        if (!items) return;
         items.forEach(function (item) {
-            const paragraph = document.createElement("p");
-            paragraph.textContent = item;
-            container.appendChild(paragraph);
+            if (item instanceof HTMLElement || item instanceof Node) {
+                container.appendChild(item);
+            } else {
+                const paragraph = document.createElement("p");
+                paragraph.textContent = item;
+                container.appendChild(paragraph);
+            }
         });
     }
 
     function closePopup() {
+        if (currentPopupOptions && typeof currentPopupOptions.onClose === "function") {
+            try {
+                currentPopupOptions.onClose();
+            } catch (e) {}
+        }
+        currentPopupOptions = null;
         document.getElementById("popup").classList.remove("open");
     }
 
@@ -33,6 +46,7 @@
         const popupTitle = document.getElementById("popup-title");
 
         const popupOptions = options || {};
+        currentPopupOptions = popupOptions;
         popupTitle.textContent = title;
         labelInput.textContent = label;
 

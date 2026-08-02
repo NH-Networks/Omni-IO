@@ -281,31 +281,138 @@
                 pairBtnName: app.i18nText("button.start_listening", "Start Listening"),
                 onPair: async function () {
                     try {
-                        const result = await window.MiOpenApi.postJson("/api/command", {
+                        await window.MiOpenApi.postJson("/api/command", {
                             command: "discover1W 60"
                         });
+
+                        const existingDeviceIds = new Set((app.state.devicesCache || []).map(function (d) { return d.id; }));
+                        const discoveredDeviceIds = new Set();
+
+                        const container = document.createElement("div");
+
+                        const statusBar = document.createElement("div");
+                        statusBar.className = "discovery-status-bar";
+
+                        const pulseDot = document.createElement("span");
+                        pulseDot.className = "pulse-dot";
+                        statusBar.appendChild(pulseDot);
+
+                        const statusText = document.createElement("span");
+                        statusText.textContent = app.i18nText("popup.listening_countdown", "Listening for screens... 60s remaining");
+                        statusBar.appendChild(statusText);
+                        container.appendChild(statusBar);
+
+                        const discListTitle = document.createElement("div");
+                        discListTitle.style.fontWeight = "bold";
+                        discListTitle.style.marginBottom = "4px";
+                        discListTitle.textContent = app.i18nText("popup.discovered_devices", "Discovered Devices:");
+                        container.appendChild(discListTitle);
+
+                        const discList = document.createElement("div");
+                        discList.className = "discovered-device-list";
+                        const emptyPlaceholder = document.createElement("p");
+                        emptyPlaceholder.style.opacity = "0.7";
+                        emptyPlaceholder.style.fontStyle = "italic";
+                        emptyPlaceholder.style.margin = "0 0 6px 0";
+                        emptyPlaceholder.textContent = app.i18nText("popup.no_screens_yet", "No new screens detected yet. Put device in PROG mode.");
+                        discList.appendChild(emptyPlaceholder);
+                        container.appendChild(discList);
+
+                        const logTitle = document.createElement("div");
+                        logTitle.style.fontWeight = "bold";
+                        logTitle.style.marginTop = "10px";
+                        logTitle.textContent = app.i18nText("popup.discovery_log", "Live Discovery Log:");
+                        container.appendChild(logTitle);
+
+                        const logConsole = document.createElement("div");
+                        logConsole.className = "discovery-log-console";
+                        container.appendChild(logConsole);
+
+                        function appendLog(text, isSuccess, isError) {
+                            const p = document.createElement("p");
+                            const timeStr = "[" + new Date().toLocaleTimeString() + "] ";
+                            p.textContent = timeStr + text;
+                            if (isSuccess) p.className = "log-success";
+                            if (isError) p.style.color = "#e74c3c";
+                            logConsole.appendChild(p);
+                            logConsole.scrollTop = logConsole.scrollHeight;
+                        }
+
+                        appendLog("Started 60-second discovery mode (discover1W 60)...");
+
+                        let secondsRemaining = 60;
+                        let pollCounter = 0;
+
+                        async function checkForNewDevices() {
+                            await fetchAndDisplayDevices(app);
+                            const currentDevices = app.state.devicesCache || [];
+                            currentDevices.forEach(function (device) {
+                                if (!existingDeviceIds.has(device.id) && !discoveredDeviceIds.has(device.id)) {
+                                    discoveredDeviceIds.add(device.id);
+                                    if (emptyPlaceholder.parentNode) {
+                                        emptyPlaceholder.parentNode.removeChild(emptyPlaceholder);
+                                    }
+                                    const badge = document.createElement("div");
+                                    badge.className = "discovered-device-badge";
+                                    badge.textContent = "✓ " + device.name + " (ID: " + device.id + ")";
+                                    discList.appendChild(badge);
+
+                                    appendLog("✓ DISCOVERED: " + device.name + " (" + device.id + ")", true);
+                                }
+                            });
+                        }
+
+                        app.onLogMessage = function (msg, isErr) {
+                            if (!msg) return;
+                            const lower = msg.toLowerCase();
+                            const isPairLog = lower.includes("pair") || lower.includes("solar") || lower.includes("1w") || lower.includes("2w") || lower.includes("learn") || lower.includes("discover");
+                            if (isPairLog) {
+                                const isSucc = lower.includes("completed") || lower.includes("authenticated") || lower.includes("stored");
+                                appendLog(msg, isSucc, isErr);
+                                checkForNewDevices();
+                            }
+                        };
+
+                        const timer = setInterval(function () {
+                            secondsRemaining--;
+                            pollCounter++;
+
+                            if (secondsRemaining > 0) {
+                                statusText.textContent = "Listening for screens... (" + secondsRemaining + "s remaining)";
+                            } else {
+                                statusText.textContent = "Discovery finished (60s elapsed).";
+                                if (pulseDot.parentNode) {
+                                    pulseDot.parentNode.removeChild(pulseDot);
+                                }
+                                clearInterval(timer);
+                                app.onLogMessage = null;
+                            }
+
+                            if (pollCounter % 3 === 0) {
+                                checkForNewDevices();
+                            }
+                        }, 1000);
+
                         app.openPopup(
                             app.i18nText("popup.discovering_title", "Discovering..."),
                             "",
-                            [app.i18nText("popup.discovering_info", "Listening for screens for 60 seconds. Newly discovered devices will automatically appear in your device list.")],
+                            [container],
                             [""],
                             {
                                 showSave: false,
                                 showInput: false,
                                 btnShowDelete: false,
-                                btnShowCancel: true
+                                btnShowCancel: true,
+                                onClose: function () {
+                                    clearInterval(timer);
+                                    app.onLogMessage = null;
+                                }
                             }
                         );
-                        // Poll 12 times (every 5 seconds for 60 seconds)
-                        let polls = 0;
-                        const pollInterval = setInterval(async function () {
-                            polls++;
-                            if (polls >= 12) {
-                                clearInterval(pollInterval);
-                            }
-                            await fetchAndDisplayDevices(app);
-                        }, 5000);
+
+                        checkForNewDevices();
                     } catch (error) {
+                        console.error("Error starting discovery:", error);
                     }
                 }
             }
