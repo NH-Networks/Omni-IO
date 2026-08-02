@@ -127,6 +127,7 @@
     "button.link":  "Link",
     "button.unlink":  "Unlink",
     "option.current_branch":  "Branche actuelle du firmware",
+    "option.current_stable":  "Dernière version stable (Current)",
     "option.master":  "master",
     "option.dev_main":  "dev-main",
     "option.beta":  "Beta",

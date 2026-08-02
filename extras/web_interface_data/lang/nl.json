@@ -127,6 +127,7 @@
     "button.link":  "Link",
     "button.unlink":  "Unlink",
     "option.current_branch":  "Huidige firmware branch",
+    "option.current_stable":  "Meest recente stabiele versie (Current)",
     "option.master":  "master",
     "option.dev_main":  "dev-main",
     "option.beta":  "Beta",

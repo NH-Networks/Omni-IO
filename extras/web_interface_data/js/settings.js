@@ -550,13 +550,23 @@
 
             if (githubUpdateStatus) githubUpdateStatus.innerText = "Checking " + branch + " releases for " + envName + "...";
 
-            const releaseResponse = await fetch("https://api.github.com/repos/NH-Networks/miopen.io/releases/tags/" + branch + "-latest");
+            let tagName = branch + "-latest";
+            if (branch === "Current") {
+                tagName = "Current";
+            }
+
+            const releaseResponse = await fetch("https://api.github.com/repos/NH-Networks/miopen.io/releases/tags/" + tagName);
             if (!releaseResponse.ok) {
-                throw new Error("Release not found for branch: " + branch);
+                throw new Error("Release not found for branch/tag: " + tagName);
             }
             const releaseData = await releaseResponse.json();
             
-            const firmwareAsset = releaseData.assets.find(a => a.name.startsWith(envName + "_" + branch) && a.name.endsWith("_firmware.bin"));
+            const firmwareAsset = releaseData.assets.find(a => {
+                if (branch === "Current") {
+                    return a.name === envName + "_firmware.bin";
+                }
+                return a.name.startsWith(envName + "_" + branch) && a.name.endsWith("_firmware.bin");
+            });
             
             if (!firmwareAsset) {
                 throw new Error("Firmware not found in the latest release for " + envName);
