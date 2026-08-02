@@ -17,9 +17,7 @@
             filesystemUploadButton: document.getElementById("upload-filesystem"),
             firmwareFileInput: document.getElementById("firmware-file"),
             firmwareUploadButton: document.getElementById("upload-firmware"),
-            githubUpdateButton: document.getElementById("github-update-check"),
-            githubUpdateBranch: document.getElementById("github-update-branch"),
-            githubUpdateStatus: document.getElementById("github-update-status"),
+
             helpDeviceButton: document.getElementById("help-device"),
             helpRemoteButton: document.getElementById("help-remote"),
             lastAddrInput: document.getElementById("last-address"),

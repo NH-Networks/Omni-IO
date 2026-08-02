@@ -530,94 +530,7 @@
         }
     }
 
-    async function checkGithubUpdate(app) {
-        let branch = app.elements.githubUpdateBranch ? app.elements.githubUpdateBranch.value : "auto";
-        const githubUpdateStatus = app.elements.githubUpdateStatus;
-        if (githubUpdateStatus) githubUpdateStatus.innerText = "Fetching current info...";
 
-        try {
-            const infoResponse = await fetch("/api/info");
-            const info = await infoResponse.json();
-            const currentBranch = info.branch;
-            const envName = info.environment;
-            
-            if (branch === "auto") {
-                branch = currentBranch;
-            }
-            if (!branch || branch === "unknown") {
-                branch = "Beta"; 
-            }
-
-            if (githubUpdateStatus) githubUpdateStatus.innerText = "Checking " + branch + " releases for " + envName + "...";
-
-            let tagName = branch + "-latest";
-            if (branch === "Current") {
-                tagName = "Current";
-            }
-
-            const releaseResponse = await fetch("https://api.github.com/repos/NH-Networks/miopen.io/releases/tags/" + tagName);
-            if (!releaseResponse.ok) {
-                throw new Error("Release not found for branch/tag: " + tagName);
-            }
-            const releaseData = await releaseResponse.json();
-            
-            const firmwareAsset = releaseData.assets.find(a => {
-                if (branch === "Current") {
-                    return a.name === envName + "_firmware.bin";
-                }
-                return a.name.startsWith(envName + "_" + branch) && a.name.endsWith("_firmware.bin");
-            });
-            
-            if (!firmwareAsset) {
-                throw new Error("Firmware not found in the latest release for " + envName);
-            }
-
-            if (!confirm("Found release for " + branch + " (" + new Date(releaseData.published_at).toLocaleString() + ").\nDo you want to download and install the firmware update?")) {
-                if (githubUpdateStatus) githubUpdateStatus.innerText = "Update cancelled.";
-                return;
-            }
-
-            if (githubUpdateStatus) githubUpdateStatus.innerText = "Found update. Downloading firmware...";
-
-            let fwResponse;
-            try {
-                // Try corsproxy.io to bypass GitHub's strict CORS policy
-                fwResponse = await fetch("https://corsproxy.io/?" + encodeURIComponent(firmwareAsset.browser_download_url));
-                if (!fwResponse.ok) throw new Error();
-                
-                const fwBlob = await fwResponse.blob();
-                if (githubUpdateStatus) githubUpdateStatus.innerText = "Uploading firmware to device...";
-
-                const fwFile = new File([fwBlob], firmwareAsset.name);
-                await uploadFileWithProgress(fwFile, "/api/firmware", function(percent) {
-                     const message = percent >= 100
-                         ? "Firmware uploaded, writing to flash..."
-                         : "Uploading firmware " + percent + "%...";
-                     if (githubUpdateStatus) githubUpdateStatus.innerText = message;
-                });
-
-                if (githubUpdateStatus) githubUpdateStatus.innerText = "Firmware update successful! Rebooting...";
-            } catch (_err) {
-                console.warn("CORS proxy failed, falling back to direct user download.");
-                if (githubUpdateStatus) githubUpdateStatus.innerText = "Automatic OTA blocked by browser security (CORS). Downloading file to your computer instead...";
-                
-                // Fallback: Trigger direct download to the user's PC
-                const a = document.createElement('a');
-                a.href = firmwareAsset.browser_download_url;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                
-                setTimeout(() => {
-                    if (githubUpdateStatus) githubUpdateStatus.innerText = "Firmware downloaded! Please select the downloaded file in the 'Upload Firmware' section below to flash it.";
-                }, 1000);
-            }
-
-        } catch (error) {
-            if (githubUpdateStatus) githubUpdateStatus.innerText = "Error: " + error.message;
-            console.error(error);
-        }
-    }
 
     function initSettingsTabs() {
         const tabs = Array.from(document.querySelectorAll("[data-settings-tab]"));
@@ -726,9 +639,7 @@
         app.sendSyslogTest = function () {
             return sendSyslogTest(app);
         };
-        app.checkGithubUpdate = function () {
-            return checkGithubUpdate(app);
-        };
+
         app.uploadFirmware = function () {
             return uploadSelectedFile(
                 app,
