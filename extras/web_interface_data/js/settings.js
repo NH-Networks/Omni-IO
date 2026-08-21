@@ -559,6 +559,30 @@
         activate(activeTab ? activeTab.dataset.settingsTab : "integration");
     }
 
+    let restartInFlight = false;
+
+    async function restartDevice(app, button) {
+        if (restartInFlight) return;
+        restartInFlight = true;
+        if (button) button.disabled = true;
+        setSettingsStatus(app, app.i18nText("status.restarting", "Herstart bezig..."));
+        try {
+            await window.MiOpenApi.postJson("/api/restart", {});
+            setSettingsStatus(app, app.i18nText("status.restarted", "ESP wordt herstart, pagina herlaadt over 8 seconden..."));
+            setTimeout(function () {
+                window.location.reload();
+            }, 8000);
+        } catch (error) {
+            // fetch throws when ESP drops connection mid-restart — that is expected
+            setSettingsStatus(app, app.i18nText("status.restarted", "ESP wordt herstart, pagina herlaadt over 8 seconden..."));
+            setTimeout(function () {
+                window.location.reload();
+            }, 8000);
+        } finally {
+            restartInFlight = false;
+        }
+    }
+
     function initSettingsActions(app) {
         const closeButton = document.getElementById("settings-close");
         if (closeButton) {
@@ -578,11 +602,7 @@
         const restartButton = document.getElementById("settings-restart");
         if (restartButton) {
             restartButton.addEventListener("click", function () {
-                setSettingsStatus(
-                    app,
-                    app.i18nText("status.restart_unavailable", "Restart is not available from this firmware build"),
-                    true
-                );
+                restartDevice(app, restartButton);
             });
         }
     }
