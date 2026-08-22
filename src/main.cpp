@@ -840,14 +840,18 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
                 display1WAction(iohc->payload.packet.header.source, action, "RX");
                 if (const auto *map = remoteMap->find(iohc->payload.packet.header.source)) {
                     IOHC::RemoteButton btn;
+                    bool recognized = true;
                     if (!strcmp(action, "OPEN")) btn = IOHC::RemoteButton::Open;
                     else if (!strcmp(action, "CLOSE")) btn = IOHC::RemoteButton::Close;
                     else if (!strcmp(action, "STOP")) btn = IOHC::RemoteButton::Stop;
                     else if (!strcmp(action, "VENT")) btn = IOHC::RemoteButton::Vent;
                     else if (!strcmp(action, "FORCE")) btn = IOHC::RemoteButton::ForceOpen;
-                    else btn = IOHC::RemoteButton::Stop; // default to avoid uninitialized
-                    for (const auto &desc : map->devices) {
-                        iohcRemote1W::getInstance()->handleRemoteAction(btn, desc);
+                    else recognized = false; // unsupported 1W command - ignore, don't dispatch as a phantom Stop
+
+                    if (recognized) {
+                        for (const auto &desc : map->devices) {
+                            iohcRemote1W::getInstance()->handleRemoteAction(btn, desc);
+                        }
                     }
                 }
             } else {
