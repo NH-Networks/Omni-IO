@@ -16,6 +16,10 @@
 
 #include <user_config.h>
 #if defined(SSD1306_DISPLAY)
+#include <board-config.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <Wire.h>
 #include <oled_display.h>
 #include <iohcCryptoHelpers.h>
 #include <iohcRemoteMap.h>
@@ -27,9 +31,20 @@
 #include <atomic>
 #include <chrono>
 #include <cstdio>
+#include <string>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/semphr.h>
+
+// OLED screen dimensions
+#define SCREEN_WIDTH  128
+#define SCREEN_HEIGHT  64
+
+// Map board I2C pins to OLED names
+#define OLED_SDA     I2C_SDA_PIN
+#define OLED_SCL     I2C_SCL_PIN
+#define OLED_RST     DISPLAY_OLED_RST_PIN
+#define OLED_ADDRESS 0x3C
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RST);
 DisplayBuffer displayBuffer;
@@ -250,25 +265,28 @@ int getSecondsSinceNoData() {
     return (esp_timer_get_time() - lastDataTime.load()) / 1000000LL;
 }
 
-const char* getRemoteName(const uint8_t *remote, const char *name) {
-    if (name) return name;
+// Returns a stable std::string to avoid dangling-pointer when falling back to hex
+static std::string getRemoteName(const uint8_t *remote, const char *name) {
+    if (name) return std::string(name);
 
     const auto *entry = IOHC::iohcRemoteMap::getInstance()->find(remote);
-    if (entry) return entry->name.c_str();
+    if (entry) return entry->name;
 
-    return bytesToHexString(remote, 3).c_str();
+    return bytesToHexString(remote, 3);
 }
 
 void display1WAction(const uint8_t *remote, const char *action, const char *dir, const char *name) {
     char buf[64];
-    snprintf(buf, sizeof(buf), "%s: %s", dir, getRemoteName(remote, name));
+    const std::string remoteName = getRemoteName(remote, name);
+    snprintf(buf, sizeof(buf), "%s: %s", dir, remoteName.c_str());
     displayCustomMessage(buf, action);
 }
 
 void display1WPosition(const uint8_t *remote, float position, const char *name) {
     char buf[16];
     snprintf(buf, sizeof(buf), "%d%%", static_cast<int>(position));
-    displayCustomMessage(getRemoteName(remote, name), buf);
+    const std::string remoteName = getRemoteName(remote, name);
+    displayCustomMessage(remoteName.c_str(), buf);
 }
 
 void displayCustomMessage(const char* message, const char* status) {

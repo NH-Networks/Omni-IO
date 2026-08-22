@@ -2,8 +2,8 @@
 #if defined(SSD1306_DISPLAY)
 #include <Arduino.h>
 
-void display1WAction(const uint8_t *remote, const char *action, const char *dir, const char *name);
-void display1WPosition(const uint8_t *remote, float position, const char *name);
+void display1WAction(const uint8_t *remote, const char *action, const char *dir, const char *name = nullptr);
+void display1WPosition(const uint8_t *remote, float position, const char *name = nullptr);
 void displayCustomMessage(const char* message, const char* status);
 void clearDisplayMessages();
 void updateDisplayStatus();
@@ -36,15 +36,13 @@ void setCpuTempEnabled(bool enabled);
 // No-op stubs when no display is present
 #include <cstdint>
 
-inline void display1WAction(const uint8_t *, const char *, const char *, const char *) {}
-inline void display1WPosition(const uint8_t *, float, const char *) {}
+inline void display1WAction(const uint8_t *, const char *, const char *, const char * = nullptr) {}
+inline void display1WPosition(const uint8_t *, float, const char * = nullptr) {}
 inline void displayCustomMessage(const char *, const char *) {}
 inline void clearDisplayMessages() {}
 inline void updateDisplayStatus() {}
 inline void wakeDisplay() {}
 inline void setDiscoveryDisplay(int) {}
-
-// broadcastLog takes const char* to avoid pulling in Arduino String outside display TU
 inline void broadcastLog(const char *) {}
 
 inline bool initDisplay() { return false; }
