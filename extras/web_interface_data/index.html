@@ -231,6 +231,38 @@
                     >Enable OLED display</span
                   ></label
                 >
+
+                <label for="display-screensaver-timeout" data-i18n="label.screensaver_timeout">Screensaver timeout (s):</label>
+                <input
+                  type="number"
+                  id="display-screensaver-timeout"
+                  min="10"
+                  max="3600"
+                  placeholder="60"
+                />
+
+                <label for="display-off-timeout" data-i18n="label.screen_off_timeout">Screen off timeout (s, 0=off):</label>
+                <input
+                  type="number"
+                  id="display-off-timeout"
+                  min="0"
+                  max="86400"
+                  placeholder="3600"
+                />
+
+                <label for="display-dim-level" data-i18n="label.dim_level">Dim level:</label>
+                <select id="display-dim-level">
+                  <option value="0" data-i18n="option.dim_low">Low</option>
+                  <option value="1" data-i18n="option.dim_medium">Medium</option>
+                  <option value="2" data-i18n="option.dim_high">High</option>
+                </select>
+
+                <label class="setting-toggle" for="display-cpu-temp"
+                  ><input type="checkbox" id="display-cpu-temp" checked="checked" />
+                  <span data-i18n="label.show_cpu_temp">Show CPU temperature</span
+                  ></label
+                >
+
                 <button id="display-update" data-i18n="button.update">
                   Update
                 </button>
@@ -612,7 +644,7 @@
     <script src="js/popup.js?v=20260530a"></script>
     <script src="js/devices.js?v=20260822b"></script>
     <script src="js/remotes.js?v=20260530a"></script>
-    <script src="js/settings.js?v=20260728c"></script>
+    <script src="js/settings.js?v=20260823a"></script>
     <script src="js/app.js?v=20260822b"></script>
     <script src="js/menu.js?v=20260728c"></script>
   </body>
