@@ -85,8 +85,6 @@
             return;
         }
 
-
-
         const logEntry = document.createElement("p");
         logEntry.textContent = message;
         if (isError) {
@@ -199,17 +197,25 @@
         app.state.ws = ws;
 
         ws.onmessage = function (event) {
-            const data = JSON.parse(event.data);
-            if (data.type === "log") {
-                app.logStatus(data.message);
-            } else if (data.type === "position") {
-                app.updateDeviceFill(data.id, data.position);
-            } else if (data.type === "deviceaction") {
-                app.applyDeviceAction(data);
-            } else if (data.type === "init") {
-                app.fetchAndDisplayDevices();
-            } else if (data.type === "lastaddr") {
-                app.elements.lastAddrInput.value = data.address || "";
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === "log") {
+                    app.logStatus(data.message);
+                } else if (data.type === "position") {
+                    app.updateDeviceFill(data.id, data.position);
+                } else if (data.type === "deviceaction") {
+                    app.applyDeviceAction(data);
+                } else if (data.type === "init") {
+                    app.fetchAndDisplayDevices();
+                } else if (data.type === "lastaddr") {
+                    if (app.elements.lastAddrInput) {
+                        app.elements.lastAddrInput.value = data.address || "";
+                    }
+                } else if (data.type === "twowstatus") {
+                    // Bug 3 fix: twowstatus wordt ontvangen maar heeft geen UI in deze branch — stilzwijgend negeren
+                }
+            } catch (e) {
+                // Ongeldige JSON van WebSocket — negeren
             }
         };
 
@@ -358,4 +364,3 @@
         app.loadLastAddress();
     });
 })();
-
