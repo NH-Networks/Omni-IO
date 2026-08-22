@@ -1,5 +1,6 @@
 #pragma once
 #if defined(SSD1306_DISPLAY)
+#include <Arduino.h>
 
 void display1WAction(const uint8_t *remote, const char *action, const char *dir, const char *name);
 void display1WPosition(const uint8_t *remote, float position, const char *name);

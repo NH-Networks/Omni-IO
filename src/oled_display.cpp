@@ -26,6 +26,7 @@
 #include <nvs_helpers.h>
 #include <atomic>
 #include <chrono>
+#include <cstdio>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/semphr.h>
@@ -259,11 +260,15 @@ const char* getRemoteName(const uint8_t *remote, const char *name) {
 }
 
 void display1WAction(const uint8_t *remote, const char *action, const char *dir, const char *name) {
-    displayCustomMessage(format("%s: %s", dir, getRemoteName(remote, name)).c_str(), action);
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%s: %s", dir, getRemoteName(remote, name));
+    displayCustomMessage(buf, action);
 }
 
 void display1WPosition(const uint8_t *remote, float position, const char *name) {
-    displayCustomMessage(getRemoteName(remote, name), format("%d%%", static_cast<int>(position)).c_str());
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%d%%", static_cast<int>(position));
+    displayCustomMessage(getRemoteName(remote, name), buf);
 }
 
 void displayCustomMessage(const char* message, const char* status) {
