@@ -104,7 +104,62 @@ namespace IOHC {
         packet->repeatTime = 40; //40ms
         packet->repeat = 4;
         packet->lock = false;
+    }
 
+    // Forge a 0x30 Add packet for a given remote and add it to packets2send.
+    // Uses a fully open broadcast target (0x003F) so the screen in pair mode
+    // receives it regardless of its type byte.
+    static void forge0x30Packet(iohcRemote1W::remote &r,
+                                std::vector<iohcPacket *> &packets2send) {
+        auto *packet = new iohcPacket;
+        packets2send.push_back(packet);
+
+        // Header defaults
+        packet->payload.packet.header.CtrlByte1.asStruct.MsgLen = sizeof(_header) - 1;
+        packet->payload.packet.header.CtrlByte1.asStruct.Protocol = 1;
+        packet->payload.packet.header.CtrlByte1.asStruct.StartFrame = 1;
+        packet->payload.packet.header.CtrlByte1.asStruct.EndFrame = 1;
+        packet->payload.packet.header.CtrlByte2.asByte = 0;
+        packet->payload.packet.header.CtrlByte2.asStruct.LPM = 1;
+
+        // Fully-open broadcast target: 0x003F  (type=0 -> any type accepted)
+        packet->payload.packet.header.target[0] = 0x00;
+        packet->payload.packet.header.target[1] = 0x00;
+        packet->payload.packet.header.target[2] = 0x3F;
+
+        packet->frequency = CHANNEL2;
+        packet->repeatTime = 40;
+        packet->repeat = 4;
+        packet->lock = false;
+
+        // Packet length
+        packet->payload.packet.header.CtrlByte1.asStruct.MsgLen += sizeof(_p0x30);
+
+        // Source (our virtual remote address)
+        for (size_t i = 0; i < sizeof(address); i++)
+            packet->payload.packet.header.source[i] = r.node[i];
+
+        // Command 0x30 = Add / key exchange
+        packet->payload.packet.header.cmd = 0x30;
+
+        // Encrypted key
+        uint8_t encKey[16];
+        memcpy(encKey, r.key, 16);
+        iohcCrypto::encrypt_1W_key(r.node, encKey);
+        memcpy(packet->payload.packet.msg.p0x30.enc_key, encKey, 16);
+
+        // Manufacturer
+        packet->payload.packet.msg.p0x30.man_id = r.manufacturer;
+        // data byte 0x01 = "I am a controller presenting my key"
+        packet->payload.packet.msg.p0x30.data = 0x01;
+        // Sequence
+        packet->payload.packet.msg.p0x30.sequence[0] = r.sequence >> 8;
+        packet->payload.packet.msg.p0x30.sequence[1] = r.sequence & 0x00ff;
+        r.sequence += 1;
+        nvs_write_sequence(r.node, r.sequence);
+
+        packet->buffer_length = packet->payload.packet.header.CtrlByte1.asStruct.MsgLen + 1;
+        digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
     }
 
     std::vector<uint8_t> frame;
@@ -122,48 +177,15 @@ namespace IOHC {
             return;
         }
 
-        // auto&[node, sequence, key, type, manufacturer, description] = *it;
         remote& r = *it;
         r.positionTracker.update();
-/*
-        int value = 0;
-        try {
-            value = std::strtol(data->at(1).c_str(), nullptr, 16);
-        } catch (const std::invalid_argument& e) {
-            printf("ERROR: Invalid 1W address format (std::invalid_argument): %s\n", data->at(1).c_str());
-            // return;
-        } catch (const std::out_of_range& e) {
-            printf("ERROR: USE A VALID 1W ADDRESS");
-            //return;
-        } catch (const std::exception& e) {
-            printf("ERROR: Unexpected exception during conversion (%s).", e.what());
-            // return;
-        }
-*/
 
-/*
-        // remote address
-        address remoteAddress = {static_cast<uint8_t>(value >> 16),
-                                 static_cast<uint8_t>(value >> 8),
-                                 static_cast<uint8_t>(value)};
-
-        const remote* foundRemote = nullptr;
-        for (const auto& oneRemote : remotes) {
-            if (memcmp(oneRemote.node, remoteAddress, sizeof(address)) == 0) {
-                foundRemote = &oneRemote;
-                break;
-            }
-        }
-        if (foundRemote != nullptr)
-            printf( "Remote found : %s\n", foundRemote->description.c_str());
-*/
         // Emulates remote button press
         switch (cmd) {
             case RemoteButton::Pair: {
                 // 0x2e: 0x1120 + target broadcast + source + 0x2e00 + sequence + hmac
 
                 std::vector<iohcPacket *> packets2send;
-//                for (auto&r: remotes) {
 
                     auto* packet = new iohcPacket;
                     packets2send.push_back(packet);
@@ -194,9 +216,8 @@ namespace IOHC {
 
                     packet->buffer_length = packet->payload.packet.header.CtrlByte1.asStruct.MsgLen + 1;
 
-                    // if (typn) packet->payload.packet.header.CtrlByte2.asStruct.LPM = 0; //TODO only first is LPM
                     digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
-//                }
+
                 _radioInstance->send(packets2send);
                 display1WAction(r.node, remoteButtonToString(cmd), "TX", r.name.c_str());
 
@@ -211,14 +232,10 @@ namespace IOHC {
                 // 0x39: 0x1c00 + target broadcast + source + 0x3900 + sequence + hmac
 
                 std::vector<iohcPacket *> packets2send;
-//                for (auto&r: remotes) {
-
 
                     auto* packet = new iohcPacket;
                     packets2send.push_back(packet);
                     IOHC::iohcRemote1W::forgePacket(packet, r.type[0]);
-                    // Packet length
-                    //                    packet->payload.packet.header.CtrlByte1.asStruct.MsgLen = sizeof(_header) - 1;
                     packet->payload.packet.header.CtrlByte1.asStruct.MsgLen += sizeof(_p0x2e);
 
                     // Source (me)
@@ -235,18 +252,17 @@ namespace IOHC {
                     r.sequence += 1;
                     nvs_write_sequence(r.node, r.sequence);
                     // hmac
-                    uint8_t hmac[16];
+                    uint8_t hmac2[16];
                     frame = std::vector(&packet->payload.packet.header.cmd, &packet->payload.packet.header.cmd + 2);
-                    iohcCrypto::create_1W_hmac(hmac, packet->payload.packet.msg.p0x2e.sequence, r.key, frame);
+                    iohcCrypto::create_1W_hmac(hmac2, packet->payload.packet.msg.p0x2e.sequence, r.key, frame);
                     for (uint8_t i = 0; i < 6; i++)
-                        packet->payload.packet.msg.p0x2e.hmac[i] = hmac[i];
+                        packet->payload.packet.msg.p0x2e.hmac[i] = hmac2[i];
 
                     packet->buffer_length = packet->payload.packet.header.CtrlByte1.asStruct.MsgLen + 1;
 
                     digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
-//                }
+
                 _radioInstance->send(packets2send);
-                //printf("\n");
                 display1WAction(r.node, remoteButtonToString(cmd), "TX", r.name.c_str());
 
                 Serial.printf("%s position: %.0f%%\n", r.name.c_str(), r.positionTracker.getPosition());
@@ -257,44 +273,13 @@ namespace IOHC {
             }
 
             case RemoteButton::Add: {
-                // 0x30: 0x1100 + target broadcast + source + 0x3000 + ???
-
+                // 0x30: key exchange broadcast so screen in pair mode stores our key.
+                // Uses fully-open broadcast target (0x003F) via forge0x30Packet().
                 std::vector<iohcPacket *> packets2send;
-//                for (auto&r: remotes) {
-
-                    auto* packet = new iohcPacket;
-                    packets2send.push_back(packet);
-                    IOHC::iohcRemote1W::forgePacket(packet, r.type[0]);
-                    // Packet length
-                    packet->payload.packet.header.CtrlByte1.asStruct.MsgLen += sizeof(_p0x30);
-
-                    // Source (me)
-                    for (size_t i = 0; i < sizeof(address); i++)
-                        packet->payload.packet.header.source[i] = r.node[i];
-                    //Command
-                    packet->payload.packet.header.cmd = 0x30;
-
-                    // Encrypted key
-                    uint8_t encKey[16];
-                    memcpy(encKey, r.key, 16);
-                    iohcCrypto::encrypt_1W_key(r.node, encKey);
-                    memcpy(packet->payload.packet.msg.p0x30.enc_key, encKey, 16);
-
-                    // Manufacturer
-                    packet->payload.packet.msg.p0x30.man_id = r.manufacturer;
-                    // Data
-                    packet->payload.packet.msg.p0x30.data = 0x01;
-                    // Sequence
-                    packet->payload.packet.msg.p0x30.sequence[0] = r.sequence >> 8;
-                    packet->payload.packet.msg.p0x30.sequence[1] = r.sequence & 0x00ff;
-                    r.sequence += 1;
-                    nvs_write_sequence(r.node, r.sequence);
-
-                    packet->buffer_length = packet->payload.packet.header.CtrlByte1.asStruct.MsgLen + 1;
-
-
-                    digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
-//                }
+                Serial.printf("1W ADD: %s (node %s) -> broadcasting 0x30\n",
+                              r.description.c_str(),
+                              bytesToHexString(r.node, sizeof(r.node)).c_str());
+                forge0x30Packet(r, packets2send);
                 _radioInstance->send(packets2send);
                 display1WAction(r.node, remoteButtonToString(cmd), "TX", r.name.c_str());
                 Serial.printf("%s position: %.0f%%\n", r.name.c_str(), r.positionTracker.getPosition());
@@ -306,22 +291,18 @@ namespace IOHC {
                 // 0x00: 0x1600 + target broadcast + source + 0x00 + Originator + ACEI + Main Param + FP1 + FP2 + sequence + hmac
 
                 std::vector<iohcPacket *> packets2send;
-//                for (auto&r: remotes) {
 
                     auto* packet = new iohcPacket;
                     packets2send.push_back(packet);
 
                     IOHC::iohcRemote1W::forgePacket(packet, r.type[0]);
-                    // Packet length
-                    // packet->payload.packet.header.CtrlByte1.asStruct.MsgLen += sizeof(_p0x00);
                     // Source (me)
                     for (size_t i = 0; i < sizeof(address); i++)
                         packet->payload.packet.header.source[i] = r.node[i];
                     //Command
                     packet->payload.packet.header.cmd = 0x00;
                     packet->payload.packet.msg.p0x00_14.origin = 0x01; // Command Source Originator is: 0x01 User
-                    //Acei packet->payload.packet.msg.p0x00.acei;
-                    setAcei(packet->payload.packet.msg.p0x00_14.acei, 0x43); //0xE7); //0x61);
+                    setAcei(packet->payload.packet.msg.p0x00_14.acei, 0x43);
                     switch (cmd) {
                         // Switch for Main Parameter of cmd 0x00: Open/Close/Stop/Ventilation
                         case RemoteButton::Open:
@@ -465,88 +446,24 @@ namespace IOHC {
                             break;
                         }
                         case RemoteButton::Mode1:{
-                            /* fast = 4x13 Increment fp2 - slow = 0x01 4x13 followed 0x00 4x14 Main 0xD2
-                            Every 9 : 10:31:38.367 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  DATA(15)  02db000900000323e7ceefedf9ce81        SEQ 23e7 MAC ceefedf9ce81  Org 2 Acei DB Main 9 fp1 0 fp2 0  Acei 6 3 1 1  Type All
-16:59:58.148 > (21) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 01 >  DATA(13)  01430500112416406780a53021    SEQ 2416 MAC 406780a53021  Org 1 Acei 43 Main 5 fp1 0 fp2 11  Acei 2 0 1 1  Type All
-16:59:58.188 > (21) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 01 <  DATA(13)  01430500112416406780a53021    SEQ 2416 MAC 406780a53021  Org 1 Acei 43 Main 5 fp1 0 fp2 11  Acei 2 0 1 1  Type All
-16:59:58.212 > (21) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 01 <  DATA(13)  01430500112416406780a53021    SEQ 2416 MAC 406780a53021  Org 1 Acei 43 Main 5 fp1 0 fp2 11  Acei 2 0 1 1  Type All
-16:59:58.238 > (21) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 01 <  DATA(13)  01430500112416406780a53021    SEQ 2416 MAC 406780a53021  Org 1 Acei 43 Main 5 fp1 0 fp2 11  Acei 2 0 1 1  Type All
-16:59:58.267 > (22) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 00 <  DATA(14)  0143d200000024179f18402aa33d  SEQ 2417 MAC 9f18402aa33d  Org 1 Acei 43 Main D200 fp1 0 fp2 0  Acei 2 0 1 1  Type All
-16:59:58.292 > (22) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 00 <  DATA(14)  0143d200000024179f18402aa33d  SEQ 2417 MAC 9f18402aa33d  Org 1 Acei 43 Main D200 fp1 0 fp2 0  Acei 2 0 1 1  Type All
-16:59:58.318 > (22) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 00 <  DATA(14)  0143d200000024179f18402aa33d  SEQ 2417 MAC 9f18402aa33d  Org 1 Acei 43 Main D200 fp1 0 fp2 0  Acei 2 0 1 1  Type All
-16:59:58.342 > (22) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 00 <  DATA(14)  0143d200000024179f18402aa33d  SEQ 2417 MAC 9f18402aa33d  Org 1 Acei 43 Main D200 fp1 0 fp2 0  Acei 2 0 1 1  Type All
-16:59:58.398 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  DATA(15)  02db000900000324182ea14f27d208        SEQ 2418 MAC 2ea14f27d208  Org 2 Acei DB Main 9 fp1 0 fp2 0  Acei 6 3 1 1  Type All
-16:59:58.422 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  DATA(15)  02db000900000324182ea14f27d208        SEQ 2418 MAC 2ea14f27d208  Org 2 Acei DB Main 9 fp1 0 fp2 0  Acei 6 3 1 1  Type All
-16:59:58.448 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  DATA(15)  02db000900000324182ea14f27d208        SEQ 2418 MAC 2ea14f27d208  Org 2 Acei DB Main 9 fp1 0 fp2 0  Acei 6 3 1 1  Type All
-16:59:58.472 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  DATA(15)  02db000900000324182ea14f27d208        SEQ 2418 MAC 2ea14f27d208  Org 2 Acei DB Main 9 fp1 0 fp2 0  Acei 6 3 1 1  Type All
-                           */
-                            //   r.sequence = 0x0835; //DEBUG
                             packet->payload.packet.header.cmd = 0x01;
                             packet->payload.packet.msg.p0x01_13.main = 0x00;
-                            packet->payload.packet.msg.p0x01_13.fp1 = 0x01; // Observed // 0x02; //IZYMO
+                            packet->payload.packet.msg.p0x01_13.fp1 = 0x01;
                             packet->payload.packet.msg.p0x01_13.fp2 = r.sequence & 0xFF;
-                            // if (packet->payload.packet.header.source[2] == 0x1A) {packet->payload.packet.msg.p0x01_13.fp1 = 0x80;packet->payload.packet.msg.p0x01_13.fp2 = 0xD3;packet->payload.packet.header.source[2] = 0x1B; packet->payload.packet.msg.p0x01_13.fp2 = r.sequence--;}
                             break;
                         }
 
                         case RemoteButton::Mode2: {
-                            /* Always: press = 0x01 4x13 followed by release = 0x01 4x13 Increment fp2
-12:46:44.045 > (21) 1W S 1 E 1  FROM B60D1B TO 00003F CMD 01 >  DATA(13)  0143000276085a643d86021cdf    SEQ 085a MAC 643d86021cdf  Org 1 Acei 43 Main 0 fp1 2 fp2 76  Acei 2 0 1 1  Type All
-12:46:44.068 > (21) 1W S 1 E 1  FROM B60D1B TO 00003F CMD 01 <  DATA(13)  0143000276085a643d86021cdf    SEQ 085a MAC 643d86021cdf  Org 1 Acei 43 Main 0 fp1 2 fp2 76  Acei 2 0 1 1  Type All
-12:46:44.092 > (21) 1W S 1 E 1  FROM B60D1B TO 00003F CMD 01 <  DATA(13)  0143000276085a643d86021cdf    SEQ 085a MAC 643d86021cdf  Org 1 Acei 43 Main 0 fp1 2 fp2 76  Acei 2 0 1 1  Type All
-12:46:44.117 > (21) 1W S 1 E 1  FROM B60D1B TO 00003F CMD 01 <  DATA(13)  0143000276085a643d86021cdf    SEQ 085a MAC 643d86021cdf  Org 1 Acei 43 Main 0 fp1 2 fp2 76  Acei 2 0 1 1  Type All
-12:46:44.392 > (21) 1W S 1 E 1  FROM B60D1B TO 00003F CMD 01 <  DATA(13)  0143000277085b9c9dd8d480dd    SEQ 085b MAC 9c9dd8d480dd  Org 1 Acei 43 Main 0 fp1 2 fp2 77  Acei 2 0 1 1  Type All
-12:46:44.414 > (21) 1W S 1 E 1  FROM B60D1B TO 00003F CMD 01 <  DATA(13)  0143000277085b9c9dd8d480dd    SEQ 085b MAC 9c9dd8d480dd  Org 1 Acei 43 Main 0 fp1 2 fp2 77  Acei 2 0 1 1  Type All
-12:46:44.437 > (21) 1W S 1 E 1  FROM B60D1B TO 00003F CMD 01 <  DATA(13)  0143000277085b9c9dd8d480dd    SEQ 085b MAC 9c9dd8d480dd  Org 1 Acei 43 Main 0 fp1 2 fp2 77  Acei 2 0 1 1  Type All
-12:46:44.463 > (21) 1W S 1 E 1  FROM B60D1B TO 00003F CMD 01 <  DATA(13)  0143000277085b9c9dd8d480dd    SEQ 085b MAC 9c9dd8d480dd  Org 1 Acei 43 Main 0 fp1 2 fp2 77  Acei 2 0 1 1  Type All
-                           */
-                            //   r.sequence = 0x085A; //DEBUG
                             packet->payload.packet.header.cmd = 0x01;
-                            packet->payload.packet.msg.p0x01_13.main/*[0]*/ = 0x00;
-                            // packet->payload.packet.msg.p0x01_13.main[1] = 0x02;
+                            packet->payload.packet.msg.p0x01_13.main = 0x00;
                             packet->payload.packet.msg.p0x01_13.fp1 = 0x02;
                             packet->payload.packet.msg.p0x01_13.fp2 =  r.sequence & 0xFF;
-                            // if (packet->payload.packet.header.source[2] == 0x1A) {packet->payload.packet.header.source[2] = 0x1B; packet->payload.packet.msg.p0x01_13.fp2++; r.sequence += 1;} // DEBUG r.sequence;}
                             break;
                     }
-                    /*Light or up/down*/
                     case RemoteButton::Mode3:{
-                        // r.sequence = 0x2262; // DEBUG
-/* 0x00 4x16 + 0x00 4x14 + 0x00 4x16
-11:26:26.903 > (24) 1W S 1 E 1  FROM B60D1A TO 0001BF CMD 00 >  DATA(16)  0143000080d300002262bcff22b0d713      SEQ 2262 MAC bcff22b0d713  Type Light  Org 1 Acei 43 Main 0 fp1 80 fp2 D3  Acei 2 0 1 1
-11:26:26.927 > (24) 1W S 1 E 1  FROM B60D1A TO 0001BF CMD 00 <  DATA(16)  0143000080d300002262bcff22b0d713      SEQ 2262 MAC bcff22b0d713  Type Light  Org 1 Acei 43 Main 0 fp1 80 fp2 D3  Acei 2 0 1 1
-11:26:26.952 > (24) 1W S 1 E 1  FROM B60D1A TO 0001BF CMD 00 <  DATA(16)  0143000080d300002262bcff22b0d713      SEQ 2262 MAC bcff22b0d713  Type Light  Org 1 Acei 43 Main 0 fp1 80 fp2 D3  Acei 2 0 1 1
-11:26:26.976 > (24) 1W S 1 E 1  FROM B60D1A TO 0001BF CMD 00 <  DATA(16)  0143000080d300002262bcff22b0d713      SEQ 2262 MAC bcff22b0d713  Type Light  Org 1 Acei 43 Main 0 fp1 80 fp2 D3  Acei 2 0 1 1
-11:26:27.005 > (22) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 00 <  DATA(14)  0143000000002262d92e2bb45c29  SEQ 2262 MAC d92e2bb45c29  Type All  Org 1 Acei 43 Main 0 fp1 0 fp2 0  Acei 2 0 1 1
-11:26:27.030 > (22) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 00 <  DATA(14)  0143000000002262d92e2bb45c29  SEQ 2262 MAC d92e2bb45c29  Type All  Org 1 Acei 43 Main 0 fp1 0 fp2 0  Acei 2 0 1 1
-11:26:27.054 > (22) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 00 <  DATA(14)  0143000000002262d92e2bb45c29  SEQ 2262 MAC d92e2bb45c29  Type All  Org 1 Acei 43 Main 0 fp1 0 fp2 0  Acei 2 0 1 1
-11:26:27.101 > (22) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 00 <  DATA(14)  0143000000002262d92e2bb45c29  SEQ 2262 MAC d92e2bb45c29  Type All  Org 1 Acei 43 Main 0 fp1 0 fp2 0  Acei 2 0 1 1
-11:26:27.129 > (24) 1W S 1 E 1  FROM B60D1A TO 0001BF CMD 00 <  DATA(16)  0143000080c80000226359c4c4837a4f      SEQ 2263 MAC 59c4c4837a4f  Type Light  Org 1 Acei 43 Main 0 fp1 80 fp2 C8  Acei 2 0 1 1
-11:26:27.156 > (24) 1W S 1 E 1  FROM B60D1A TO 0001BF CMD 00 <  DATA(16)  0143000080c80000226359c4c4837a4f      SEQ 2263 MAC 59c4c4837a4f  Type Light  Org 1 Acei 43 Main 0 fp1 80 fp2 C8  Acei 2 0 1 1
-11:26:27.179 > (24) 1W S 1 E 1  FROM B60D1A TO 0001BF CMD 00 <  DATA(16)  0143000080c80000226359c4c4837a4f      SEQ 2263 MAC 59c4c4837a4f  Type Light  Org 1 Acei 43 Main 0 fp1 80 fp2 C8  Acei 2 0 1 1
-11:26:27.206 > (24) 1W S 1 E 1  FROM B60D1A TO 0001BF CMD 00 <  DATA(16)  0143000080c80000226359c4c4837a4f      SEQ 2263 MAC 59c4c4837a4f  Type Light  Org 1 Acei 43 Main 0 fp1 80 fp2 C8  Acei 2 0 1 1
-*/
                         break;
                     }
                     case RemoteButton::Mode4: {
-/* 0x00 4x16  MAIN D200 FP 20 FP2 CC DATA A200 or MAIN D200 FP 20 FP2 CD DATA 2E00
-Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  DATA(15)  02db0009000003233d56ca3c456f2d        SEQ 233d MAC 56ca3c456f2d  Org 2 Acei DB Main 9 fp1 0 fp2 0  Acei 6 3 1 1  Type All
-10:10:36.905 > (24) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 00 >  DATA(16)  0143d20020cd2e00 23d5ec80e44be6b6      SEQ 23d5 MAC ec80e44be6b6  Org 1 Acei 43 Main D200 fp1 20 fp2 CD Data 2E00 Acei 2 0 1 1  Type All
-10:10:36.929 > (24) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 00 <  DATA(16)  0143d20020cd2e00 23d5ec80e44be6b6      SEQ 23d5 MAC ec80e44be6b6  Org 1 Acei 43 Main D200 fp1 20 fp2 CD Data 2E00 Acei 2 0 1 1  Type All
-10:10:36.955 > (24) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 00 <  DATA(16)  0143d20020cd2e00 23d5ec80e44be6b6      SEQ 23d5 MAC ec80e44be6b6  Org 1 Acei 43 Main D200 fp1 20 fp2 CD Data 2E00 Acei 2 0 1 1  Type All
-10:10:36.980 > (24) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 00 <  DATA(16)  0143d20020cd2e00 23d5ec80e44be6b6      SEQ 23d5 MAC ec80e44be6b6  Org 1 Acei 43 Main D200 fp1 20 fp2 CD Data 2E00 Acei 2 0 1 1  Type All
-
-10:10:41.420 > (24) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 00 >  DATA(16)  0143d20020cca200 23d6c90d142dae8a      SEQ 23d6 MAC c90d142dae8a  Org 1 Acei 43 Main D200 fp1 20 fp2 CC Data A200 Acei 2 0 1 1  Type All
-10:10:41.442 > (24) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 00 <  DATA(16)  0143d20020cca200 23d6c90d142dae8a      SEQ 23d6 MAC c90d142dae8a  Org 1 Acei 43 Main D200 fp1 20 fp2 CC Data A200 Acei 2 0 1 1  Type All
-10:10:41.469 > (24) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 00 <  DATA(16)  0143d20020cca200 23d6c90d142dae8a      SEQ 23d6 MAC c90d142dae8a  Org 1 Acei 43 Main D200 fp1 20 fp2 CC Data A200 Acei 2 0 1 1  Type All
-10:10:41.494 > (24) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 00 <  DATA(16)  0143d20020cca200 23d6c90d142dae8a      SEQ 23d6 MAC c90d142dae8a  Org 1 Acei 43 Main D200 fp1 20 fp2 CC Data A200 Acei 2 0 1 1  Type All
-
-10:12:18.352 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  DATA(15)  02db0009000003 23dc49fa35972c4b        SEQ 23dc MAC 49fa35972c4b  Org 2 Acei DB Main 9 fp1 0 fp2 0  Acei 6 3 1 1  Type All
-10:12:18.376 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  DATA(15)  02db0009000003 23dc49fa35972c4b        SEQ 23dc MAC 49fa35972c4b  Org 2 Acei DB Main 9 fp1 0 fp2 0  Acei 6 3 1 1  Type All
-10:12:18.402 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  DATA(15)  02db0009000003 23dc49fa35972c4b        SEQ 23dc MAC 49fa35972c4b  Org 2 Acei DB Main 9 fp1 0 fp2 0  Acei 6 3 1 1  Type All
-10:12:18.427 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  DATA(15)  02db0009000003 23dc49fa35972c4b        SEQ 23dc MAC 49fa35972c4b  Org 2 Acei DB Main 9 fp1 0 fp2 0  Acei 6 3 1 1  Type All
-*/
-                            // r.sequence = 0x2313; // DEBUG
                             packet->payload.packet.header.cmd = 0x00;
                             packet->payload.packet.msg.p0x00_16.main[0] = 0xd2;
                             packet->payload.packet.msg.p0x00_16.main[1] = 0x00;
@@ -555,55 +472,30 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
                             packet->payload.packet.msg.p0x00_16.data[0] = 0x2E;
                             packet->payload.packet.msg.p0x00_16.data[1] = 0x00;
                              if (packet->payload.packet.header.source[2] == 0x1B) {
-                                // packet->payload.packet.header.source[2] = 0x1A;
                                 packet->payload.packet.msg.p0x00_16.fp2 = 0xCC;
                                 packet->payload.packet.msg.p0x00_16.data[0] = 0xA2;
                             }
-
                         break;
                     }
-                        default: // If reaching default here, then cmd is not recognized, then return
+                        default:
                             return;
                     }
-                    /*
-                                        if (r.type == 6) { // Vert
-                                            //typen
-                                            packet->payload.packet.msg.p0x00_14.fp1 = 0x80;
-                                            packet->payload.packet.msg.p0x00_14.fp2 = 0xD3;
-                                            // Packet length
-                                            packet->payload.packet.header.CtrlByte1.asStruct.MsgLen += sizeof(_p0x00_14);
-                                        }
-                    */
-                    // if (r.type == 6) { // Jaune
-                    //     packet->payload.packet.msg.p0x00.fp1 = 0x80;
-                    //     packet->payload.packet.msg.p0x00.fp2 = 0xC8;
-                    //     // Packet length
-                    //     packet->payload.packet.header.CtrlByte1.asStruct.MsgLen += sizeof(_p0x00);
-                    // }
-                    // hmac
+
                     uint8_t hmac[16];
-                    // frame = std::vector(&packet->payload.packet.header.cmd, &packet->payload.packet.header.cmd + 7);
-                    // + toAdd);
 
                     if (r.type[0] == 0 && (cmd == RemoteButton::Mode1 ||  cmd == RemoteButton::Mode2)) {
-                        //                        // packet->payload.packet.header.cmd = 0x01;
                         packet->payload.packet.header.CtrlByte1.asStruct.MsgLen += sizeof(_p0x01_13) ;
-                        //                        // _sequence -= 1; // Use same sequence as light
                         packet->payload.packet.msg.p0x01_13.sequence[0] = r.sequence >> 8;
                         packet->payload.packet.msg.p0x01_13.sequence[1] = r.sequence & 0x00ff;
-                        uint8_t toAdd = 5 + 1; // OK
+                        uint8_t toAdd = 5 + 1;
                         frame = std::vector(&packet->payload.packet.header.cmd, &packet->payload.packet.header.cmd + toAdd);
                         iohcCrypto::create_1W_hmac(hmac, packet->payload.packet.msg.p0x01_13.sequence, r.key, frame);
                         for (uint8_t i = 0; i < 6; i++) {
                             packet->payload.packet.msg.p0x01_13.hmac[i] = hmac[i];
                         }
                     }
-
-                    else if (r.type[0] == 0 && (cmd == RemoteButton::Mode4 )) {
-
-                        //                        // packet->payload.packet.header.cmd = 0x01;
+                    else if (r.type[0] == 0 && (cmd == RemoteButton::Mode4)) {
                         packet->payload.packet.header.CtrlByte1.asStruct.MsgLen += sizeof(_p0x00_16) ;
-                        //                        // _sequence -= 1; // Use same sequence as light
                         packet->payload.packet.msg.p0x00_16.sequence[0] = r.sequence >> 8;
                         packet->payload.packet.msg.p0x00_16.sequence[1] = r.sequence & 0x00ff;
                         uint8_t toAdd = 8 + 1;
@@ -615,34 +507,19 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
                     }
                     else {
                         packet->payload.packet.header.CtrlByte1.asStruct.MsgLen += sizeof(_p0x00_14) ;
-                        // Sequence
                         packet->payload.packet.msg.p0x00_14.sequence[0] = r.sequence >> 8;
                         packet->payload.packet.msg.p0x00_14.sequence[1] = r.sequence & 0x00ff;
-                        uint8_t toAdd =  6 + 1; //OK
+                        uint8_t toAdd = 6 + 1;
                         frame = std::vector(&packet->payload.packet.header.cmd, &packet->payload.packet.header.cmd + toAdd);
                         iohcCrypto::create_1W_hmac(hmac, packet->payload.packet.msg.p0x00_14.sequence, r.key, frame);
                         for (uint8_t i = 0; i < 6; i++) {
                             packet->payload.packet.msg.p0x00_14.hmac[i] = hmac[i];
                         }
                     }
-                    /*
-                                        if (r.type == 0xff) {
-                                            packet->payload.packet.header.cmd = 0x20;
-                                            packet->payload.packet.msg.p0x00_14.origin = 0x02;
-                                            packet->payload.packet.msg.p0x00_14.acei.asByte = 0xDB;
-                                            packet->payload.packet.header.CtrlByte1.asStruct.MsgLen += sizeof(_p0x00_14);
-                                        }
-                    */
+
                     r.sequence += 1;
                     nvs_write_sequence(r.node, r.sequence);
-                    // hmac
-                    // uint8_t hmac[16];
-                    // frame = std::vector(&packet->payload.packet.header.cmd, &packet->payload.packet.header.cmd + 7 + toAdd);
-                    // iohcCrypto::create_1W_hmac(hmac, packet->payload.packet.msg.p0x00.sequence, _key, frame);
-                    // for (uint8_t i = 0; i < 6; i++) {
-                    //     packet->payload.packet.msg.p0x00.hmac[i] = hmac[i];
-                    //     packet->payload.packet.msg.p0x00_all.hmac[i] = hmac[i];
-                    // }
+
                     packet->buffer_length = packet->payload.packet.header.CtrlByte1.asStruct.MsgLen + 1;
 
                     digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
@@ -655,7 +532,34 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
                     break;
                 }
         }
-        this->save(); // Save sequence number
+        this->save();
+    }
+
+    // addBroadcast: send cmd 0x30 for every unpaired (or all) remotes.
+    // Called automatically by the discover1W command so the screen receives
+    // the key-exchange packet immediately when it enters pair mode.
+    // Pass force=true to also re-send for already-paired remotes (e.g. re-pair).
+    void iohcRemote1W::addBroadcast(bool force) {
+        int count = 0;
+        for (auto &r : remotes) {
+            if (!force && r.paired) continue;
+            std::vector<iohcPacket *> packets2send;
+            Serial.printf("1W DISCOVER: advertising %s (node %s)\n",
+                          r.description.c_str(),
+                          bytesToHexString(r.node, sizeof(r.node)).c_str());
+            forge0x30Packet(r, packets2send);
+            _radioInstance->send(packets2send);
+            display1WAction(r.node, "ADD", "TX", r.name.c_str());
+            r.paired = true;
+            count++;
+            // Small gap between packets so the radio can switch back to RX
+            vTaskDelay(pdMS_TO_TICKS(200));
+        }
+        if (count == 0) {
+            Serial.println("1W DISCOVER: no unpaired remotes to advertise. Use 'force' or add a new remote first with new1W.");
+        } else {
+            save();
+        }
     }
 
    bool iohcRemote1W::load() {
@@ -681,7 +585,6 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
         }
         f.close();
 
-        // Iterate through the JSON object
         bool updateFile = false;
         std::vector<remote> loadedRemotes;
         for (JsonPair kv: doc.as<JsonObject>()) {
@@ -721,29 +624,17 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
                     updateFile = true;
                 }
             }
-            // Persist the highest value back to NVS
             nvs_write_sequence(r.node, r.sequence);
             JsonArray jarr = jobj["type"].as<JsonArray>();
             if (jarr.isNull()) {
                 Serial.printf("Skipping 1W remote '%s': missing type array\n", entryId.c_str());
                 continue;
             }
-            // Réservez de l'espace dans le vecteur pour éviter les allocations inutiles
-
-            //_type.reserve(jarr.size());
             r.type.reserve(jarr.size());
-
-            // Iterate through the JSON  type array
             for (auto && i : jarr) {
-            // _type.insert(_type.begin() + i, jarr[i].as<uint16_t>());
-            //_type.push_back(i.as<uint16_t>());
                 r.type.push_back(i.as<uint8_t>());
             }
 
-            // _type = jobj["type"].as<u_int16_t>();
-//            r.type = jobj["type"].as<u_int16_t>();
-
-            // _manufacturer = jobj["manufacturer_id"].as<uint8_t>();
             r.manufacturer = jobj["manufacturer_id"].as<uint8_t>();
             if (jobj["description"].is<const char *>()) {
                 r.description = jobj["description"].as<const char *>();
@@ -793,14 +684,13 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
             Serial.printf("No valid 1W remotes loaded from %s\n", IOHC_1W_REMOTE);
         }
         remotes = loadedRemotes;
-        Serial.printf("Loaded %d x 1W remotes\n", remotes.size()); // _type.size());
-        // Ensure JSON reflects the latest sequence values and persist defaults
+        Serial.printf("Loaded %d x 1W remotes\n", remotes.size());
         if (updateFile) {
             this->save();
         }
-        // _sequence = 0x1402;    // DEBUG
         return true;
     }
+
    bool iohcRemote1W::save() {
         if (remotes.empty()) {
             Serial.printf("Refusing to save empty 1W remote list to %s\n", IOHC_1W_REMOTE);
@@ -817,37 +707,25 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
         }
         JsonDocument doc;
         for (const auto&r: remotes) {
-            // jobj["key"] = bytesToHexString(_key, sizeof(_key));
             auto jobj = doc[bytesToHexString(r.node, sizeof(r.node))].to<JsonObject>();
             jobj["key"] = bytesToHexString(r.key, sizeof(r.key));
 
             uint8_t btmp[2];
-            // btmp[1] = _sequence & 0x00ff;
-            // btmp[0] = _sequence >> 8;
             btmp[1] = r.sequence & 0x00ff;
             btmp[0] = r.sequence >> 8;
-
             jobj["sequence"] = bytesToHexString(btmp, sizeof(btmp));
 
-            // JsonArray jarr = jobj.createNestedArray("type");
             auto jarr = jobj["type"].to<JsonArray>();
             for (uint8_t i : r.type) {
-                // if (i)
-                bool added = jarr.add(i);
-                // else
-                // break;
-                }
+                jarr.add(i);
+            }
 
-            // jobj["manufacturer_id"] = _manufacturer;
             jobj["manufacturer_id"] = r.manufacturer;
             jobj["description"] = r.description;
             jobj["name"] = r.name;
-
             jobj["travel_time"] = r.travelTime;
             jobj["position"] = static_cast<int>(std::round(r.positionTracker.getPosition()));
-
             jobj["paired"] = r.paired;
-
         }
         const size_t written = serializeJson(doc, f);
         f.flush();
@@ -874,7 +752,6 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
             return false;
         }
         LittleFS.remove(backupFile);
-
         return true;
     }
 
@@ -885,7 +762,6 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
     bool iohcRemote1W::addRemote(const std::string &name) {
         remote r{};
 
-        // Generate unique address
         bool unique = false;
         while (!unique) {
             for (uint8_t i = 0; i < sizeof(r.node); i++)
@@ -895,7 +771,6 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
             });
         }
 
-        // Generate random key
         for (uint8_t &b : r.key)
             b = esp_random() & 0xff;
 
@@ -906,8 +781,6 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
         r.travelTime = DEFAULT_TRAVEL_TIME_SEC;
         r.paired = false;
 
-
-        // Generate unique description
         const char letters[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         std::string desc;
         do {
@@ -1081,7 +954,7 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
                 r.positionTracker.startOpening();
                 r.movement = remote::Movement::Opening;
                 r.targetPosition = 100.0f;
-                            broadcastWebDeviceAction(r, "OPENING");
+                broadcastWebDeviceAction(r, "OPENING");
 #if defined(MQTT)
                 {
                     std::string id = bytesToHexString(r.node, sizeof(r.node));
@@ -1096,7 +969,7 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
                 r.positionTracker.startClosing();
                 r.movement = remote::Movement::Closing;
                 r.targetPosition = 0.0f;
-                            broadcastWebDeviceAction(r, "CLOSING");
+                broadcastWebDeviceAction(r, "CLOSING");
 #if defined(MQTT)
                 {
                     std::string id = bytesToHexString(r.node, sizeof(r.node));
@@ -1111,7 +984,7 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
                 r.positionTracker.stop();
                 r.movement = remote::Movement::Idle;
                 r.targetPosition = r.positionTracker.getPosition();
-                            broadcastWebDeviceAction(r, "STOP");
+                broadcastWebDeviceAction(r, "STOP");
 #if defined(MQTT)
                 {
                     std::string id = bytesToHexString(r.node, sizeof(r.node));
@@ -1167,7 +1040,6 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
             }
 
             if (moving) {
-                //Serial.printf("%s position: %.0f%%\n", r.name.c_str(), pos);
                 display1WPosition(r.node, pos, r.name.c_str());
 #if defined(MQTT) || defined(WEBSERVER)
                 std::string id = bytesToHexString(r.node, sizeof(r.node));
