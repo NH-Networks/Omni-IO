@@ -55,6 +55,7 @@ namespace IOHC {
             std::vector<uint8_t> type{};
             uint8_t manufacturer{};
             bool paired{false};
+            bool repeatOnNoResponse{false};
             std::string description;
             std::string name;
             uint32_t travelTime{}; // seconds to fully open or close
