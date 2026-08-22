@@ -16,7 +16,6 @@
             filesystemUploadButton: document.getElementById("upload-filesystem"),
             firmwareFileInput: document.getElementById("firmware-file"),
             firmwareUploadButton: document.getElementById("upload-firmware"),
-
             helpDeviceButton: document.getElementById("help-device"),
             helpRemoteButton: document.getElementById("help-remote"),
             lastAddrInput: document.getElementById("last-address"),
@@ -71,7 +70,7 @@
 
     function i18nText(key, fallback) {
         if (typeof window.t === "function") {
-            const value = window.t(key);
+            var value = window.t(key);
             if (value && value !== key) {
                 return value;
             }
@@ -84,7 +83,7 @@
             return;
         }
 
-        const logEntry = document.createElement("p");
+        var logEntry = document.createElement("p");
         logEntry.textContent = message;
         if (isError) {
             logEntry.style.color = "red";
@@ -108,7 +107,7 @@
             return;
         }
         try {
-            const logs = await window.MiOpenApi.requestJson("/api/logs");
+            var logs = await window.MiOpenApi.requestJson("/api/logs");
             app.elements.statusMessages.textContent = "";
             if (Array.isArray(logs)) {
                 logs.forEach(function (message) {
@@ -121,11 +120,11 @@
     }
 
     function initSuggestions(app) {
-        const suggestions = ["add", "remove", "close", "open", "ls", "cat"];
+        var suggestions = ["add", "remove", "close", "open", "ls", "cat"];
         app.elements.suggestions.textContent = "";
 
         suggestions.forEach(function (item) {
-            const option = document.createElement("option");
+            var option = document.createElement("option");
             option.value = item;
             option.textContent = item;
             app.elements.suggestions.appendChild(option);
@@ -148,7 +147,7 @@
     }
 
     function initTheme(app) {
-        const savedTheme = localStorage.getItem("theme");
+        var savedTheme = localStorage.getItem("theme");
         if (savedTheme === "dark") {
             document.body.classList.add("dark-mode");
         }
@@ -190,18 +189,29 @@
         }
     }
 
+    // Per-device RAF handle for WebSocket position bursts
+    var _wsPositionRaf = {};
+
     function initWebSocket(app) {
-        const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
-        const ws = new WebSocket(wsScheme + "://" + window.location.host + "/ws");
+        var wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
+        var ws = new WebSocket(wsScheme + "://" + window.location.host + "/ws");
         app.state.ws = ws;
 
         ws.onmessage = function (event) {
             try {
-                const data = JSON.parse(event.data);
+                var data = JSON.parse(event.data);
                 if (data.type === "log") {
                     app.logStatus(data.message);
                 } else if (data.type === "position") {
-                    app.updateDeviceFill(data.id, data.position);
+                    // Throttle to one DOM write per animation frame per device
+                    if (_wsPositionRaf[data.id]) {
+                        cancelAnimationFrame(_wsPositionRaf[data.id]);
+                    }
+                    var _capturedData = data;
+                    _wsPositionRaf[data.id] = requestAnimationFrame(function () {
+                        delete _wsPositionRaf[_capturedData.id];
+                        app.updateDeviceFill(_capturedData.id, _capturedData.position);
+                    });
                 } else if (data.type === "deviceaction") {
                     app.applyDeviceAction(data);
                 } else if (data.type === "init") {
@@ -211,10 +221,10 @@
                         app.elements.lastAddrInput.value = data.address || "";
                     }
                 } else if (data.type === "twowstatus") {
-                    // Bug 3 fix: twowstatus wordt ontvangen maar heeft geen UI in deze branch — stilzwijgend negeren
+                    // twowstatus has no UI in this branch — silently ignored
                 }
             } catch (e) {
-                // Ongeldige JSON van WebSocket — negeren
+                // Invalid JSON from WebSocket — ignore
             }
         };
 
@@ -284,20 +294,17 @@
         }
         if (app.elements.downloadBackupButton) {
             app.elements.downloadBackupButton.addEventListener("click", function () {
-                window.MiOpenApi.downloadFile("/api/download/backup", "miopen-backup.json").catch(function (error) {
-                });
+                window.MiOpenApi.downloadFile("/api/download/backup", "miopen-backup.json").catch(function () {});
             });
         }
         if (app.elements.downloadDevicesButton) {
             app.elements.downloadDevicesButton.addEventListener("click", function () {
-                window.MiOpenApi.downloadFile("/api/download/devices", "1W.json").catch(function (error) {
-                });
+                window.MiOpenApi.downloadFile("/api/download/devices", "1W.json").catch(function () {});
             });
         }
         if (app.elements.downloadRemotesButton) {
             app.elements.downloadRemotesButton.addEventListener("click", function () {
-                window.MiOpenApi.downloadFile("/api/download/remotes", "RemoteMap.json").catch(function (error) {
-                });
+                window.MiOpenApi.downloadFile("/api/download/remotes", "RemoteMap.json").catch(function () {});
             });
         }
         if (app.elements.addPopupButton) {
@@ -309,7 +316,7 @@
     }
 
     document.addEventListener("DOMContentLoaded", function () {
-        const app = {
+        var app = {
             elements: createElements(),
             i18nText: i18nText,
             logStatus: function (message, isError) {
@@ -342,7 +349,7 @@
         });
 
         window.MiOpenApi.requestJson("/api/info").then(function (info) {
-            const el = document.getElementById("firmware-version");
+            var el = document.getElementById("firmware-version");
             if (el && info.version) {
                 el.textContent = "Firmware: " + info.version + (info.branch ? " (" + info.branch + ")" : "");
             }
