@@ -14,6 +14,8 @@
 
         if (typeof durationSeconds === "number" && durationSeconds > 0) {
             deviceEl.style.transitionDuration = durationSeconds.toFixed(2) + "s";
+        } else {
+            deviceEl.style.transitionDuration = "";
         }
 
         const clamped = Math.max(0, Math.min(100, Number(percent) || 0));
@@ -52,7 +54,15 @@
         const source = data.source || "gateway";
         const current = typeof data.position !== "undefined" ? data.position : (cached ? cached.position : data.target);
 
-        updateDeviceFill(data.id, current, action === "stop" ? 0.2 : undefined);
+        // Use travel_time from cache for smooth open/close animation
+        let animDuration;
+        if (action === "stop") {
+            animDuration = 0.2;
+        } else if (cached && cached.travel_time > 0) {
+            animDuration = cached.travel_time;
+        }
+
+        updateDeviceFill(data.id, current, animDuration);
         setDeviceState(data.id, state, source);
 
         if (cached && typeof current !== "undefined") {
@@ -92,10 +102,16 @@
                 const nameSpan = document.createElement("span");
                 nameSpan.textContent = device.name;
 
+                // Live state label (Bug 1 fix: aanmaken zodat setDeviceState() het kan vinden)
+                const stateSpan = document.createElement("span");
+                stateSpan.classList.add("device-state");
+                stateSpan.textContent = device.active === false ? "inactive" : "";
+
                 const listItem = document.createElement("li");
                 listItem.classList.add("device");
                 listItem.dataset.id = device.id;
                 listItem.appendChild(nameSpan);
+                listItem.appendChild(stateSpan);
 
                 listItem.appendChild(createDeviceButton("up", "open", function () {
                     runAction(app, device.id, "open").catch(function (error) {
@@ -113,6 +129,11 @@
                 }));
 
                 listItem.appendChild(createDeviceButton(app.i18nText("button.edit", "edit"), "edit", async function () {
+                    // Bug 5 fix: altijd verse data uit cache lezen, niet de stale closure-variabele
+                    let currentDevice = app.state.devicesCache.find(function (d) {
+                        return d.id === device.id;
+                    }) || device;
+
                     try {
                         const freshDevices = await window.MiOpenApi.requestJson("/api/devices");
                         app.state.devicesCache = freshDevices;
@@ -120,7 +141,7 @@
                             return candidate.id === device.id;
                         });
                         if (freshDevice) {
-                            device = freshDevice;
+                            currentDevice = freshDevice;
                         }
                     } catch (error) {
                     }
@@ -129,12 +150,12 @@
                         app.i18nText("popup.edit_device_title", "Edit Device"),
                         app.i18nText("popup.adjust_name", "Adjust the name:"),
                         [
-                            app.i18nText("popup.info_id", "ID: {value}").replace("{value}", device.id),
-                            app.i18nText("popup.info_description", "Description: {value}").replace("{value}", device.description || ""),
-                            app.i18nText("popup.info_position", "Position: {value}%").replace("{value}", String(device.position)),
+                            app.i18nText("popup.info_id", "ID: {value}").replace("{value}", currentDevice.id),
+                            app.i18nText("popup.info_description", "Description: {value}").replace("{value}", currentDevice.description || ""),
+                            app.i18nText("popup.info_position", "Position: {value}%").replace("{value}", String(currentDevice.position)),
                             app.i18nText("popup.info_paired", "Paired: {value}").replace(
                                 "{value}",
-                                device.paired ? app.i18nText("value.yes", "Yes") : app.i18nText("value.no", "No")
+                                currentDevice.paired ? app.i18nText("value.yes", "Yes") : app.i18nText("value.no", "No")
                             )
                         ],
                         [""],
@@ -143,23 +164,23 @@
                             showInput: true,
                             showTiming: true,
                             btnShowDelete: true,
-                            defaultValue: device.name,
-                            defaultTiming: device.travel_time,
+                            defaultValue: currentDevice.name,
+                            defaultTiming: currentDevice.travel_time,
                             pairLabel: app.i18nText("popup.pair_label_device", "Add / Remove the device to the physical screen"),
                             deleteInfo: app.i18nText("popup.delete_device_info", "Only use when the device is not linked to a physical screen."),
                             onSave: async function (newName, newTiming) {
                                 try {
-                                    if (newName.trim() && newName !== device.name) {
+                                    if (newName.trim() && newName !== currentDevice.name) {
                                         const renameResult = await window.MiOpenApi.postJson("/api/command", {
-                                            deviceId: device.id,
+                                            deviceId: currentDevice.id,
                                             command: "edit1W " + newName
                                         });
                                     }
 
                                     const parsedTiming = parseInt(newTiming, 10);
-                                    if (!isNaN(parsedTiming) && parsedTiming > 0 && parsedTiming !== device.travel_time) {
+                                    if (!isNaN(parsedTiming) && parsedTiming > 0 && parsedTiming !== currentDevice.travel_time) {
                                         const timeResult = await window.MiOpenApi.postJson("/api/command", {
-                                            deviceId: device.id,
+                                            deviceId: currentDevice.id,
                                             command: "time1W " + parsedTiming
                                         });
                                     }
@@ -171,7 +192,7 @@
                             onPair: async function () {
                                 try {
                                     const result = await window.MiOpenApi.postJson("/api/command", {
-                                        deviceId: device.id,
+                                        deviceId: currentDevice.id,
                                         command: "add"
                                     });
                                     await fetchAndDisplayDevices(app);
@@ -181,7 +202,7 @@
                             onUnpair: async function () {
                                 try {
                                     const result = await window.MiOpenApi.postJson("/api/command", {
-                                        deviceId: device.id,
+                                        deviceId: currentDevice.id,
                                         command: "remove"
                                     });
                                     await fetchAndDisplayDevices(app);
@@ -190,7 +211,7 @@
                             },
                             onDelete: async function () {
                                 const result = await window.MiOpenApi.postJson("/api/command", {
-                                    deviceId: device.id,
+                                    deviceId: currentDevice.id,
                                     command: "del1W"
                                 });
                                 await fetchAndDisplayDevices(app);
@@ -223,7 +244,6 @@
         if (!commandStr) {
             return;
         }
-
 
         try {
             const result = await window.MiOpenApi.postJson("/api/command", {

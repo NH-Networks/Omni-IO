@@ -327,14 +327,9 @@ void handleApiDevices(AsyncWebServerRequest *request, JsonArray &root) {
     deviceObj["position"] = r.positionTracker.getPosition();
     deviceObj["travel_time"] = r.travelTime;
     deviceObj["paired"] = r.paired;
+    deviceObj["active"] = r.paired;
+    deviceObj["repeatOnNoResponse"] = r.repeatOnNoResponse;
   }
-
-  // Provide a generic command interface as last entry
-  // JsonObject cmdObj = root.add<JsonObject>();
-  // cmdObj["id"] = "cmd_if";
-  // cmdObj["name"] = "Command Interface";
-
-  // log_i("Sent device list"); // Requires a logging library
 }
 
 void handleApiRemotes(AsyncWebServerRequest *request, JsonArray &root) {
@@ -1324,6 +1319,12 @@ void setupWebServer() {
   server.on("/api/upload/remotes", HTTP_POST, handleUploadRemotesDone,
             handleUploadRemotesFile);
 
+  // Restart endpoint
+  server.on("/api/restart", HTTP_POST, [](AsyncWebServerRequest *request) {
+    request->send(200, "application/json", "{\"message\":\"Rebooting...\"}" );
+    scheduleRestart("web-reboot");
+  });
+
   ws.onEvent(onWsEvent);
   server.addHandler(&ws);
 
@@ -1334,18 +1335,6 @@ void setupWebServer() {
   staticHandler.setFilter([](AsyncWebServerRequest *request) {
     return !request->url().startsWith("/api");
   });
-  // You might need to explicitly serve each file if serveStatic with directory
-  // isn't working as expected or if files are not in a subdirectory of the data
-  // dir. server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-  //     request->send(LittleFS, "/web_interface_data/index.html", "text/html");
-  // });
-  // server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request){
-  //     request->send(LittleFS, "/web_interface_data/style.css", "text/css");
-  // });
-  // server.on("/script.js", HTTP_GET, [](AsyncWebServerRequest *request){
-  //     request->send(LittleFS, "/web_interface_data/script.js",
-  //     "application/javascript");
-  // });
 
   server.onNotFound([](AsyncWebServerRequest *request) {
     request->send(404, "text/plain", "Not found");
@@ -1361,4 +1350,3 @@ void loopWebServer() {
 }
 
 #endif // defined(WEBSERVER)
-
