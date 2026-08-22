@@ -33,6 +33,8 @@ void setCpuTempEnabled(bool enabled);
 #else
 
 // No-op stubs when no display is present
+#include <cstdint>
+
 inline void display1WAction(const uint8_t *, const char *, const char *, const char *) {}
 inline void display1WPosition(const uint8_t *, float, const char *) {}
 inline void displayCustomMessage(const char *, const char *) {}
@@ -40,7 +42,9 @@ inline void clearDisplayMessages() {}
 inline void updateDisplayStatus() {}
 inline void wakeDisplay() {}
 inline void setDiscoveryDisplay(int) {}
-inline void broadcastLog(const String &) {}
+
+// broadcastLog takes const char* to avoid pulling in Arduino String outside display TU
+inline void broadcastLog(const char *) {}
 
 inline bool initDisplay() { return false; }
 inline bool isDisplayEnabled() { return false; }

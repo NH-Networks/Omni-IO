@@ -384,7 +384,8 @@
                 if (!isNaN(offVal)) payload.screenOffTimeout = offVal;
             }
             if (app.elements.displayDimLevelSelect) {
-                payload.dimLevel = parseInt(app.elements.displayDimLevelSelect.value, 10);
+                const dimVal = parseInt(app.elements.displayDimLevelSelect.value, 10);
+                payload.dimLevel = isNaN(dimVal) ? 0 : dimVal;
             }
             if (app.elements.displayCpuTempInput) {
                 payload.showCpuTemp = app.elements.displayCpuTempInput.checked;
