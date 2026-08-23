@@ -393,11 +393,11 @@
 
                 <div style="display: flex; gap: 8px; align-items: flex-end; margin-top: 8px;">
                   <div style="flex: 1;">
-                    <label for="sun-lat" data-i18n="label.latitude">Breedtegraad (Lat):</label>
+                    <label for="sun-lat" data-i18n="label.latitude">Breedtegraad (GPS):</label>
                     <input type="number" step="0.0001" id="sun-lat" placeholder="52.3676" />
                   </div>
                   <div style="flex: 1;">
-                    <label for="sun-lon" data-i18n="label.longitude">Lengtegraad (Lon):</label>
+                    <label for="sun-lon" data-i18n="label.longitude">Lengtegraad (GPS):</label>
                     <input type="number" step="0.0001" id="sun-lon" placeholder="4.9041" />
                   </div>
                   <button type="button" id="sun-geolocate-btn" style="margin-bottom: 10px; padding: 9px 12px; font-size: 0.85em; white-space: nowrap;" title="GPS Locatie Ophalen">
@@ -405,24 +405,28 @@
                   </button>
                 </div>
 
+                <div style="margin: 6px 0 10px; padding: 8px 10px; background: rgba(90,110,140,0.06); border-radius: 6px; font-size: 0.8em; color: var(--color-text); opacity: 0.85;" data-i18n="help.facade_desc">
+                  Geef aan wanneer de zon op het raam schijnt (bijv. 120° Zuidoost tot 260° West, Zuid = 180°).
+                </div>
+
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                   <div style="flex: 1; min-width: 130px;">
-                    <label for="sun-azimuth-start" data-i18n="label.azimuth_start">Gevel start (°):</label>
+                    <label for="sun-azimuth-start" data-i18n="label.azimuth_start">Zon op raam vanaf (°):</label>
                     <input type="number" id="sun-azimuth-start" min="0" max="360" placeholder="120" />
                   </div>
                   <div style="flex: 1; min-width: 130px;">
-                    <label for="sun-azimuth-end" data-i18n="label.azimuth_end">Gevel eind (°):</label>
+                    <label for="sun-azimuth-end" data-i18n="label.azimuth_end">Zon op raam tot (°):</label>
                     <input type="number" id="sun-azimuth-end" min="0" max="360" placeholder="260" />
                   </div>
                   <div style="flex: 1; min-width: 130px;">
-                    <label for="sun-min-elevation" data-i18n="label.min_elevation">Min. zonhoogte (°):</label>
+                    <label for="sun-min-elevation" data-i18n="label.min_elevation">Min. zonhoogte boven horizon (°):</label>
                     <input type="number" id="sun-min-elevation" min="0" max="90" placeholder="10" />
                   </div>
                 </div>
 
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                   <div style="flex: 1; min-width: 130px;">
-                    <label for="sun-radiation-thresh" data-i18n="label.radiation_threshold">Min. straling (W/m²):</label>
+                    <label for="sun-radiation-thresh" data-i18n="label.radiation_threshold">Min. straling voor zonwering (W/m²):</label>
                     <input type="number" id="sun-radiation-thresh" min="0" max="1200" placeholder="200" />
                   </div>
                   <div style="flex: 1; min-width: 130px;">
