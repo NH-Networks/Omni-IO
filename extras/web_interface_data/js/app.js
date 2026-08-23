@@ -217,6 +217,25 @@
                 );
             });
         }
+
+        // Mobile touch / click toggle for tooltips
+        document.addEventListener("click", function (e) {
+            var tip = e.target.closest(".tip-icon");
+            if (tip) {
+                var wasActive = tip.classList.contains("active");
+                document.querySelectorAll(".tip-icon.active").forEach(function (el) {
+                    el.classList.remove("active");
+                });
+                if (!wasActive) {
+                    tip.classList.add("active");
+                }
+                e.stopPropagation();
+            } else {
+                document.querySelectorAll(".tip-icon.active").forEach(function (el) {
+                    el.classList.remove("active");
+                });
+            }
+        });
     }
 
     // Per-device RAF handle for WebSocket position bursts
