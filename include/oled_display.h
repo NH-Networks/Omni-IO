@@ -9,32 +9,26 @@ void clearDisplayMessages();
 void updateDisplayStatus();
 void wakeDisplay();
 void setDiscoveryDisplay(int seconds);
-void broadcastLog(const String &msg);
 
 bool initDisplay();
 bool isDisplayEnabled();
 void setDisplayEnabled(bool enabled);
 
-// Screensaver timeout (seconds of inactivity before screensaver, default 60)
 uint16_t getScreensaverTimeout();
 void setScreensaverTimeout(uint16_t seconds);
 
-// Screen-off timeout (seconds of inactivity before display off, default 3600)
 uint16_t getScreenOffTimeout();
 void setScreenOffTimeout(uint16_t seconds);
 
-// Dim level: 0 = low (contrast 1), 1 = medium (contrast 64), 2 = high (contrast 200)
 uint8_t getDimLevel();
 void setDimLevel(uint8_t level);
 
-// Show CPU temperature in display header
 bool isCpuTempEnabled();
 void setCpuTempEnabled(bool enabled);
 
 #else
 
 // No-op stubs when no display is present
-#include <Arduino.h>
 #include <cstdint>
 
 inline void display1WAction(const uint8_t *, const char *, const char *, const char * = nullptr) {}
@@ -44,7 +38,6 @@ inline void clearDisplayMessages() {}
 inline void updateDisplayStatus() {}
 inline void wakeDisplay() {}
 inline void setDiscoveryDisplay(int) {}
-inline void broadcastLog(const String &) {}
 
 inline bool initDisplay() { return false; }
 inline bool isDisplayEnabled() { return false; }
