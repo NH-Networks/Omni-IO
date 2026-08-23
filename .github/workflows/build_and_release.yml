@@ -79,19 +79,23 @@ jobs:
       - name: Generate release notes
         run: |
           cat > changelog.md <<EOF
-          Release build for ${{ github.ref_name }}.
+          ## MiOpen.IO Release ${{ github.ref_name }}
 
-          Commit: ${{ github.sha }}
+          ### What's New in v3.2.0
+          - **OLED Display Controls**: Runtime-configurable screensaver timeout (10–3600s), screen-off timeout (0s to disable, or 60–86400s), dim levels (Low, Medium, High), and CPU temperature toggle.
+          - **Multi-language Support (i18n)**: Fully translated Web UI settings in Dutch (NL), English (EN), German (DE), and French (FR).
+          - **Persistent Settings (NVS)**: All display and system preferences are persisted across reboots via ESP32 NVS.
+          - **Optimized CI/CD & Multi-Board Builds**: Automated PlatformIO build pipeline producing ready-to-flash combined binary packages and OTA artifacts for all supported hardware.
 
-          Included files:
-          - LilyGoLoraESP32 combined firmware image
-          - LilyGoLoraESP32 firmware and filesystem images
-          - HeltecLoraV2ESP32 combined firmware image
-          - HeltecLoraV2ESP32 firmware and filesystem images
-          - LilyGoT3S3 combined firmware image
-          - LilyGoT3S3 firmware and filesystem images
-          - LilyGoTBeamV12ESP32 combined firmware image
-          - LilyGoTBeamV12ESP32 firmware and filesystem images
+          ### Supported Hardware
+          - **LilyGo T-Beam v1.2** (\`LilyGoTBeamV12ESP32\`)
+          - **LilyGo LoRa32 v2.1** (\`LilyGoLoraESP32\`)
+          - **Heltec LoRa32 v2** (\`HeltecLoraV2ESP32\`)
+          - **LilyGo T3-S3** (\`LilyGoT3S3\`)
+
+          ### Included Files
+          - Combined flash images (\`*.bin\`): Single-file flash containing bootloader, partition table, firmware, and LittleFS filesystem.
+          - Standalone firmware (\`*_firmware.bin\`) & filesystem (\`*_filesystem.bin\`) for web/OTA update.
           EOF
 
       - name: Release
