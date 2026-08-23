@@ -34,6 +34,7 @@ void setCpuTempEnabled(bool enabled);
 #else
 
 // No-op stubs when no display is present
+#include <Arduino.h>
 #include <cstdint>
 
 inline void display1WAction(const uint8_t *, const char *, const char *, const char * = nullptr) {}
@@ -43,7 +44,7 @@ inline void clearDisplayMessages() {}
 inline void updateDisplayStatus() {}
 inline void wakeDisplay() {}
 inline void setDiscoveryDisplay(int) {}
-inline void broadcastLog(const char *) {}
+inline void broadcastLog(const String &) {}
 
 inline bool initDisplay() { return false; }
 inline bool isDisplayEnabled() { return false; }
