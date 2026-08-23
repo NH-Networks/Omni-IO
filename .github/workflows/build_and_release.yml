@@ -14,28 +14,27 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Setup PlatformIO
-        uses: n-vr/setup-platformio-action@v1
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
       - name: Cache PlatformIO
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
-          path: ~/.platformio
+          path: |
+            ~/.platformio
+            .pio
           key: ${{ runner.os }}-pio-${{ hashFiles('platformio.ini') }}
           restore-keys: ${{ runner.os }}-pio-
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: '3.14'
-
-      - name: install esptools
-        run: pip install -U esptool
+      - name: Install PlatformIO and esptool
+        run: pip install -U platformio esptool
 
       - name: Generate release tag
         id: generate_release_tag
@@ -47,12 +46,12 @@ jobs:
       - name: Build PlatformIO project
         env:
           RELEASE_VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || steps.generate_release_tag.outputs.release_tag }}
-        run: pio run -e LilyGoLoraESP32 -e HeltecLoraV2ESP32 -e LilyGoT3S3
+        run: pio run -e LilyGoLoraESP32 -e HeltecLoraV2ESP32 -e LilyGoT3S3 -e LilyGoTBeamV12ESP32
 
       - name: Build filesystem
         env:
           RELEASE_VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || steps.generate_release_tag.outputs.release_tag }}
-        run: pio run -e LilyGoLoraESP32 -e HeltecLoraV2ESP32 -e LilyGoT3S3 -t buildfs
+        run: pio run -e LilyGoLoraESP32 -e HeltecLoraV2ESP32 -e LilyGoT3S3 -e LilyGoTBeamV12ESP32 -t buildfs
 
       - name: Merge bin files together for LilyGoLoraESP32
         run: esptool --chip esp32 merge-bin -o LilyGoLoraESP32.bin --flash-size 4MB 0x1000 .pio/build/LilyGoLoraESP32/bootloader.bin 0x8000 .pio/build/LilyGoLoraESP32/partitions.bin 0x10000 .pio/build/LilyGoLoraESP32/firmware.bin 0x390000 .pio/build/LilyGoLoraESP32/littlefs.bin
@@ -63,6 +62,9 @@ jobs:
       - name: Merge bin files together for LilyGoT3S3
         run: esptool --chip esp32s3 merge-bin -o LilyGoT3S3.bin --flash-size 4MB 0x0 .pio/build/LilyGoT3S3/bootloader.bin 0x8000 .pio/build/LilyGoT3S3/partitions.bin 0x10000 .pio/build/LilyGoT3S3/firmware.bin 0x390000 .pio/build/LilyGoT3S3/littlefs.bin
 
+      - name: Merge bin files together for LilyGoTBeamV12ESP32
+        run: esptool --chip esp32 merge-bin -o LilyGoTBeamV12ESP32.bin --flash-size 4MB 0x1000 .pio/build/LilyGoTBeamV12ESP32/bootloader.bin 0x8000 .pio/build/LilyGoTBeamV12ESP32/partitions.bin 0x10000 .pio/build/LilyGoTBeamV12ESP32/firmware.bin 0x390000 .pio/build/LilyGoTBeamV12ESP32/littlefs.bin
+
       - name: Prepare firmware and littlefs files for release
         run: |
           mv .pio/build/LilyGoLoraESP32/firmware.bin LilyGoLoraESP32_firmware.bin
@@ -71,11 +73,13 @@ jobs:
           mv .pio/build/HeltecLoraV2ESP32/littlefs.bin HeltecLoraV2ESP32_filesystem.bin
           mv .pio/build/LilyGoT3S3/firmware.bin LilyGoT3S3_firmware.bin
           mv .pio/build/LilyGoT3S3/littlefs.bin LilyGoT3S3_filesystem.bin
+          mv .pio/build/LilyGoTBeamV12ESP32/firmware.bin LilyGoTBeamV12ESP32_firmware.bin
+          mv .pio/build/LilyGoTBeamV12ESP32/littlefs.bin LilyGoTBeamV12ESP32_filesystem.bin
 
       - name: Generate release notes
         run: |
           cat > changelog.md <<EOF
-          Beta release build for ${{ github.ref_name }}.
+          Release build for ${{ github.ref_name }}.
 
           Commit: ${{ github.sha }}
 
@@ -86,10 +90,12 @@ jobs:
           - HeltecLoraV2ESP32 firmware and filesystem images
           - LilyGoT3S3 combined firmware image
           - LilyGoT3S3 firmware and filesystem images
+          - LilyGoTBeamV12ESP32 combined firmware image
+          - LilyGoTBeamV12ESP32 firmware and filesystem images
           EOF
 
       - name: Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@v2
         with:
           name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || steps.generate_release_tag.outputs.release_tag }}
           body_path: changelog.md
@@ -105,9 +111,12 @@ jobs:
             LilyGoT3S3.bin
             LilyGoT3S3_firmware.bin
             LilyGoT3S3_filesystem.bin
+            LilyGoTBeamV12ESP32.bin
+            LilyGoTBeamV12ESP32_firmware.bin
+            LilyGoTBeamV12ESP32_filesystem.bin
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: build-artifacts
           path: |
@@ -120,4 +129,7 @@ jobs:
             LilyGoT3S3.bin
             LilyGoT3S3_firmware.bin
             LilyGoT3S3_filesystem.bin
+            LilyGoTBeamV12ESP32.bin
+            LilyGoTBeamV12ESP32_firmware.bin
+            LilyGoTBeamV12ESP32_filesystem.bin
             changelog.md

@@ -2,6 +2,8 @@ import subprocess
 import os
 
 def get_version():
+    if os.environ.get("RELEASE_VERSION"):
+        return os.environ.get("RELEASE_VERSION")
     if os.environ.get("GITHUB_REF_TYPE") == "tag" and os.environ.get("GITHUB_REF_NAME"):
         return os.environ.get("GITHUB_REF_NAME")
     try:
