@@ -14,15 +14,19 @@ bool initDisplay();
 bool isDisplayEnabled();
 void setDisplayEnabled(bool enabled);
 
+// Screensaver timeout (seconds of inactivity before screensaver, default 60)
 uint16_t getScreensaverTimeout();
 void setScreensaverTimeout(uint16_t seconds);
 
+// Screen-off timeout (seconds of inactivity before display off, default 3600)
 uint16_t getScreenOffTimeout();
 void setScreenOffTimeout(uint16_t seconds);
 
+// Dim level: 0 = low (contrast 1), 1 = medium (contrast 64), 2 = high (contrast 200)
 uint8_t getDimLevel();
 void setDimLevel(uint8_t level);
 
+// Show CPU temperature in display header
 bool isCpuTempEnabled();
 void setCpuTempEnabled(bool enabled);
 
