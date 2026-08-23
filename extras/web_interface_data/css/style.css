@@ -749,3 +749,43 @@ footer p {
   display: grid;
   gap: 8px;
 }
+
+/* Sun Automation */
+.sun-metric-box {
+  background: rgba(90, 110, 140, 0.08);
+  border: 1px solid var(--color7);
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.sun-metric-box:hover {
+  background: rgba(90, 110, 140, 0.14);
+  transform: translateY(-1px);
+}
+.dark-mode .sun-metric-box {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+#sun-condition-badge {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: background-color 0.3s ease;
+}
+#sun-screens-list label {
+  background: rgba(0, 0, 0, 0.03);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--color7);
+  transition: background 0.15s ease;
+}
+#sun-screens-list label:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+.dark-mode #sun-screens-list label {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.dark-mode #sun-screens-list label:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+

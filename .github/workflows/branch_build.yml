@@ -7,6 +7,7 @@ on:
       - master
       - dev-main
       - Beta
+      - 'feature/**'
 
 jobs:
   build:

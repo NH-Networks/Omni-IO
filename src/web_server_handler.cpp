@@ -30,6 +30,7 @@ constexpr time_t MIN_VALID_NTP_EPOCH = 1600000000; // ~Sept 2020
 #include <syslog_helper.h>
 #endif
 #include <tokens.h>
+#include <sun_helper.h>
 
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
@@ -1205,6 +1206,83 @@ void handleApiMqttSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObjec
 }
 #endif
 
+void handleApiSunGet(AsyncWebServerRequest *request, JsonObject &root) {
+  SunHelper *sun = SunHelper::getInstance();
+  const SunConfig &cfg = sun->getConfig();
+  const SunMetrics &met = sun->getMetrics();
+
+  JsonObject configObj = root.createNestedObject("config");
+  configObj["enabled"] = cfg.enabled;
+  configObj["latitude"] = cfg.latitude;
+  configObj["longitude"] = cfg.longitude;
+  configObj["azimuthStart"] = cfg.azimuthStart;
+  configObj["azimuthEnd"] = cfg.azimuthEnd;
+  configObj["minElevation"] = cfg.minElevation;
+  configObj["radiationThreshold"] = cfg.radiationThreshold;
+  configObj["maxCloudCover"] = cfg.maxCloudCover;
+  configObj["sunOnDelayMin"] = cfg.sunOnDelayMin;
+  configObj["sunOffDelayMin"] = cfg.sunOffDelayMin;
+  configObj["maxWindSpeed"] = cfg.maxWindSpeed;
+  configObj["nightAutoOpen"] = cfg.nightAutoOpen;
+
+  JsonObject screensObj = configObj.createNestedObject("screens");
+  for (const auto &kv : cfg.enabledScreens) {
+    screensObj[kv.first] = kv.second;
+  }
+
+  JsonObject metricsObj = root.createNestedObject("metrics");
+  metricsObj["elevation"] = met.elevation;
+  metricsObj["azimuth"] = met.azimuth;
+  metricsObj["directRadiation"] = met.directRadiation;
+  metricsObj["cloudCover"] = met.cloudCover;
+  metricsObj["temperature"] = met.temperature;
+  metricsObj["windSpeed"] = met.windSpeed;
+  metricsObj["isDay"] = met.isDay;
+  metricsObj["lastUpdateEpoch"] = met.lastUpdateEpoch;
+
+  root["condition"] = sun->getConditionString();
+  root["actionActive"] = sun->isActionActive();
+  root["sunnyElapsedSec"] = sun->getSunnyElapsedSeconds();
+  root["cloudyElapsedSec"] = sun->getCloudyElapsedSeconds();
+  root["countdownSec"] = sun->getNextActionCountdownSeconds();
+}
+
+void handleApiSunSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
+  SunHelper *sun = SunHelper::getInstance();
+  SunConfig cfg = sun->getConfig();
+
+  if (doc.containsKey("enabled")) cfg.enabled = doc["enabled"].as<bool>();
+  if (doc.containsKey("latitude")) cfg.latitude = doc["latitude"].as<float>();
+  if (doc.containsKey("longitude")) cfg.longitude = doc["longitude"].as<float>();
+  if (doc.containsKey("azimuthStart")) cfg.azimuthStart = doc["azimuthStart"].as<float>();
+  if (doc.containsKey("azimuthEnd")) cfg.azimuthEnd = doc["azimuthEnd"].as<float>();
+  if (doc.containsKey("minElevation")) cfg.minElevation = doc["minElevation"].as<float>();
+  if (doc.containsKey("radiationThreshold")) cfg.radiationThreshold = doc["radiationThreshold"].as<float>();
+  if (doc.containsKey("maxCloudCover")) cfg.maxCloudCover = doc["maxCloudCover"].as<float>();
+  if (doc.containsKey("sunOnDelayMin")) cfg.sunOnDelayMin = doc["sunOnDelayMin"].as<uint16_t>();
+  if (doc.containsKey("sunOffDelayMin")) cfg.sunOffDelayMin = doc["sunOffDelayMin"].as<uint16_t>();
+  if (doc.containsKey("maxWindSpeed")) cfg.maxWindSpeed = doc["maxWindSpeed"].as<float>();
+  if (doc.containsKey("nightAutoOpen")) cfg.nightAutoOpen = doc["nightAutoOpen"].as<bool>();
+
+  if (doc.containsKey("screens") && doc["screens"].is<JsonObject>()) {
+    JsonObject screens = doc["screens"].as<JsonObject>();
+    for (JsonPair kv : screens) {
+      cfg.enabledScreens[kv.key().c_str()] = kv.value().as<bool>();
+    }
+  }
+
+  sun->setConfig(cfg);
+
+  root["success"] = true;
+  root["message"] = "Sun automation settings saved";
+}
+
+void handleApiSunEvaluate(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
+  SunHelper::getInstance()->evaluateNow();
+  root["success"] = true;
+  root["message"] = "Sun automation evaluation triggered";
+}
+
 void handleFirmwareUpdate(AsyncWebServerRequest *request) {
   if (Update.hasError()) {
     request->send(500, "application/json",
@@ -1346,6 +1424,9 @@ void setupWebServer() {
   server.on("/api/syslog/test", HTTP_POST, jsonPost(handleApiSyslogTest));
   server.on("/api/syslog", HTTP_POST, jsonPost(handleApiSyslogSet));
 #endif
+  server.on("/api/sun", HTTP_GET, jsonGet(handleApiSunGet));
+  server.on("/api/sun", HTTP_POST, jsonPost(handleApiSunSet));
+  server.on("/api/sun/evaluate", HTTP_POST, jsonPost(handleApiSunEvaluate));
   server.on("/api/firmware", HTTP_POST, handleFirmwareUpdate,
             handleFirmwareUpload);
   server.on("/api/filesystem", HTTP_POST, handleFilesystemUpdate,
