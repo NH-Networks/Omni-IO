@@ -305,6 +305,7 @@
             app.elements.fallbackSaveButton.disabled = false;
         }
     }
+
     async function loadDisplayConfig(app) {
         if (!app.elements.displayEnabledInput) {
             return;
@@ -319,6 +320,23 @@
             const config = await window.MiOpenApi.requestJson("/api/display");
             const enabled = config.enabled !== false;
             app.elements.displayEnabledInput.checked = enabled;
+
+            if (app.elements.displayScreensaverTimeoutInput) {
+                app.elements.displayScreensaverTimeoutInput.value =
+                    config.screensaverTimeout !== undefined ? config.screensaverTimeout : 60;
+            }
+            if (app.elements.displayOffTimeoutInput) {
+                app.elements.displayOffTimeoutInput.value =
+                    config.screenOffTimeout !== undefined ? config.screenOffTimeout : 3600;
+            }
+            if (app.elements.displayDimLevelSelect) {
+                app.elements.displayDimLevelSelect.value =
+                    config.dimLevel !== undefined ? String(config.dimLevel) : "0";
+            }
+            if (app.elements.displayCpuTempInput) {
+                app.elements.displayCpuTempInput.checked = config.showCpuTemp !== false;
+            }
+
             setDisplayStatus(
                 app,
                 enabled
@@ -353,9 +371,27 @@
             app.i18nText("status.display_saving", "Saving display setting...")
         );
         try {
-            const result = await window.MiOpenApi.postJson("/api/display", {
+            const payload = {
                 enabled: requestedEnabled
-            });
+            };
+
+            if (app.elements.displayScreensaverTimeoutInput) {
+                const ssVal = parseInt(app.elements.displayScreensaverTimeoutInput.value, 10);
+                if (!isNaN(ssVal)) payload.screensaverTimeout = ssVal;
+            }
+            if (app.elements.displayOffTimeoutInput) {
+                const offVal = parseInt(app.elements.displayOffTimeoutInput.value, 10);
+                if (!isNaN(offVal)) payload.screenOffTimeout = offVal;
+            }
+            if (app.elements.displayDimLevelSelect) {
+                const dimVal = parseInt(app.elements.displayDimLevelSelect.value, 10);
+                payload.dimLevel = isNaN(dimVal) ? 0 : dimVal;
+            }
+            if (app.elements.displayCpuTempInput) {
+                payload.showCpuTemp = app.elements.displayCpuTempInput.checked;
+            }
+
+            const result = await window.MiOpenApi.postJson("/api/display", payload);
             const enabled = result.enabled !== false;
             app.elements.displayEnabledInput.checked = enabled;
             setSettingsStatus(
@@ -538,25 +574,30 @@
 
         function activate(name) {
             tabs.forEach(function (tab) {
-                tab.classList.toggle("active", tab.dataset.settingsTab === name);
+                const isActive = tab.dataset.settingsTab === name;
+                tab.classList.toggle("active", isActive);
             });
             panels.forEach(function (panel) {
                 const isActive = panel.dataset.settingsPanel === name;
                 panel.classList.toggle("active", isActive);
-                panel.hidden = !isActive;
+                if (isActive) {
+                    panel.removeAttribute("hidden");
+                    panel.style.setProperty("display", "grid", "important");
+                } else {
+                    panel.setAttribute("hidden", "hidden");
+                    panel.style.setProperty("display", "none", "important");
+                }
             });
         }
 
         tabs.forEach(function (tab) {
-            tab.addEventListener("click", function () {
+            tab.addEventListener("click", function (e) {
+                if (e && typeof e.preventDefault === "function") e.preventDefault();
                 activate(tab.dataset.settingsTab);
             });
         });
 
-        const activeTab = tabs.find(function (tab) {
-            return tab.classList.contains("active");
-        });
-        activate(activeTab ? activeTab.dataset.settingsTab : "integration");
+        activate("integration");
     }
 
     let restartInFlight = false;
@@ -605,6 +646,252 @@
                 restartDevice(app, restartButton);
             });
         }
+    }
+
+    let sunScreensCache = {};
+    let sunIntervalTimer = null;
+
+    function renderSunScreensList(app, remotes, currentConfig) {
+        if (!app.elements.sunScreensList) return;
+        const list = app.elements.sunScreensList;
+        list.innerHTML = "";
+
+        if (!remotes || remotes.length === 0) {
+            list.innerHTML = `<p style="font-size: 0.85em; opacity: 0.7;">${app.i18nText("help.no_screens_found", "Geen schermen gevonden.")}</p>`;
+            return;
+        }
+
+        const savedScreens = (currentConfig && currentConfig.screens) || sunScreensCache;
+
+        remotes.forEach(function (r) {
+            const desc = r.description || r.address || "";
+            const name = r.name || desc;
+            const isChecked = savedScreens[desc] !== undefined ? savedScreens[desc] : true;
+
+            const row = document.createElement("label");
+            row.style.display = "flex";
+            row.style.alignItems = "center";
+            row.style.gap = "8px";
+            row.style.fontSize = "0.9em";
+            row.style.cursor = "pointer";
+
+            const cb = document.createElement("input");
+            cb.type = "checkbox";
+            cb.checked = isChecked;
+            cb.dataset.sunScreenDesc = desc;
+            cb.style.margin = "0";
+
+            const span = document.createElement("span");
+            span.textContent = `${name} (${desc})`;
+
+            row.appendChild(cb);
+            row.appendChild(span);
+            list.appendChild(row);
+        });
+    }
+
+    function renderSunMetrics(app, data) {
+        if (!data || !app.elements.sunConditionBadge) return;
+        const met = data.metrics || {};
+        const cond = data.condition || "disabled";
+        const isActive = data.actionActive || false;
+        const countdown = data.countdownSec || 0;
+
+        function getCompassName(deg) {
+            if (deg === undefined || isNaN(deg)) return "-";
+            const d = (deg % 360 + 360) % 360;
+            const dirs = ["N", "NNO", "NO", "ONO", "O", "OZO", "ZO", "ZZO", "Z", "ZZW", "ZW", "WZW", "W", "WNW", "NW", "NNW"];
+            const idx = Math.round(d / 22.5) % 16;
+            return `${d.toFixed(0)}° (${dirs[idx]})`;
+        }
+
+        if (app.elements.sunMetricRadiation) {
+            app.elements.sunMetricRadiation.textContent = (met.directRadiation !== undefined ? Math.round(met.directRadiation) : "-") + " W/m²";
+        }
+        if (app.elements.sunMetricCloud) {
+            app.elements.sunMetricCloud.textContent = (met.cloudCover !== undefined ? Math.round(met.cloudCover) : "-") + "%";
+        }
+        if (app.elements.sunMetricElevation) {
+            app.elements.sunMetricElevation.textContent = (met.elevation !== undefined ? met.elevation.toFixed(1) : "-") + "°";
+        }
+        if (app.elements.sunMetricAzimuth) {
+            app.elements.sunMetricAzimuth.textContent = getCompassName(met.azimuth);
+        }
+        if (app.elements.sunMetricWind) {
+            app.elements.sunMetricWind.textContent = (met.windSpeed !== undefined ? met.windSpeed.toFixed(1) : "-") + " km/h";
+        }
+        if (app.elements.sunMetricTemp) {
+            app.elements.sunMetricTemp.textContent = (met.temperature !== undefined ? met.temperature.toFixed(1) : "-") + " °C";
+        }
+
+        const badge = app.elements.sunConditionBadge;
+        const desc = app.elements.sunActionDesc;
+
+        let badgeText = "";
+        let badgeColor = "#5A6E8C";
+        let descText = "";
+
+        switch (cond) {
+            case "disabled":
+                badgeText = app.i18nText("sun_state.disabled", "Uitgeschakeld");
+                badgeColor = "#777";
+                descText = app.i18nText("sun_state.disabled_desc", "Zon automatisering staat uit.");
+                break;
+            case "sunny":
+                badgeText = app.i18nText("sun_state.sunny", "☀️ Volle zon op gevel");
+                badgeColor = "#d97706";
+                if (isActive) {
+                    descText = app.i18nText("sun_state.screens_closed", "Schermen zijn automatisch gesloten voor de zon.");
+                } else if (countdown > 0) {
+                    const min = Math.ceil(countdown / 60);
+                    descText = app.i18nText("sun_state.closing_in", `Zon gedetecteerd. Sluiten over ${min} min...`);
+                } else {
+                    descText = app.i18nText("sun_state.sun_active", "Zon actief.");
+                }
+                break;
+            case "cloudy":
+                badgeText = app.i18nText("sun_state.cloudy", "⛅ Bewolkt / Lage straling");
+                badgeColor = "#4b5563";
+                if (isActive && countdown > 0) {
+                    const min = Math.ceil(countdown / 60);
+                    descText = app.i18nText("sun_state.opening_in", `Zon weggevallen. Schermen openen over ${min} min...`);
+                } else {
+                    descText = app.i18nText("sun_state.screens_open", "Schermen geopend (geen zonbelasting).");
+                }
+                break;
+            case "outside_facade":
+                badgeText = app.i18nText("sun_state.outside_facade", "🧭 Zon buiten bereik gevel");
+                badgeColor = "#6b7280";
+                if (isActive && countdown > 0) {
+                    const min = Math.ceil(countdown / 60);
+                    descText = app.i18nText("sun_state.opening_in", `Zon voorbij gevel. Schermen openen over ${min} min...`);
+                } else {
+                    descText = app.i18nText("sun_state.outside_desc", "Zon schijnt niet rechtstreeks op deze gevel.");
+                }
+                break;
+            case "night":
+                badgeText = app.i18nText("sun_state.night", "🌙 Nacht / Zonsondergang");
+                badgeColor = "#374151";
+                descText = app.i18nText("sun_state.night_desc", "Zon is onder de horizon.");
+                break;
+            case "wind_alert":
+                badgeText = app.i18nText("sun_state.wind_alert", "💨 Windbeveiliging actief");
+                badgeColor = "#dc2626";
+                descText = app.i18nText("sun_state.wind_desc", "Harde wind gedetecteerd! Schermen zijn ingetrokken voor veiligheid.");
+                break;
+            default:
+                badgeText = cond;
+                badgeColor = "#5A6E8C";
+                descText = "";
+        }
+
+        badge.textContent = badgeText;
+        badge.style.background = badgeColor;
+        if (desc) desc.textContent = descText;
+    }
+
+    async function loadSunConfig(app) {
+        try {
+            const data = await window.MiOpenApi.requestJson("/api/sun");
+            const cfg = data.config || {};
+            if (app.elements.sunEnabledInput) app.elements.sunEnabledInput.checked = !!cfg.enabled;
+            if (app.elements.sunLatInput && cfg.latitude !== undefined) app.elements.sunLatInput.value = cfg.latitude;
+            if (app.elements.sunLonInput && cfg.longitude !== undefined) app.elements.sunLonInput.value = cfg.longitude;
+            if (app.elements.sunAzimuthStartInput && cfg.azimuthStart !== undefined) app.elements.sunAzimuthStartInput.value = cfg.azimuthStart;
+            if (app.elements.sunAzimuthEndInput && cfg.azimuthEnd !== undefined) app.elements.sunAzimuthEndInput.value = cfg.azimuthEnd;
+            if (app.elements.sunMinElevationInput && cfg.minElevation !== undefined) app.elements.sunMinElevationInput.value = cfg.minElevation;
+            if (app.elements.sunRadiationThreshInput && cfg.radiationThreshold !== undefined) app.elements.sunRadiationThreshInput.value = cfg.radiationThreshold;
+            if (app.elements.sunCloudThreshInput && cfg.maxCloudCover !== undefined) app.elements.sunCloudThreshInput.value = cfg.maxCloudCover;
+            if (app.elements.sunDelayOnInput && cfg.sunOnDelayMin !== undefined) app.elements.sunDelayOnInput.value = cfg.sunOnDelayMin;
+            if (app.elements.sunDelayOffInput && cfg.sunOffDelayMin !== undefined) app.elements.sunDelayOffInput.value = cfg.sunOffDelayMin;
+            if (app.elements.sunMaxWindInput && cfg.maxWindSpeed !== undefined) app.elements.sunMaxWindInput.value = cfg.maxWindSpeed;
+            if (app.elements.sunWindActionSelect && cfg.windAction !== undefined) app.elements.sunWindActionSelect.value = cfg.windAction;
+            if (app.elements.sunNightAutoOpenInput) app.elements.sunNightAutoOpenInput.checked = cfg.nightAutoOpen !== undefined ? !!cfg.nightAutoOpen : true;
+
+            sunScreensCache = cfg.screens || {};
+
+            // Fetch and render screen list
+            const remotes = await window.MiOpenApi.requestJson("/api/remotes").catch(() => []);
+            renderSunScreensList(app, remotes, cfg);
+
+            renderSunMetrics(app, data);
+
+            if (!sunIntervalTimer) {
+                sunIntervalTimer = setInterval(function () {
+                    const sunPanel = document.querySelector('[data-settings-panel="sun"]');
+                    if (sunPanel && sunPanel.classList.contains("active")) {
+                        window.MiOpenApi.requestJson("/api/sun").then(function (d) {
+                            renderSunMetrics(app, d);
+                        }).catch(function () {});
+                    }
+                }, 15000);
+            }
+        } catch (e) {
+            console.error("loadSunConfig error", e);
+        }
+    }
+
+    async function saveSunConfig(app) {
+        const screens = {};
+        if (app.elements.sunScreensList) {
+            const checkboxes = app.elements.sunScreensList.querySelectorAll("input[data-sun-screen-desc]");
+            checkboxes.forEach(function (cb) {
+                const desc = cb.dataset.sunScreenDesc;
+                if (desc) screens[desc] = cb.checked;
+            });
+        }
+
+        const payload = {
+            enabled: app.elements.sunEnabledInput ? app.elements.sunEnabledInput.checked : false,
+            latitude: app.elements.sunLatInput ? parseFloat(app.elements.sunLatInput.value) || 52.3676 : 52.3676,
+            longitude: app.elements.sunLonInput ? parseFloat(app.elements.sunLonInput.value) || 4.9041 : 4.9041,
+            azimuthStart: app.elements.sunAzimuthStartInput ? parseFloat(app.elements.sunAzimuthStartInput.value) || 120 : 120,
+            azimuthEnd: app.elements.sunAzimuthEndInput ? parseFloat(app.elements.sunAzimuthEndInput.value) || 260 : 260,
+            minElevation: app.elements.sunMinElevationInput ? parseFloat(app.elements.sunMinElevationInput.value) || 10 : 10,
+            radiationThreshold: app.elements.sunRadiationThreshInput ? parseFloat(app.elements.sunRadiationThreshInput.value) || 200 : 200,
+            maxCloudCover: app.elements.sunCloudThreshInput ? parseFloat(app.elements.sunCloudThreshInput.value) || 75 : 75,
+            sunOnDelayMin: app.elements.sunDelayOnInput ? parseInt(app.elements.sunDelayOnInput.value, 10) || 5 : 5,
+            sunOffDelayMin: app.elements.sunDelayOffInput ? parseInt(app.elements.sunDelayOffInput.value, 10) || 15 : 15,
+            maxWindSpeed: app.elements.sunMaxWindInput ? parseFloat(app.elements.sunMaxWindInput.value) || 35 : 35,
+            windAction: app.elements.sunWindActionSelect ? app.elements.sunWindActionSelect.value : "open",
+            nightAutoOpen: app.elements.sunNightAutoOpenInput ? app.elements.sunNightAutoOpenInput.checked : true,
+            screens: screens
+        };
+
+        setSettingsStatus(app, app.i18nText("status.saving", "Opslaan..."));
+        try {
+            await window.MiOpenApi.postJson("/api/sun", payload);
+            setSettingsStatus(app, app.i18nText("status.sun_saved", "Zon automatisering instellingen opgeslagen!"), false, 4000);
+            await loadSunConfig(app);
+        } catch (e) {
+            setSettingsStatus(app, app.i18nText("status.error_saving", "Fout bij opslaan: ") + (e.message || e), true, 6000);
+        }
+    }
+
+    async function evaluateSunNow(app) {
+        setSettingsStatus(app, app.i18nText("status.measuring", "Meting ophalen en evalueren..."));
+        try {
+            await window.MiOpenApi.postJson("/api/sun/evaluate", {});
+            setSettingsStatus(app, app.i18nText("status.measured", "Meting voltooid!"), false, 3000);
+            await loadSunConfig(app);
+        } catch (e) {
+            setSettingsStatus(app, app.i18nText("status.error_measuring", "Fout bij meting: ") + (e.message || e), true, 6000);
+        }
+    }
+
+    function geolocateUser(app) {
+        if (!navigator.geolocation) {
+            alert(app.i18nText("error.geolocation_not_supported", "Geolocatie wordt niet ondersteund door deze browser."));
+            return;
+        }
+        setSettingsStatus(app, app.i18nText("status.geolocating", "GPS-locatie bepalen..."));
+        navigator.geolocation.getCurrentPosition(function (pos) {
+            if (app.elements.sunLatInput) app.elements.sunLatInput.value = pos.coords.latitude.toFixed(4);
+            if (app.elements.sunLonInput) app.elements.sunLonInput.value = pos.coords.longitude.toFixed(4);
+            setSettingsStatus(app, app.i18nText("status.geolocated", "Locatie succesvol ingevuld!"), false, 3000);
+        }, function (err) {
+            setSettingsStatus(app, app.i18nText("status.geolocate_failed", "Locatiebepaling mislukt: ") + err.message, true, 5000);
+        });
     }
 
     function init(app) {
@@ -658,6 +945,18 @@
         };
         app.sendSyslogTest = function () {
             return sendSyslogTest(app);
+        };
+        app.loadSunConfig = function () {
+            return loadSunConfig(app);
+        };
+        app.saveSunConfig = function () {
+            return saveSunConfig(app);
+        };
+        app.evaluateSunNow = function () {
+            return evaluateSunNow(app);
+        };
+        app.geolocateUser = function () {
+            return geolocateUser(app);
         };
 
         app.uploadFirmware = function () {

@@ -16,6 +16,10 @@
 
 #include <user_config.h>
 #if defined(SSD1306_DISPLAY)
+#include <board-config.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <Wire.h>
 #include <oled_display.h>
 #include <iohcCryptoHelpers.h>
 #include <iohcRemoteMap.h>
@@ -26,9 +30,21 @@
 #include <nvs_helpers.h>
 #include <atomic>
 #include <chrono>
+#include <cstdio>
+#include <string>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/semphr.h>
+
+// OLED screen dimensions
+#define SCREEN_WIDTH  128
+#define SCREEN_HEIGHT  64
+
+// Map board I2C pins to OLED names
+#define OLED_SDA     I2C_SDA_PIN
+#define OLED_SCL     I2C_SCL_PIN
+#define OLED_RST     DISPLAY_OLED_RST_PIN
+#define OLED_ADDRESS 0x3C
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RST);
 DisplayBuffer displayBuffer;
@@ -43,8 +59,46 @@ void displayTask(void *);
 
 const int MILLIS_BETWEEN_DISPLAY_UPDATE_SLOW = 5000;
 const int MILLIS_BETWEEN_DISPLAY_UPDATE_FAST = 100;
-const int SECONDS_BEFORE_SCREENSAVER = 60;
-const int SECONDS_BEFORE_SCREEN_OFF = 3600; // 60 minutes
+
+// Runtime-configurable display settings
+static std::atomic<uint16_t> screensaverTimeout{60};    // seconds
+static std::atomic<uint16_t> screenOffTimeout{3600};    // seconds
+static std::atomic<uint8_t>  dimLevel{0};               // 0=low,1=med,2=high
+static std::atomic<bool>     cpuTempEnabled{true};
+
+// Map dim level to SSD1306 contrast byte
+static uint8_t dimLevelToContrast(uint8_t level) {
+    switch (level) {
+        case 2:  return 200;
+        case 1:  return 64;
+        default: return 1;
+    }
+}
+
+uint16_t getScreensaverTimeout() { return screensaverTimeout.load(); }
+void setScreensaverTimeout(uint16_t seconds) {
+    screensaverTimeout = seconds;
+    nvs_write_u16(NVS_KEY_DISPLAY_SCREENSAVER, seconds);
+}
+
+uint16_t getScreenOffTimeout() { return screenOffTimeout.load(); }
+void setScreenOffTimeout(uint16_t seconds) {
+    screenOffTimeout = seconds;
+    nvs_write_u16(NVS_KEY_DISPLAY_SCREENOFF, seconds);
+}
+
+uint8_t getDimLevel() { return dimLevel.load(); }
+void setDimLevel(uint8_t level) {
+    if (level > 2) level = 2;
+    dimLevel = level;
+    nvs_write_u16(NVS_KEY_DISPLAY_DIM, level);
+}
+
+bool isCpuTempEnabled() { return cpuTempEnabled.load(); }
+void setCpuTempEnabled(bool enabled) {
+    cpuTempEnabled = enabled;
+    nvs_write_bool(NVS_KEY_DISPLAY_CPUTEMP, enabled);
+}
 
 const uint8_t PROGMEM miopenioLogo[] =
 {
@@ -158,14 +212,33 @@ bool initDisplay() {
         displayEnabled = enabled;
     }
 
+    uint16_t ssSecs = 60;
+    if (nvs_read_u16(NVS_KEY_DISPLAY_SCREENSAVER, ssSecs)) {
+        screensaverTimeout = ssSecs;
+    }
+
+    uint16_t offSecs = 3600;
+    if (nvs_read_u16(NVS_KEY_DISPLAY_SCREENOFF, offSecs)) {
+        screenOffTimeout = offSecs;
+    }
+
+    uint16_t dim = 0;
+    if (nvs_read_u16(NVS_KEY_DISPLAY_DIM, dim)) {
+        dimLevel = static_cast<uint8_t>(dim > 2 ? 0 : dim);
+    }
+
+    bool showTemp = true;
+    if (nvs_read_bool(NVS_KEY_DISPLAY_CPUTEMP, showTemp)) {
+        cpuTempEnabled = showTemp;
+    }
+
     Wire.begin(OLED_SDA, OLED_SCL);
     if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDRESS)) {
         return false;
     }
-    
-    // Dim the screen to reduce power consumption and heat
+
     display.ssd1306_command(SSD1306_SETCONTRAST);
-    display.ssd1306_command(1); // Set contrast to a low value instead of 0
+    display.ssd1306_command(1);
 
     if (xTaskCreatePinnedToCore(displayTask, "DisplayTask", 4096, nullptr, 1,
                                 &displayTaskHandle, tskNO_AFFINITY) != pdPASS) {
@@ -192,21 +265,28 @@ int getSecondsSinceNoData() {
     return (esp_timer_get_time() - lastDataTime.load()) / 1000000LL;
 }
 
-const char* getRemoteName(const uint8_t *remote, const char *name) {
-    if (name) return name;
-    
-    const auto *entry = IOHC::iohcRemoteMap::getInstance()->find(remote);
-    if (entry) return entry->name.c_str();
+// Returns a stable std::string to avoid dangling-pointer when falling back to hex
+static std::string getRemoteName(const uint8_t *remote, const char *name) {
+    if (name) return std::string(name);
 
-    return bytesToHexString(remote, 3).c_str();
+    const auto *entry = IOHC::iohcRemoteMap::getInstance()->find(remote);
+    if (entry) return entry->name;
+
+    return bytesToHexString(remote, 3);
 }
 
 void display1WAction(const uint8_t *remote, const char *action, const char *dir, const char *name) {
-    displayCustomMessage(format("%s: %s", dir, getRemoteName(remote, name)).c_str(), action);
+    char buf[64];
+    const std::string remoteName = getRemoteName(remote, name);
+    snprintf(buf, sizeof(buf), "%s: %s", dir, remoteName.c_str());
+    displayCustomMessage(buf, action);
 }
 
 void display1WPosition(const uint8_t *remote, float position, const char *name) {
-    displayCustomMessage(getRemoteName(remote, name), format("%d%%", static_cast<int>(position)).c_str());
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%d%%", static_cast<int>(position));
+    const std::string remoteName = getRemoteName(remote, name);
+    displayCustomMessage(remoteName.c_str(), buf);
 }
 
 void displayCustomMessage(const char* message, const char* status) {
@@ -230,7 +310,6 @@ void clearDisplayMessages() {
     lastDataTime.store(esp_timer_get_time());
     setTimerSpeed(slow);
 }
-
 
 void updateDisplayStatus() {
     if (!displayEnabled.load()) {
@@ -281,7 +360,6 @@ void setDisplayEnabled(bool enabled) {
 }
 
 void drawLogo(int x, int y) {
-    // miopenio logo is 16x10
     display.drawBitmap(x+1, y+1, miopenioLogo, 16, 10, SSD1306_WHITE);
     display.setCursor(x+20, y+4);
     display.print("MiOpen.IO");
@@ -291,24 +369,22 @@ void drawHeader() {
     drawLogo(0, 0);
 
 #if defined(MQTT)
-    // mqtt icon is 16x5 (including 3 pixels space, so adding 1 extra for a reasonable space)
     const auto mqttIcon = mqttIcons[mqttStatusToIconIndex()];
     display.drawBitmap(127-8-1-16, 5, mqttIcon, 16, 5, SSD1306_WHITE);
-#endif // MQTT
+#endif
 
-    // wifi icon is 8x7
     const auto wifiIcon = wifiIcons[min(wifiStatus.signalStrengthPercent.load(), 99) / 25];
     display.drawBitmap(127-8, 3, wifiIcon, 8, 7, SSD1306_WHITE);
 
-    // CPU Temperature
-    display.setCursor(82, 4);
-    display.printf("%.0fC", temperatureRead());
+    if (cpuTempEnabled.load()) {
+        display.setCursor(82, 4);
+        display.printf("%.0fC", temperatureRead());
+    }
 }
 
 void drawFooter() {
     if (wifiStatus.connectionStatus == ConnState::Connected) {
         display.setCursor(1, 56);
-        // every 10 seconds alternate between url and ip
         if (getSecondsSinceStart() / 10 % 2 == 0) {
             display.println("http://miopenio.local");
         } else {
@@ -350,18 +426,20 @@ void drawData(const std::vector<std::string>& currentLines) {
 }
 
 void drawLogo() {
-    // draw logo and text at random position to avoid burn-in
-    const int x = 50.0 * std::rand() / RAND_MAX; // number between 0 and 50
-    const int y = 30.0 * std::rand() / RAND_MAX; // adjusted max y to 30 to fit text
+    const int x = 50.0 * std::rand() / RAND_MAX;
+    const int y = 30.0 * std::rand() / RAND_MAX;
     drawLogo(x, y);
-    
+
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
-    display.setCursor(x, y + 16);
-    display.printf("CPU: %.0fC", temperatureRead());
-    
+
+    if (cpuTempEnabled.load()) {
+        display.setCursor(x, y + 16);
+        display.printf("CPU: %.0fC", temperatureRead());
+    }
+
     if (wifiStatus.connectionStatus == ConnState::Connected) {
-        display.setCursor(x, y + 26);
+        display.setCursor(x, y + (cpuTempEnabled.load() ? 26 : 16));
         display.print(WiFi.localIP().toString().c_str());
     }
 }
@@ -369,13 +447,12 @@ void drawLogo() {
 void displayTask(void *) {
     bool taskDisplayOn = true;
     bool isDimmed = true;
-    
-    // Dirty tracking state
+
     time_t lastDrawnTime = 0;
     int lastRssi = 0;
     int lastMqttIcon = -1;
     std::vector<std::string> lastLines;
-    
+
     while (true) {
         const bool showData = timerIsFast.load();
         const TickType_t waitTicks = pdMS_TO_TICKS(showData ? MILLIS_BETWEEN_DISPLAY_UPDATE_FAST
@@ -400,12 +477,14 @@ void displayTask(void *) {
         const auto secondsSinceNoData = getSecondsSinceNoData();
         time_t now = time(nullptr);
 
-        if (showData || secondsSinceNoData < SECONDS_BEFORE_SCREENSAVER) {
+        const int ssSecs  = screensaverTimeout.load();
+        const int offSecs = screenOffTimeout.load();
+
+        if (showData || secondsSinceNoData < ssSecs) {
             std::vector<std::string> currentLines;
-            
-            // Check dirty conditions for data screen
+
             bool dirty = false;
-            if (isDimmed) dirty = true; // Needs undimming
+            if (isDimmed) dirty = true;
             if (now != lastDrawnTime) dirty = true;
             if (wifiStatus.rssi != lastRssi) dirty = true;
 #if defined(MQTT)
@@ -413,16 +492,12 @@ void displayTask(void *) {
             if (currentMqttIcon != lastMqttIcon) dirty = true;
 #endif
 
-            // To avoid flickering and I2C spam, we only want to redraw if data is dirty, 
-            // but we must call drawContents to get the lines and check.
-            // A simpler way: we prepare a dummy call to see if lines changed? No, 
-            // we will just call getTextToDisplay directly.
             int width = SCREEN_WIDTH / 6;
             int height = (SCREEN_HEIGHT - 20 - 8) / 8;
             xSemaphoreTake(displayBufferMutex, portMAX_DELAY);
             currentLines = displayBuffer.getTextToDisplay(width, height);
             xSemaphoreGive(displayBufferMutex);
-            
+
             if (currentLines != lastLines) dirty = true;
 
             if (dirty) {
@@ -433,7 +508,7 @@ void displayTask(void *) {
                 display.clearDisplay();
                 drawData(currentLines);
                 display.display();
-                
+
                 lastDrawnTime = now;
                 lastRssi = wifiStatus.rssi;
 #if defined(MQTT)
@@ -441,23 +516,22 @@ void displayTask(void *) {
 #endif
                 lastLines = currentLines;
             }
-        } else if (secondsSinceNoData < SECONDS_BEFORE_SCREEN_OFF) {
+        } else if (offSecs == 0 || secondsSinceNoData < offSecs) {
             setTimerSpeed(slow);
             if (!taskDisplayOn) {
                 display.ssd1306_command(SSD1306_DISPLAYON);
                 taskDisplayOn = true;
             }
             if (!isDimmed) {
+                const uint8_t contrast = dimLevelToContrast(dimLevel.load());
                 display.ssd1306_command(SSD1306_SETCONTRAST);
-                display.ssd1306_command(1);
+                display.ssd1306_command(contrast);
                 isDimmed = true;
             }
-            // Screensaver is drawn every SLOW tick (5000ms), so it's fine to redraw
             display.clearDisplay();
             drawLogo();
             display.display();
-            
-            // Reset dirty tracking for when we wake up
+
             lastDrawnTime = 0;
             lastLines.clear();
         } else {

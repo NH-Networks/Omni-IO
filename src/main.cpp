@@ -45,6 +45,7 @@
 #if defined(WEBSERVER)
 #include <web_server_handler.h>
 #endif
+#include <sun_helper.h>
 #include "LittleFS.h"
 //#include <WiFi.h> // Assuming WiFi is used and initialized elsewhere or will be here.
 
@@ -297,6 +298,7 @@ void setup() {
     initMqtt();
 #endif
     Cmd::kbd_tick.attach_ms(500, Cmd::cmdFuncHandler);
+    SunHelper::getInstance()->begin();
 
 //    esp_timer_dump(stdout);
 
@@ -1190,4 +1192,5 @@ void txUserBuffer(Tokens *cmd) {
 
 void loop() {
     loopWebServer(); // For ESPAsyncWebServer, this is typically not needed.
+    SunHelper::getInstance()->tick();
 }

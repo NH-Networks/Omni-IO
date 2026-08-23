@@ -30,12 +30,9 @@ constexpr time_t MIN_VALID_NTP_EPOCH = 1600000000; // ~Sept 2020
 #include <syslog_helper.h>
 #endif
 #include <tokens.h>
-// #include "main.h" // Or other relevant headers to access device data and
-// command functions
+#include <sun_helper.h>
 
-// Assume ESPAsyncWebServer for now.
-// If you use WebServer.h, the setup and request handling will be different.
-AsyncWebServer server(80); // Create AsyncWebServer object on port 80
+AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
 struct TwoWStatus {
@@ -105,10 +102,8 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
                       size_t len) {
   wakeDisplay();
   if (type == WS_EVT_CONNECT) {
-    // Ensure we broadcast the current position before sending init message
     IOHC::iohcRemote1W::getInstance()->updatePositions();
 
-    // Build a compact init message containing only device information
     JsonDocument doc;
     doc["type"] = "init";
 
@@ -223,7 +218,6 @@ void updateTwoWRxStatus(const String &packetType, const String &from,
   broadcastTwoWStatus();
 }
 
-// Structure describing a device entry returned to the web UI
 struct Device {
   String id;
   String name;
@@ -310,7 +304,6 @@ ArJsonRequestHandlerFunction jsonPost(const ArPostRequestHandlerFunction<JsonArr
 }
 
 void handleApiDevices(AsyncWebServerRequest *request, JsonArray &root) {
-  // Update device positions before returning them to the web client
   IOHC::iohcRemote1W::getInstance()->updatePositions();
 
   auto remotes = IOHC::iohcRemote1W::getInstance()->getRemotes();
@@ -492,6 +485,7 @@ void handleUploadBackupFile(AsyncWebServerRequest *request, String filename,
     request->_tempFile.close();
   }
 }
+
 void handleDownloadDevices(AsyncWebServerRequest *request) {
   if (LittleFS.exists(IOHC_1W_REMOTE)) {
     request->send(LittleFS, IOHC_1W_REMOTE, "application/json", true);
@@ -693,7 +687,6 @@ static void scheduleRestart(const char *taskName) {
   }
 }
 
-
 static bool isValidHostname(const String &hostname) {
   if (hostname.length() == 0 || hostname.length() > 31) {
     return false;
@@ -711,6 +704,7 @@ static bool isValidIpString(const String &value) {
   IPAddress ip;
   return value.length() > 0 && ip.fromString(value);
 }
+
 void handleApiNetworkGet(AsyncWebServerRequest *request, JsonObject &root) {
   root["hostname"] = WiFi.getHostname() ? WiFi.getHostname() : "MiOpenIO";
   root["dhcp"] = true;
@@ -720,7 +714,7 @@ void handleApiNetworkGet(AsyncWebServerRequest *request, JsonObject &root) {
   root["gateway"] = WiFi.gatewayIP().toString();
   root["dns1"] = WiFi.dnsIP(0).toString();
   root["dns2"] = WiFi.dnsIP(1).toString();
-  
+
   std::string sntp_server = "pool.ntp.org";
   nvs_read_string(NVS_KEY_NET_SNTP, sntp_server);
   root["sntp"] = sntp_server.c_str();
@@ -735,14 +729,13 @@ void handleApiNetworkGet(AsyncWebServerRequest *request, JsonObject &root) {
   struct tm tmnow;
   localtime_r(&now, &tmnow);
   char timeBuf[64];
-  if (now > MIN_VALID_NTP_EPOCH) { // Valid time after year 2020 (NTP synced)
+  if (now > MIN_VALID_NTP_EPOCH) {
     strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%d %H:%M:%S", &tmnow);
   } else {
     snprintf(timeBuf, sizeof(timeBuf), "Not synchronized");
   }
   root["time"] = timeBuf;
 }
-
 
 void handleApiNetworkSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
   String hostname = doc["hostname"] | "MiOpenIO";
@@ -812,6 +805,7 @@ void handleApiFallbackSet(AsyncWebServerRequest *request, JsonObject &doc, JsonO
   root["success"] = true;
   root["message"] = "Fallback AP settings saved";
 }
+
 void handleApiWifiGet(AsyncWebServerRequest *request, JsonObject &root) {
   root["ssid"] = getConfiguredWiFiSSID();
   root["connected"] = WiFi.status() == WL_CONNECTED;
@@ -831,7 +825,6 @@ void handleApiWifiScan(AsyncWebServerRequest *request, JsonObject &root) {
     delay(250);
     count = WiFi.scanNetworks(false, true);
   }
-
 
   root["count"] = count;
   root["status"] = WiFi.status();
@@ -857,6 +850,7 @@ void handleApiWifiScan(AsyncWebServerRequest *request, JsonObject &root) {
   }
   WiFi.scanDelete();
 }
+
 void handleApiWifiSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
   String ssid = doc["ssid"] | "";
   String password = doc["password"] | "";
@@ -894,7 +888,7 @@ void handleApiInfo(AsyncWebServerRequest *request, JsonObject &root) {
   root["environment"] = "unknown";
 #endif
 #else
-  root["version"] = "dev";
+  root["version"] = "3.2.1";
 #endif
   root["uptimeMs"] = millis();
   root["freeHeap"] = ESP.getFreeHeap();
@@ -954,23 +948,76 @@ static bool jsonToBool(JsonVariant variant, bool &value) {
 
 #if defined(SSD1306_DISPLAY)
 void handleApiDisplayGet(AsyncWebServerRequest *request, JsonObject &root) {
-  const bool enabled = isDisplayEnabled();
-  root["enabled"] = enabled;
+  root["enabled"] = isDisplayEnabled();
+  root["screensaverTimeout"] = getScreensaverTimeout();
+  root["screenOffTimeout"] = getScreenOffTimeout();
+  root["dimLevel"] = getDimLevel();
+  root["showCpuTemp"] = isCpuTempEnabled();
 }
 
 void handleApiDisplaySet(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
-  bool enabled = isDisplayEnabled();
-  if (!doc["enabled"].is<JsonVariant>() || !jsonToBool(doc["enabled"], enabled)) {
-    request->send(400, "application/json",
-                  "{\"success\":false,\"message\":\"Invalid enabled value\"}");
-    return;
+  // enabled
+  if (doc["enabled"].is<JsonVariant>()) {
+    bool enabled = isDisplayEnabled();
+    if (!jsonToBool(doc["enabled"], enabled)) {
+      request->send(400, "application/json",
+                    "{\"success\":false,\"message\":\"Invalid enabled value\"}");
+      return;
+    }
+    setDisplayEnabled(enabled);
   }
 
-  setDisplayEnabled(enabled);
+  // screensaverTimeout
+  if (doc["screensaverTimeout"].is<JsonVariant>()) {
+    int val = doc["screensaverTimeout"] | -1;
+    if (val < 10 || val > 3600) {
+      request->send(400, "application/json",
+                    "{\"success\":false,\"message\":\"screensaverTimeout must be 10..3600\"}");
+      return;
+    }
+    setScreensaverTimeout(static_cast<uint16_t>(val));
+  }
+
+  // screenOffTimeout (0 = disable screen-off, or 60..86400)
+  if (doc["screenOffTimeout"].is<JsonVariant>()) {
+    int val = doc["screenOffTimeout"] | -1;
+    if (val != 0 && (val < 60 || val > 86400)) {
+      request->send(400, "application/json",
+                    "{\"success\":false,\"message\":\"screenOffTimeout must be 0 or 60..86400\"}");
+      return;
+    }
+    setScreenOffTimeout(static_cast<uint16_t>(val));
+  }
+
+  // dimLevel
+  if (doc["dimLevel"].is<JsonVariant>()) {
+    int val = doc["dimLevel"] | -1;
+    if (val < 0 || val > 2) {
+      request->send(400, "application/json",
+                    "{\"success\":false,\"message\":\"dimLevel must be 0, 1 or 2\"}");
+      return;
+    }
+    setDimLevel(static_cast<uint8_t>(val));
+  }
+
+  // showCpuTemp
+  if (doc["showCpuTemp"].is<JsonVariant>()) {
+    bool show = isCpuTempEnabled();
+    if (!jsonToBool(doc["showCpuTemp"], show)) {
+      request->send(400, "application/json",
+                    "{\"success\":false,\"message\":\"Invalid showCpuTemp value\"}");
+      return;
+    }
+    setCpuTempEnabled(show);
+  }
 
   root["success"] = true;
   root["message"] = "Display configuration updated";
   root["enabled"] = isDisplayEnabled();
+  root["screensaverTimeout"] = getScreensaverTimeout();
+  root["screenOffTimeout"] = getScreenOffTimeout();
+  root["dimLevel"] = getDimLevel();
+  root["showCpuTemp"] = isCpuTempEnabled();
 }
 #endif
 
@@ -1039,7 +1086,6 @@ void handleApiSyslogSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObj
 
   if (doc["tag"].is<JsonVariant>()) {
     String newTag = doc["tag"] | "";
-    // Sanitise: keep only alphanumeric and hyphen, truncate to 20 chars
     String sanitised;
     for (char c : newTag) {
       if (isalnum(c) || c == '-') sanitised += c;
@@ -1082,6 +1128,7 @@ void handleApiSyslogTest(AsyncWebServerRequest *request, JsonObject &doc, JsonOb
   root["message"] = "Test message sent";
 }
 #endif
+
 #if defined(MQTT)
 void handleApiMqttGet(AsyncWebServerRequest *request, JsonObject &root) {
   root["server"] = mqtt_server.c_str();
@@ -1158,6 +1205,85 @@ void handleApiMqttSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObjec
   root["message"] = "MQTT configuration updated";
 }
 #endif
+
+void handleApiSunGet(AsyncWebServerRequest *request, JsonObject &root) {
+  SunHelper *sun = SunHelper::getInstance();
+  const SunConfig &cfg = sun->getConfig();
+  const SunMetrics &met = sun->getMetrics();
+
+  JsonObject configObj = root.createNestedObject("config");
+  configObj["enabled"] = cfg.enabled;
+  configObj["latitude"] = cfg.latitude;
+  configObj["longitude"] = cfg.longitude;
+  configObj["azimuthStart"] = cfg.azimuthStart;
+  configObj["azimuthEnd"] = cfg.azimuthEnd;
+  configObj["minElevation"] = cfg.minElevation;
+  configObj["radiationThreshold"] = cfg.radiationThreshold;
+  configObj["maxCloudCover"] = cfg.maxCloudCover;
+  configObj["sunOnDelayMin"] = cfg.sunOnDelayMin;
+  configObj["sunOffDelayMin"] = cfg.sunOffDelayMin;
+  configObj["maxWindSpeed"] = cfg.maxWindSpeed;
+  configObj["windAction"] = cfg.windAction.c_str();
+  configObj["nightAutoOpen"] = cfg.nightAutoOpen;
+
+  JsonObject screensObj = configObj.createNestedObject("screens");
+  for (const auto &kv : cfg.enabledScreens) {
+    screensObj[kv.first] = kv.second;
+  }
+
+  JsonObject metricsObj = root.createNestedObject("metrics");
+  metricsObj["elevation"] = met.elevation;
+  metricsObj["azimuth"] = met.azimuth;
+  metricsObj["directRadiation"] = met.directRadiation;
+  metricsObj["cloudCover"] = met.cloudCover;
+  metricsObj["temperature"] = met.temperature;
+  metricsObj["windSpeed"] = met.windSpeed;
+  metricsObj["isDay"] = met.isDay;
+  metricsObj["lastUpdateEpoch"] = met.lastUpdateEpoch;
+
+  root["condition"] = sun->getConditionString();
+  root["actionActive"] = sun->isActionActive();
+  root["sunnyElapsedSec"] = sun->getSunnyElapsedSeconds();
+  root["cloudyElapsedSec"] = sun->getCloudyElapsedSeconds();
+  root["countdownSec"] = sun->getNextActionCountdownSeconds();
+}
+
+void handleApiSunSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
+  SunHelper *sun = SunHelper::getInstance();
+  SunConfig cfg = sun->getConfig();
+
+  if (doc.containsKey("enabled")) cfg.enabled = doc["enabled"].as<bool>();
+  if (doc.containsKey("latitude")) cfg.latitude = doc["latitude"].as<float>();
+  if (doc.containsKey("longitude")) cfg.longitude = doc["longitude"].as<float>();
+  if (doc.containsKey("azimuthStart")) cfg.azimuthStart = doc["azimuthStart"].as<float>();
+  if (doc.containsKey("azimuthEnd")) cfg.azimuthEnd = doc["azimuthEnd"].as<float>();
+  if (doc.containsKey("minElevation")) cfg.minElevation = doc["minElevation"].as<float>();
+  if (doc.containsKey("radiationThreshold")) cfg.radiationThreshold = doc["radiationThreshold"].as<float>();
+  if (doc.containsKey("maxCloudCover")) cfg.maxCloudCover = doc["maxCloudCover"].as<float>();
+  if (doc.containsKey("sunOnDelayMin")) cfg.sunOnDelayMin = doc["sunOnDelayMin"].as<uint16_t>();
+  if (doc.containsKey("sunOffDelayMin")) cfg.sunOffDelayMin = doc["sunOffDelayMin"].as<uint16_t>();
+  if (doc.containsKey("maxWindSpeed")) cfg.maxWindSpeed = doc["maxWindSpeed"].as<float>();
+  if (doc.containsKey("windAction")) cfg.windAction = doc["windAction"].as<const char*>();
+  if (doc.containsKey("nightAutoOpen")) cfg.nightAutoOpen = doc["nightAutoOpen"].as<bool>();
+
+  if (doc.containsKey("screens") && doc["screens"].is<JsonObject>()) {
+    JsonObject screens = doc["screens"].as<JsonObject>();
+    for (JsonPair kv : screens) {
+      cfg.enabledScreens[kv.key().c_str()] = kv.value().as<bool>();
+    }
+  }
+
+  sun->setConfig(cfg);
+
+  root["success"] = true;
+  root["message"] = "Sun automation settings saved";
+}
+
+void handleApiSunEvaluate(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
+  SunHelper::getInstance()->evaluateNow();
+  root["success"] = true;
+  root["message"] = "Sun automation evaluation triggered";
+}
 
 void handleFirmwareUpdate(AsyncWebServerRequest *request) {
   if (Update.hasError()) {
@@ -1262,15 +1388,10 @@ void handleFilesystemUpload(AsyncWebServerRequest *request, String filename,
 void setupWebServer() {
   Serial.println("Initializing HTTP server ...");
 
-  // Serve static files from /web_interface_data
-  // Ensure this path matches where your platformio.ini places data files
-  // or how you upload them (e.g., SPIFFS, LittleFS).
-  // The path "/" serves index.html from the data directory.
   if (!LittleFS.exists("/web_interface_data/index.html")) {
     Serial.println("Warning: /web_interface_data/index.html not found");
   }
 
-  // API Endpoints
   server.on("/api/info", HTTP_GET, jsonGet(handleApiInfo));
   server.on("/api/devices", HTTP_GET, jsonGet(handleApiDevices));
   server.on("/api/remotes", HTTP_GET, jsonGet(handleApiRemotes));
@@ -1305,6 +1426,9 @@ void setupWebServer() {
   server.on("/api/syslog/test", HTTP_POST, jsonPost(handleApiSyslogTest));
   server.on("/api/syslog", HTTP_POST, jsonPost(handleApiSyslogSet));
 #endif
+  server.on("/api/sun", HTTP_GET, jsonGet(handleApiSunGet));
+  server.on("/api/sun", HTTP_POST, jsonPost(handleApiSunSet));
+  server.on("/api/sun/evaluate", HTTP_POST, jsonPost(handleApiSunEvaluate));
   server.on("/api/firmware", HTTP_POST, handleFirmwareUpdate,
             handleFirmwareUpload);
   server.on("/api/filesystem", HTTP_POST, handleFilesystemUpdate,
@@ -1319,7 +1443,6 @@ void setupWebServer() {
   server.on("/api/upload/remotes", HTTP_POST, handleUploadRemotesDone,
             handleUploadRemotesFile);
 
-  // Restart endpoint
   server.on("/api/restart", HTTP_POST, [](AsyncWebServerRequest *request) {
     request->send(200, "application/json", "{\"message\":\"Rebooting...\"}" );
     scheduleRestart("web-reboot");
@@ -1345,7 +1468,6 @@ void setupWebServer() {
 }
 
 void loopWebServer() {
-  // For ESPAsyncWebServer, most work is done asynchronously.
   ws.cleanupClients();
 }
 

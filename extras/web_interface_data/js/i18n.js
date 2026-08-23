@@ -28,6 +28,10 @@ function applyI18n() {
     el.placeholder = t(el.dataset.i18nPlaceholder);
   });
 
+  document.querySelectorAll("[data-i18n-title]").forEach((el) => {
+    el.title = t(el.dataset.i18nTitle);
+  });
+
   document.title = t("page.title");
 }
 

@@ -7,6 +7,7 @@ on:
       - master
       - dev-main
       - Beta
+      - 'feature/**'
 
 jobs:
   build:
@@ -22,17 +23,17 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Cache PlatformIO
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: |
             ~/.platformio
@@ -55,6 +56,7 @@ jobs:
         run: |
           mkdir -p artifacts
           COMMIT_TIME=$(git show -s --format=%cd --date=format:'%Y%m%d_%H%M' HEAD)
+          SAFE_BRANCH=$(echo "${{ github.ref_name }}" | tr '/' '_')
           CHIP="esp32"
           FLASH_SIZE="4MB"
           FS_OFFSET="0x390000"
@@ -66,10 +68,10 @@ jobs:
             CHIP="esp32s3"
             BOOT_OFFSET="0x0"
           fi
-          esptool --chip "$CHIP" merge-bin -o artifacts/${{ matrix.env }}_${{ github.ref_name }}_${COMMIT_TIME}.bin --flash-size "$FLASH_SIZE" "$BOOT_OFFSET" .pio/build/${{ matrix.env }}/bootloader.bin 0x8000 .pio/build/${{ matrix.env }}/partitions.bin 0x10000 .pio/build/${{ matrix.env }}/firmware.bin "$FS_OFFSET" .pio/build/${{ matrix.env }}/littlefs.bin
-          cp .pio/build/${{ matrix.env }}/firmware.bin artifacts/${{ matrix.env }}_${{ github.ref_name }}_${COMMIT_TIME}_firmware.bin
-          cp .pio/build/${{ matrix.env }}/littlefs.bin artifacts/${{ matrix.env }}_${{ github.ref_name }}_${COMMIT_TIME}_filesystem.bin
-          cat > artifacts/${{ matrix.env }}_${{ github.ref_name }}_${COMMIT_TIME}_info.json <<EOF
+          esptool --chip "$CHIP" merge-bin -o "artifacts/${{ matrix.env }}_${SAFE_BRANCH}_${COMMIT_TIME}.bin" --flash-size "$FLASH_SIZE" "$BOOT_OFFSET" .pio/build/${{ matrix.env }}/bootloader.bin 0x8000 .pio/build/${{ matrix.env }}/partitions.bin 0x10000 .pio/build/${{ matrix.env }}/firmware.bin "$FS_OFFSET" .pio/build/${{ matrix.env }}/littlefs.bin
+          cp .pio/build/${{ matrix.env }}/firmware.bin "artifacts/${{ matrix.env }}_${SAFE_BRANCH}_${COMMIT_TIME}_firmware.bin"
+          cp .pio/build/${{ matrix.env }}/littlefs.bin "artifacts/${{ matrix.env }}_${SAFE_BRANCH}_${COMMIT_TIME}_filesystem.bin"
+          cat > "artifacts/${{ matrix.env }}_${SAFE_BRANCH}_${COMMIT_TIME}_info.json" <<EOF
           {
             "branch": "${{ github.ref_name }}",
             "commit": "${{ github.sha }}",
@@ -78,9 +80,9 @@ jobs:
           EOF
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.env }}-${{ github.ref_name }}
+          name: ${{ matrix.env }}
           path: artifacts/
 
   release:

@@ -50,6 +50,10 @@
             fallbackStatus: document.getElementById("fallback-status"),
             fallbackSaveButton: document.getElementById("fallback-save"),
             displayEnabledInput: document.getElementById("display-enabled"),
+            displayScreensaverTimeoutInput: document.getElementById("display-screensaver-timeout"),
+            displayOffTimeoutInput: document.getElementById("display-off-timeout"),
+            displayDimLevelSelect: document.getElementById("display-dim-level"),
+            displayCpuTempInput: document.getElementById("display-cpu-temp"),
             displayUpdateButton: document.getElementById("display-update"),
             displayStatus: document.getElementById("display-status"),
             syslogEnabledInput: document.getElementById("syslog-enabled"),
@@ -58,6 +62,32 @@
             syslogTagInput: document.getElementById("syslog-tag"),
             syslogUpdateButton: document.getElementById("syslog-update"),
             syslogTestButton: document.getElementById("syslog-test"),
+            sunEnabledInput: document.getElementById("sun-enabled"),
+            sunLatInput: document.getElementById("sun-lat"),
+            sunLonInput: document.getElementById("sun-lon"),
+            sunGeolocateBtn: document.getElementById("sun-geolocate-btn"),
+            sunAzimuthStartInput: document.getElementById("sun-azimuth-start"),
+            sunAzimuthEndInput: document.getElementById("sun-azimuth-end"),
+            sunMinElevationInput: document.getElementById("sun-min-elevation"),
+            sunRadiationThreshInput: document.getElementById("sun-radiation-thresh"),
+            sunCloudThreshInput: document.getElementById("sun-cloud-thresh"),
+            sunDelayOnInput: document.getElementById("sun-delay-on"),
+            sunDelayOffInput: document.getElementById("sun-delay-off"),
+            sunMaxWindInput: document.getElementById("sun-max-wind"),
+            sunWindActionSelect: document.getElementById("sun-wind-action"),
+            sunNightAutoOpenInput: document.getElementById("sun-night-auto-open"),
+            sunScreensList: document.getElementById("sun-screens-list"),
+            sunSaveBtn: document.getElementById("sun-save-btn"),
+            sunEvaluateBtn: document.getElementById("sun-evaluate-btn"),
+            sunConditionBadge: document.getElementById("sun-condition-badge"),
+            sunActionDesc: document.getElementById("sun-action-desc"),
+            sunMetricRadiation: document.getElementById("sun-metric-radiation"),
+            sunMetricCloud: document.getElementById("sun-metric-cloud"),
+            sunMetricElevation: document.getElementById("sun-metric-elevation"),
+            sunMetricAzimuth: document.getElementById("sun-metric-azimuth"),
+            sunMetricWind: document.getElementById("sun-metric-wind"),
+            sunMetricTemp: document.getElementById("sun-metric-temp"),
+            sunStatusMsg: document.getElementById("sun-status-msg"),
             remotePopupButton: document.getElementById("remote-popup"),
             remotesFileInput: document.getElementById("remotes-file"),
             remotesUploadButton: document.getElementById("upload-remotes"),
@@ -187,6 +217,25 @@
                 );
             });
         }
+
+        // Mobile touch / click toggle for tooltips
+        document.addEventListener("click", function (e) {
+            var tip = e.target.closest(".tip-icon");
+            if (tip) {
+                var wasActive = tip.classList.contains("active");
+                document.querySelectorAll(".tip-icon.active").forEach(function (el) {
+                    el.classList.remove("active");
+                });
+                if (!wasActive) {
+                    tip.classList.add("active");
+                }
+                e.stopPropagation();
+            } else {
+                document.querySelectorAll(".tip-icon.active").forEach(function (el) {
+                    el.classList.remove("active");
+                });
+            }
+        });
     }
 
     // Per-device RAF handle for WebSocket position bursts
@@ -245,52 +294,69 @@
 
     function bindEvents(app) {
         if (app.elements.sendCommandButton) {
-            app.elements.sendCommandButton.addEventListener("click", app.sendCommand);
+            app.elements.sendCommandButton.addEventListener("click", function () {
+                if (typeof app.sendCommand === "function") app.sendCommand();
+            });
         }
         if (app.elements.mqttUpdateButton) {
-            app.elements.mqttUpdateButton.addEventListener("click", app.updateMqttConfig);
+            app.elements.mqttUpdateButton.addEventListener("click", function () {
+                if (typeof app.updateMqttConfig === "function") app.updateMqttConfig();
+            });
         }
         if (app.elements.wifiScanButton) {
-            app.elements.wifiScanButton.addEventListener("click", app.scanWifiNetworks);
+            app.elements.wifiScanButton.addEventListener("click", function () {
+                if (typeof app.scanWifiNetworks === "function") app.scanWifiNetworks();
+            });
         }
         if (app.elements.wifiConfigSaveButton) {
-            app.elements.wifiConfigSaveButton.addEventListener("click", app.saveWifiConfig);
+            app.elements.wifiConfigSaveButton.addEventListener("click", function () {
+                if (typeof app.saveWifiConfig === "function") app.saveWifiConfig();
+            });
         }
         if (app.elements.networkSaveButton) {
-            app.elements.networkSaveButton.addEventListener("click", app.saveNetworkConfig);
+            app.elements.networkSaveButton.addEventListener("click", function () {
+                if (typeof app.saveNetworkConfig === "function") app.saveNetworkConfig();
+            });
         }
         if (app.elements.displayUpdateButton) {
-            app.elements.displayUpdateButton.addEventListener("click", app.updateDisplayConfig);
+            app.elements.displayUpdateButton.addEventListener("click", function () {
+                if (typeof app.updateDisplayConfig === "function") app.updateDisplayConfig();
+            });
         }
         if (app.elements.syslogUpdateButton) {
-            app.elements.syslogUpdateButton.addEventListener("click", app.updateSyslogConfig);
+            app.elements.syslogUpdateButton.addEventListener("click", function () {
+                if (typeof app.updateSyslogConfig === "function") app.updateSyslogConfig();
+            });
         }
         if (app.elements.syslogTestButton) {
-            app.elements.syslogTestButton.addEventListener("click", app.sendSyslogTest);
-        }
-        if (app.elements.ioKeySaveButton) {
-            app.elements.ioKeySaveButton.addEventListener("click", app.saveIoSystemKey);
-        }
-        if (app.elements.ioKeyClearButton) {
-            app.elements.ioKeyClearButton.addEventListener("click", app.clearIoSystemKey);
+            app.elements.syslogTestButton.addEventListener("click", function () {
+                if (typeof app.sendSyslogTest === "function") app.sendSyslogTest();
+            });
         }
         if (app.elements.firmwareUploadButton) {
-            app.elements.firmwareUploadButton.addEventListener("click", app.uploadFirmware);
-        }
-        if (app.elements.githubUpdateButton) {
-            app.elements.githubUpdateButton.addEventListener("click", app.checkGithubUpdate);
+            app.elements.firmwareUploadButton.addEventListener("click", function () {
+                if (typeof app.uploadFirmware === "function") app.uploadFirmware();
+            });
         }
         if (app.elements.filesystemUploadButton) {
-            app.elements.filesystemUploadButton.addEventListener("click", app.uploadFilesystem);
+            app.elements.filesystemUploadButton.addEventListener("click", function () {
+                if (typeof app.uploadFilesystem === "function") app.uploadFilesystem();
+            });
         }
         if (app.elements.backupUploadButton) {
-            app.elements.backupUploadButton.addEventListener("click", app.uploadBackup);
+            app.elements.backupUploadButton.addEventListener("click", function () {
+                if (typeof app.uploadBackup === "function") app.uploadBackup();
+            });
         }
         if (app.elements.devicesUploadButton) {
-            app.elements.devicesUploadButton.addEventListener("click", app.uploadDevices);
+            app.elements.devicesUploadButton.addEventListener("click", function () {
+                if (typeof app.uploadDevices === "function") app.uploadDevices();
+            });
         }
         if (app.elements.remotesUploadButton) {
-            app.elements.remotesUploadButton.addEventListener("click", app.uploadRemotes);
+            app.elements.remotesUploadButton.addEventListener("click", function () {
+                if (typeof app.uploadRemotes === "function") app.uploadRemotes();
+            });
         }
         if (app.elements.downloadBackupButton) {
             app.elements.downloadBackupButton.addEventListener("click", function () {
@@ -307,11 +373,30 @@
                 window.MiOpenApi.downloadFile("/api/download/remotes", "RemoteMap.json").catch(function () {});
             });
         }
+        if (app.elements.sunSaveBtn) {
+            app.elements.sunSaveBtn.addEventListener("click", function () {
+                if (typeof app.saveSunConfig === "function") app.saveSunConfig();
+            });
+        }
+        if (app.elements.sunEvaluateBtn) {
+            app.elements.sunEvaluateBtn.addEventListener("click", function () {
+                if (typeof app.evaluateSunNow === "function") app.evaluateSunNow();
+            });
+        }
+        if (app.elements.sunGeolocateBtn) {
+            app.elements.sunGeolocateBtn.addEventListener("click", function () {
+                if (typeof app.geolocateUser === "function") app.geolocateUser();
+            });
+        }
         if (app.elements.addPopupButton) {
-            app.elements.addPopupButton.addEventListener("click", app.openAddDevicePopup);
+            app.elements.addPopupButton.addEventListener("click", function () {
+                if (typeof app.openAddDevicePopup === "function") app.openAddDevicePopup();
+            });
         }
         if (app.elements.remotePopupButton) {
-            app.elements.remotePopupButton.addEventListener("click", app.openAddRemotePopup);
+            app.elements.remotePopupButton.addEventListener("click", function () {
+                if (typeof app.openAddRemotePopup === "function") app.openAddRemotePopup();
+            });
         }
     }
 
@@ -346,6 +431,7 @@
         window.addEventListener("i18n:changed", function () {
             app.fetchAndDisplayDevices();
             app.fetchAndDisplayRemotes();
+            if (typeof app.loadSunConfig === "function") app.loadSunConfig();
         });
 
         window.MiOpenApi.requestJson("/api/info").then(function (info) {
@@ -362,6 +448,7 @@
         app.loadFallbackConfig();
         app.loadDisplayConfig();
         app.loadSyslogConfig();
+        app.loadSunConfig();
         app.fetchAndDisplayDevices();
         app.fetchAndDisplayRemotes();
         app.loadLastAddress();
