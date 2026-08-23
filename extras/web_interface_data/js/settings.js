@@ -697,6 +697,14 @@
         const isActive = data.actionActive || false;
         const countdown = data.countdownSec || 0;
 
+        function getCompassName(deg) {
+            if (deg === undefined || isNaN(deg)) return "-";
+            const d = (deg % 360 + 360) % 360;
+            const dirs = ["N", "NNO", "NO", "ONO", "O", "OZO", "ZO", "ZZO", "Z", "ZZW", "ZW", "WZW", "W", "WNW", "NW", "NNW"];
+            const idx = Math.round(d / 22.5) % 16;
+            return `${d.toFixed(0)}° (${dirs[idx]})`;
+        }
+
         if (app.elements.sunMetricRadiation) {
             app.elements.sunMetricRadiation.textContent = (met.directRadiation !== undefined ? Math.round(met.directRadiation) : "-") + " W/m²";
         }
@@ -707,7 +715,7 @@
             app.elements.sunMetricElevation.textContent = (met.elevation !== undefined ? met.elevation.toFixed(1) : "-") + "°";
         }
         if (app.elements.sunMetricAzimuth) {
-            app.elements.sunMetricAzimuth.textContent = (met.azimuth !== undefined ? met.azimuth.toFixed(1) : "-") + "°";
+            app.elements.sunMetricAzimuth.textContent = getCompassName(met.azimuth);
         }
         if (app.elements.sunMetricWind) {
             app.elements.sunMetricWind.textContent = (met.windSpeed !== undefined ? met.windSpeed.toFixed(1) : "-") + " km/h";

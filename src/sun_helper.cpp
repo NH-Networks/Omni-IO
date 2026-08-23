@@ -46,7 +46,7 @@ bool SunHelper::loadConfig() {
     if (!f) {
         return false;
     }
-    StaticJsonDocument<2048> doc;
+    JsonDocument doc;
     DeserializationError err = deserializeJson(doc, f);
     f.close();
     if (err) {
@@ -68,7 +68,7 @@ bool SunHelper::loadConfig() {
     config.nightAutoOpen = doc["nightAutoOpen"] | true;
 
     config.enabledScreens.clear();
-    if (doc.containsKey("screens") && doc["screens"].is<JsonObject>()) {
+    if (doc["screens"].is<JsonObject>()) {
         JsonObject screens = doc["screens"].as<JsonObject>();
         for (JsonPair kv : screens) {
             config.enabledScreens[kv.key().c_str()] = kv.value().as<bool>();
@@ -78,7 +78,7 @@ bool SunHelper::loadConfig() {
 }
 
 bool SunHelper::saveConfig() {
-    StaticJsonDocument<2048> doc;
+    JsonDocument doc;
     doc["enabled"] = config.enabled;
     doc["latitude"] = config.latitude;
     doc["longitude"] = config.longitude;
@@ -92,7 +92,7 @@ bool SunHelper::saveConfig() {
     doc["maxWindSpeed"] = config.maxWindSpeed;
     doc["nightAutoOpen"] = config.nightAutoOpen;
 
-    JsonObject screens = doc.createNestedObject("screens");
+    JsonObject screens = doc["screens"].to<JsonObject>();
     for (const auto &kv : config.enabledScreens) {
         screens[kv.first] = kv.second;
     }
@@ -240,9 +240,9 @@ void SunHelper::fetchWeatherApi() {
     int httpCode = http.GET();
     if (httpCode == HTTP_CODE_OK) {
         String payload = http.getString();
-        StaticJsonDocument<1024> doc;
+        JsonDocument doc;
         DeserializationError err = deserializeJson(doc, payload);
-        if (!err && doc.containsKey("current")) {
+        if (!err && doc["current"].is<JsonObject>()) {
             JsonObject cur = doc["current"].as<JsonObject>();
             metrics.directRadiation = cur["direct_radiation"] | 0.0f;
             metrics.cloudCover = cur["cloud_cover"] | 0.0f;
@@ -279,7 +279,7 @@ void SunHelper::evaluateState() {
         condition = SunCondition::WindAlert;
         hasSunnyStart = false;
         if (actionActive) {
-            addLogMessage("Sun Automation: Wind speed alert (%.1f km/h) -> Retracting screens", metrics.windSpeed);
+            addLogMessage(String("Sun Automation: Wind speed alert (") + String(metrics.windSpeed, 1) + " km/h) -> Retracting screens");
             triggerSunAction(false); // Open screens for safety
         }
         return;
@@ -329,7 +329,7 @@ void SunHelper::evaluateState() {
         uint32_t reqSec = config.sunOnDelayMin * 60;
 
         if (sunnyElapsedSec >= reqSec && !actionActive) {
-            addLogMessage("Sun Automation: Sun active for %u min -> Closing screens", config.sunOnDelayMin);
+            addLogMessage(String("Sun Automation: Sun active for ") + String(config.sunOnDelayMin) + " min -> Closing screens");
             triggerSunAction(true); // Close screens
         }
     } else {
@@ -344,7 +344,7 @@ void SunHelper::evaluateState() {
         uint32_t reqSec = config.sunOffDelayMin * 60;
 
         if (notSunnyElapsedSec >= reqSec && actionActive) {
-            addLogMessage("Sun Automation: Sun absent for %u min -> Opening screens", config.sunOffDelayMin);
+            addLogMessage(String("Sun Automation: Sun absent for ") + String(config.sunOffDelayMin) + " min -> Opening screens");
             triggerSunAction(false); // Open screens
         }
     }
@@ -365,14 +365,17 @@ void SunHelper::triggerSunAction(bool closeScreens) {
         }
 
         Tokens cmdTokens;
-        cmdTokens.push_back("order");
-        cmdTokens.push_back(r.description);
         cmdTokens.push_back(closeScreens ? "close" : "open");
+        cmdTokens.push_back(r.description);
 
-        Serial.printf("[SUN] Dispatching: order %s %s (%s)\n",
-                      r.description.c_str(), closeScreens ? "close" : "open", r.name.c_str());
+        Serial.printf("[SUN] Dispatching: %s %s (%s)\n",
+                      closeScreens ? "close" : "open", r.description.c_str(), r.name.c_str());
 
-        IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Order, &cmdTokens);
+        if (closeScreens) {
+            IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Close, &cmdTokens);
+        } else {
+            IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Open, &cmdTokens);
+        }
         vTaskDelay(pdMS_TO_TICKS(150));
     }
 }
