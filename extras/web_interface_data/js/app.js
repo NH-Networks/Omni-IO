@@ -62,6 +62,31 @@
             syslogTagInput: document.getElementById("syslog-tag"),
             syslogUpdateButton: document.getElementById("syslog-update"),
             syslogTestButton: document.getElementById("syslog-test"),
+            sunEnabledInput: document.getElementById("sun-enabled"),
+            sunLatInput: document.getElementById("sun-lat"),
+            sunLonInput: document.getElementById("sun-lon"),
+            sunGeolocateBtn: document.getElementById("sun-geolocate-btn"),
+            sunAzimuthStartInput: document.getElementById("sun-azimuth-start"),
+            sunAzimuthEndInput: document.getElementById("sun-azimuth-end"),
+            sunMinElevationInput: document.getElementById("sun-min-elevation"),
+            sunRadiationThreshInput: document.getElementById("sun-radiation-thresh"),
+            sunCloudThreshInput: document.getElementById("sun-cloud-thresh"),
+            sunDelayOnInput: document.getElementById("sun-delay-on"),
+            sunDelayOffInput: document.getElementById("sun-delay-off"),
+            sunMaxWindInput: document.getElementById("sun-max-wind"),
+            sunNightAutoOpenInput: document.getElementById("sun-night-auto-open"),
+            sunScreensList: document.getElementById("sun-screens-list"),
+            sunSaveBtn: document.getElementById("sun-save-btn"),
+            sunEvaluateBtn: document.getElementById("sun-evaluate-btn"),
+            sunConditionBadge: document.getElementById("sun-condition-badge"),
+            sunActionDesc: document.getElementById("sun-action-desc"),
+            sunMetricRadiation: document.getElementById("sun-metric-radiation"),
+            sunMetricCloud: document.getElementById("sun-metric-cloud"),
+            sunMetricElevation: document.getElementById("sun-metric-elevation"),
+            sunMetricAzimuth: document.getElementById("sun-metric-azimuth"),
+            sunMetricWind: document.getElementById("sun-metric-wind"),
+            sunMetricTemp: document.getElementById("sun-metric-temp"),
+            sunStatusMsg: document.getElementById("sun-status-msg"),
             remotePopupButton: document.getElementById("remote-popup"),
             remotesFileInput: document.getElementById("remotes-file"),
             remotesUploadButton: document.getElementById("upload-remotes"),
@@ -328,6 +353,21 @@
                 window.MiOpenApi.downloadFile("/api/download/remotes", "RemoteMap.json").catch(function () {});
             });
         }
+        if (app.elements.sunSaveBtn) {
+            app.elements.sunSaveBtn.addEventListener("click", function () {
+                if (typeof app.saveSunConfig === "function") app.saveSunConfig();
+            });
+        }
+        if (app.elements.sunEvaluateBtn) {
+            app.elements.sunEvaluateBtn.addEventListener("click", function () {
+                if (typeof app.evaluateSunNow === "function") app.evaluateSunNow();
+            });
+        }
+        if (app.elements.sunGeolocateBtn) {
+            app.elements.sunGeolocateBtn.addEventListener("click", function () {
+                if (typeof app.geolocateUser === "function") app.geolocateUser();
+            });
+        }
         if (app.elements.addPopupButton) {
             app.elements.addPopupButton.addEventListener("click", function () {
                 if (typeof app.openAddDevicePopup === "function") app.openAddDevicePopup();
@@ -371,6 +411,7 @@
         window.addEventListener("i18n:changed", function () {
             app.fetchAndDisplayDevices();
             app.fetchAndDisplayRemotes();
+            if (typeof app.loadSunConfig === "function") app.loadSunConfig();
         });
 
         window.MiOpenApi.requestJson("/api/info").then(function (info) {
@@ -387,6 +428,7 @@
         app.loadFallbackConfig();
         app.loadDisplayConfig();
         app.loadSyslogConfig();
+        app.loadSunConfig();
         app.fetchAndDisplayDevices();
         app.fetchAndDisplayRemotes();
         app.loadLastAddress();
