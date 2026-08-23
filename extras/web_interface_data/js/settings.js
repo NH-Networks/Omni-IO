@@ -574,25 +574,30 @@
 
         function activate(name) {
             tabs.forEach(function (tab) {
-                tab.classList.toggle("active", tab.dataset.settingsTab === name);
+                const isActive = tab.dataset.settingsTab === name;
+                tab.classList.toggle("active", isActive);
             });
             panels.forEach(function (panel) {
                 const isActive = panel.dataset.settingsPanel === name;
                 panel.classList.toggle("active", isActive);
-                panel.hidden = !isActive;
+                if (isActive) {
+                    panel.removeAttribute("hidden");
+                    panel.style.setProperty("display", "grid", "important");
+                } else {
+                    panel.setAttribute("hidden", "hidden");
+                    panel.style.setProperty("display", "none", "important");
+                }
             });
         }
 
         tabs.forEach(function (tab) {
-            tab.addEventListener("click", function () {
+            tab.addEventListener("click", function (e) {
+                if (e && typeof e.preventDefault === "function") e.preventDefault();
                 activate(tab.dataset.settingsTab);
             });
         });
 
-        const activeTab = tabs.find(function (tab) {
-            return tab.classList.contains("active");
-        });
-        activate(activeTab ? activeTab.dataset.settingsTab : "integration");
+        activate("integration");
     }
 
     let restartInFlight = false;
