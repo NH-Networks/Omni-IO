@@ -65,6 +65,7 @@ bool SunHelper::loadConfig() {
     config.sunOnDelayMin = doc["sunOnDelayMin"] | 5;
     config.sunOffDelayMin = doc["sunOffDelayMin"] | 15;
     config.maxWindSpeed = doc["maxWindSpeed"] | 35.0f;
+    config.windAction = doc["windAction"] | "open";
     config.nightAutoOpen = doc["nightAutoOpen"] | true;
 
     config.enabledScreens.clear();
@@ -90,6 +91,7 @@ bool SunHelper::saveConfig() {
     doc["sunOnDelayMin"] = config.sunOnDelayMin;
     doc["sunOffDelayMin"] = config.sunOffDelayMin;
     doc["maxWindSpeed"] = config.maxWindSpeed;
+    doc["windAction"] = config.windAction;
     doc["nightAutoOpen"] = config.nightAutoOpen;
 
     JsonObject screens = doc["screens"].to<JsonObject>();
@@ -278,9 +280,17 @@ void SunHelper::evaluateState() {
     if (config.maxWindSpeed > 0 && metrics.windSpeed >= config.maxWindSpeed) {
         condition = SunCondition::WindAlert;
         hasSunnyStart = false;
-        if (actionActive) {
-            addLogMessage(String("Sun Automation: Wind speed alert (") + String(metrics.windSpeed, 1) + " km/h) -> Retracting screens");
-            triggerSunAction(false); // Open screens for safety
+        hasNotSunnyStart = false;
+        if (config.windAction == "close") {
+            if (!actionActive) {
+                addLogMessage(String("Sun Automation: Wind speed alert (") + String(metrics.windSpeed, 1) + " km/h) -> Closing screens (storm protection)");
+                triggerSunAction(true); // Close screens for protection
+            }
+        } else if (config.windAction == "open") {
+            if (actionActive) {
+                addLogMessage(String("Sun Automation: Wind speed alert (") + String(metrics.windSpeed, 1) + " km/h) -> Retracting screens (safety)");
+                triggerSunAction(false); // Open screens for safety
+            }
         }
         return;
     }

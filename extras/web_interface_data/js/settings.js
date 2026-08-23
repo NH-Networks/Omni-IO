@@ -805,6 +805,7 @@
             if (app.elements.sunDelayOnInput && cfg.sunOnDelayMin !== undefined) app.elements.sunDelayOnInput.value = cfg.sunOnDelayMin;
             if (app.elements.sunDelayOffInput && cfg.sunOffDelayMin !== undefined) app.elements.sunDelayOffInput.value = cfg.sunOffDelayMin;
             if (app.elements.sunMaxWindInput && cfg.maxWindSpeed !== undefined) app.elements.sunMaxWindInput.value = cfg.maxWindSpeed;
+            if (app.elements.sunWindActionSelect && cfg.windAction !== undefined) app.elements.sunWindActionSelect.value = cfg.windAction;
             if (app.elements.sunNightAutoOpenInput) app.elements.sunNightAutoOpenInput.checked = cfg.nightAutoOpen !== undefined ? !!cfg.nightAutoOpen : true;
 
             sunScreensCache = cfg.screens || {};
@@ -852,6 +853,7 @@
             sunOnDelayMin: app.elements.sunDelayOnInput ? parseInt(app.elements.sunDelayOnInput.value, 10) || 5 : 5,
             sunOffDelayMin: app.elements.sunDelayOffInput ? parseInt(app.elements.sunDelayOffInput.value, 10) || 15 : 15,
             maxWindSpeed: app.elements.sunMaxWindInput ? parseFloat(app.elements.sunMaxWindInput.value) || 35 : 35,
+            windAction: app.elements.sunWindActionSelect ? app.elements.sunWindActionSelect.value : "open",
             nightAutoOpen: app.elements.sunNightAutoOpenInput ? app.elements.sunNightAutoOpenInput.checked : true,
             screens: screens
         };

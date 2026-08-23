@@ -39,6 +39,7 @@ struct SunConfig {
     uint16_t sunOnDelayMin = 5;        // Debounce before closing
     uint16_t sunOffDelayMin = 15;      // Debounce before opening
     float maxWindSpeed = 35.0f;        // Wind safety limit km/h (0 = disabled)
+    std::string windAction = "open";   // "open" (omhoog), "close" (omlaag), "none" (geen actie)
     bool nightAutoOpen = true;         // Auto retract screens at sunset
     std::map<std::string, bool> enabledScreens; // Screen description -> auto enabled
 };

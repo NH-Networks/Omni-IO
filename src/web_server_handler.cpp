@@ -1223,6 +1223,7 @@ void handleApiSunGet(AsyncWebServerRequest *request, JsonObject &root) {
   configObj["sunOnDelayMin"] = cfg.sunOnDelayMin;
   configObj["sunOffDelayMin"] = cfg.sunOffDelayMin;
   configObj["maxWindSpeed"] = cfg.maxWindSpeed;
+  configObj["windAction"] = cfg.windAction.c_str();
   configObj["nightAutoOpen"] = cfg.nightAutoOpen;
 
   JsonObject screensObj = configObj.createNestedObject("screens");
@@ -1262,6 +1263,7 @@ void handleApiSunSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObject
   if (doc.containsKey("sunOnDelayMin")) cfg.sunOnDelayMin = doc["sunOnDelayMin"].as<uint16_t>();
   if (doc.containsKey("sunOffDelayMin")) cfg.sunOffDelayMin = doc["sunOffDelayMin"].as<uint16_t>();
   if (doc.containsKey("maxWindSpeed")) cfg.maxWindSpeed = doc["maxWindSpeed"].as<float>();
+  if (doc.containsKey("windAction")) cfg.windAction = doc["windAction"].as<const char*>();
   if (doc.containsKey("nightAutoOpen")) cfg.nightAutoOpen = doc["nightAutoOpen"].as<bool>();
 
   if (doc.containsKey("screens") && doc["screens"].is<JsonObject>()) {

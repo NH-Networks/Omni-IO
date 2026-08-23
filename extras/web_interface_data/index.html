@@ -448,6 +448,14 @@
                     <label for="sun-max-wind" data-i18n="label.max_wind">Windlimiet (km/h):</label>
                     <input type="number" id="sun-max-wind" min="0" max="150" placeholder="35" />
                   </div>
+                  <div style="flex: 1; min-width: 160px;">
+                    <label for="sun-wind-action" data-i18n="label.wind_action">Actie bij harde wind:</label>
+                    <select id="sun-wind-action">
+                      <option value="open" data-i18n="option.wind_action_open">Schermen omhoog (intrekken)</option>
+                      <option value="close" data-i18n="option.wind_action_close">Schermen omlaag (dicht doen)</option>
+                      <option value="none" data-i18n="option.wind_action_none">Geen actie</option>
+                    </select>
+                  </div>
                 </div>
 
                 <label class="setting-toggle" for="sun-night-auto-open" style="margin-top: 8px;">

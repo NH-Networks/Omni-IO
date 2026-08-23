@@ -74,6 +74,7 @@
             sunDelayOnInput: document.getElementById("sun-delay-on"),
             sunDelayOffInput: document.getElementById("sun-delay-off"),
             sunMaxWindInput: document.getElementById("sun-max-wind"),
+            sunWindActionSelect: document.getElementById("sun-wind-action"),
             sunNightAutoOpenInput: document.getElementById("sun-night-auto-open"),
             sunScreensList: document.getElementById("sun-screens-list"),
             sunSaveBtn: document.getElementById("sun-save-btn"),
