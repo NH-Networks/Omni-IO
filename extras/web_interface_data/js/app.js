@@ -39,6 +39,8 @@
             networkDns1Input: document.getElementById("net-dns1"),
             networkDns2Input: document.getElementById("net-dns2"),
             networkSntpInput: document.getElementById("net-sntp"),
+            networkTzSelect: document.getElementById("net-tz-select"),
+            networkTzCustomWrap: document.getElementById("net-tz-custom-wrap"),
             networkTzInput: document.getElementById("net-tz"),
             networkTimeInput: document.getElementById("net-time"),
             networkStatus: document.getElementById("network-status"),

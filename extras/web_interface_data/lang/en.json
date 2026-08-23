@@ -38,6 +38,8 @@
     "label.password":  "Password:",
     "label.discovery_topic":  "Discovery Topic:",
     "label.enable_syslog_forwarding":  "Enable syslog forwarding",
+    "label.timezone":  "Timezone:",
+    "label.custom_posix_tz":  "Custom POSIX String:",
     "label.syslog_tag":  "Tag:",
     "placeholder.syslog_tag":  "e.g. myhouse",
     "note.syslog_privacy":  "Only device events are sent — no credentials or IP addresses.",
