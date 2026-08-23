@@ -189,7 +189,8 @@
         window.closePopup = closePopup;
     }
 
-    window.MiOpenPopup = {
+    window.OmniIoPopup = {
         init: init
     };
+    window.MiOpenPopup = window.OmniIoPopup;
 })();

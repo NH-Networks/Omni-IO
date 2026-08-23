@@ -107,11 +107,11 @@
     }
 
     async function loadLogBuffer(app) {
-        if (!app.elements.statusMessages || !window.MiOpenApi) {
+        if (!app.elements.statusMessages || !window.OmniIoApi) {
             return;
         }
         try {
-            var logs = await window.MiOpenApi.requestJson("/api/logs");
+            var logs = await window.OmniIoApi.requestJson("/api/logs");
             app.elements.statusMessages.textContent = "";
             if (Array.isArray(logs)) {
                 logs.forEach(function (message) {
@@ -315,17 +315,17 @@
         }
         if (app.elements.downloadBackupButton) {
             app.elements.downloadBackupButton.addEventListener("click", function () {
-                window.MiOpenApi.downloadFile("/api/download/backup", "miopen-backup.json").catch(function () {});
+                window.OmniIoApi.downloadFile("/api/download/backup", "omni-io-backup.json").catch(function () {});
             });
         }
         if (app.elements.downloadDevicesButton) {
             app.elements.downloadDevicesButton.addEventListener("click", function () {
-                window.MiOpenApi.downloadFile("/api/download/devices", "1W.json").catch(function () {});
+                window.OmniIoApi.downloadFile("/api/download/devices", "1W.json").catch(function () {});
             });
         }
         if (app.elements.downloadRemotesButton) {
             app.elements.downloadRemotesButton.addEventListener("click", function () {
-                window.MiOpenApi.downloadFile("/api/download/remotes", "RemoteMap.json").catch(function () {});
+                window.OmniIoApi.downloadFile("/api/download/remotes", "RemoteMap.json").catch(function () {});
             });
         }
         if (app.elements.addPopupButton) {
@@ -356,10 +356,11 @@
             }
         };
 
-        window.MiOpenPopup.init(app);
-        window.MiOpenDevices.init(app);
-        window.MiOpenRemotes.init(app);
-        window.MiOpenSettings.init(app);
+        window.OmniIoPopup.init(app);
+        window.OmniIoDevices.init(app);
+        window.OmniIoRemotes.init(app);
+        window.OmniIoSettings.init(app);
+        window.OmniIoApp = app;
         window.MiOpenApp = app;
 
         initSuggestions(app);
@@ -373,7 +374,7 @@
             app.fetchAndDisplayRemotes();
         });
 
-        window.MiOpenApi.requestJson("/api/info").then(function (info) {
+        window.OmniIoApi.requestJson("/api/info").then(function (info) {
             var el = document.getElementById("firmware-version");
             if (el && info.version) {
                 el.textContent = "Firmware: " + info.version + (info.branch ? " (" + info.branch + ")" : "");

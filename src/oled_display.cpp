@@ -100,7 +100,7 @@ void setCpuTempEnabled(bool enabled) {
     nvs_write_bool(NVS_KEY_DISPLAY_CPUTEMP, enabled);
 }
 
-const uint8_t PROGMEM miopenioLogo[] =
+const uint8_t PROGMEM omniIoLogo[] =
 {
     B00000010, B00000000,
     B00001101, B10000000,
@@ -360,9 +360,9 @@ void setDisplayEnabled(bool enabled) {
 }
 
 void drawLogo(int x, int y) {
-    display.drawBitmap(x+1, y+1, miopenioLogo, 16, 10, SSD1306_WHITE);
+    display.drawBitmap(x+1, y+1, omniIoLogo, 16, 10, SSD1306_WHITE);
     display.setCursor(x+20, y+4);
-    display.print("MiOpen.IO");
+    display.print("Omni-IO");
 }
 
 void drawHeader() {
@@ -386,7 +386,7 @@ void drawFooter() {
     if (wifiStatus.connectionStatus == ConnState::Connected) {
         display.setCursor(1, 56);
         if (getSecondsSinceStart() / 10 % 2 == 0) {
-            display.println("http://miopenio.local");
+            display.println("http://omni-io.local");
         } else {
             display.printf("IP: %s\n", WiFi.localIP().toString().c_str());
         }

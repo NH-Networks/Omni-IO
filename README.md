@@ -1,194 +1,124 @@
-<img src="https://github.com/user-attachments/assets/f6b606a1-0eca-4fd6-a509-d5d1136b2d31" alt="smlogo" width="50"/>
+# Omni-IO — Open-Source ESP32 io-homecontrol® Gateway
 
-# IO-Homecontrol ESP32 Project
+<div align="center">
+  <img src="extras/web_interface_data/img/logo.png" alt="Omni-IO Logo" width="100"/>
+  <br/>
+  <strong>Next-Generation Open-Source 868MHz Gateway for io-homecontrol® Devices</strong>
+  <br/><br/>
 
-Based on the wonderful work of:
-
-[Velocet/iown-homecontrol](https://github.com/Velocet/iown-homecontrol)  
-[cridp/iown-homecontrol-esp32sx1276](https://github.com/cridp/iown-homecontrol-esp32sx1276)
-
-Please be advised that the modification to this code have mainly be focussing on the 1W communication with the screen. Certain modification have made the 2W part of the code "unstable". Please notice if the code is used as a furhter base.
-
-[☕ Support the project on BuyMeACoffee](https://buymeacoffee.com/dyna_mite)
-
----
-
-### 📖 Documentation & Wiki
-[- Dutch & English help ](https://github.com/rspaargaren/iohomecontrol/wiki)
+  [![Release](https://img.shields.io/github/v/release/NH-Networks/Omni-IO?style=flat-square&color=blue)](https://github.com/NH-Networks/Omni-IO/releases)
+  [![PlatformIO](https://img.shields.io/badge/PlatformIO-ESP32-orange?style=flat-square)](https://platformio.org/)
+  [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-MQTT%20Discovery-41BDF5?style=flat-square&logo=home-assistant)](https://www.home-assistant.io/)
+  [![License](https://img.shields.io/badge/License-CC%20BY--NC--ND%204.0-lightgrey?style=flat-square)](https://creativecommons.org/licenses/by-nc-nd/4.0/)
+  [![BuyMeACoffee](https://img.shields.io/badge/Support-Buy%20Me%20A%20Coffee-yellow?style=flat-square&logo=buy-me-a-coffee)](https://buymeacoffee.com/dyna_mite)
+</div>
 
 ---
 
-### **Disclaimer**  
-Tool designed for educational and testing purposes, provided "as is", without warranty of any kind. Creators and contributors are not responsible for any misuse or damage caused by this tool.
+## 🌟 Acknowledgments & Credits
 
-_I don't give any support, especially concerning the obsolete 1W part._
+**Omni-IO** stands on the shoulders of giants. This project is built upon the pioneering research, reverse engineering, and codebase contributions of several key members of the open-source home automation community:
 
-This code doesn’t use the RadioLib. Even if it’s perfect for a start, it doesn’t allow to be as fast as possible.
+* **[Velocet](https://github.com/Velocet)** — Author of [Velocet/iown-homecontrol](https://github.com/Velocet/iown-homecontrol): The groundbreaking reverse engineering, protocol specifications, CRC algorithms, and AES cryptography implementations for the io-homecontrol® protocol.
+* **[cridp](https://github.com/cridp)** — Author of [cridp/iown-homecontrol-esp32sx1276](https://github.com/cridp/iown-homecontrol-esp32sx1276): Hardware adaptation and timing optimizations for the ESP32 and Semtech SX1276 radio transceiver.
+* **[djbenbe](https://github.com/djbenbe)** — Core firmware development, UI concept, graphics, and initial integration.
+* **[rspaargaren](https://github.com/rspaargaren)** — Community documentation, troubleshooting guides, and [io-homecontrol Wiki](https://github.com/rspaargaren/iohomecontrol/wiki).
+* **[CloudAXS](https://github.com/CloudAXS)** — Web interface architecture, modern responsive design, and multi-language engine.
 
----
-
-### Documentation
-This code was intentionally written with all possible details found in the protocol documentation.  
-- (i.e., there are 3 different CRCs, 3 different AES implementations, all detailed)  
-- This allows those with little knowledge of C/CPP to understand the sequence of each command.  
-- All these details require you to carefully read the work of @Velocet to understand this protocol.  
-- There is no magic documentation; only personal work to adapt to your own needs.  
-- But all the functional basics for 1W and 2W are there.  
-- All AES implementations are included, without using an external library.  
-- All 1W / 2W commands for pairing/associating are included as well.  
+*All respective trademarks and copyrights belong to their respective owners.*
 
 ---
 
-### Usage
-Use it like a scanner, perform some commands on your real device to identify the corresponding CMDid and address.  
+## ✨ Features
 
-→ Choose your board before build.  
+* 📡 **868.95 MHz io-homecontrol® Radio Engine**:
+  * Native 1-Way (1W) control for shutters, blinds, screens, and Velux/Somfy window openers.
+  * 2-Way (2W) protocol frame sniffing, device discovery, and temperature/mode controls for compatible HVAC systems (Atlantic / Sauter / Thermor).
+* 🌐 **Modern Built-in Web UI**:
+  * Fully responsive mobile & desktop web interface served directly from LittleFS.
+  * Real-time WebSocket connection for instant feedback and live RF traffic log stream.
+  * Multi-language support with instant live switching (**Dutch**, **English**, **German**, and **French**).
+  * Direct device pairing, unpairing, renaming, and travel-time configuration.
+  * Physical remote controller map manager.
+* 🏠 **Home Assistant Auto-Discovery via MQTT**:
+  * Automatic discovery for cover entities (blinds, screens, shutters).
+  * Smooth percentage-based position control with travel time tracking.
+  * Dedicated pairing and maintenance button entities.
+  * Real-time state reporting (`OPEN`, `CLOSED`, `OPENING`, `CLOSING`, `STOP`).
+  * Availability tracking with MQTT Last Will and Testament (LWT).
+* 🖥️ **OLED Display & Advanced Screen Manager**:
+  * Status display showing device name, WiFi signal, IP / mDNS address, MQTT state, and optional CPU temperature.
+  * Runtime configurable screensaver timeout, screen-off timeout, and 3 dimming levels (Low, Medium, High).
+* 📜 **Syslog & Remote Logging**:
+  * Sends log messages directly to remote Syslog servers (RFC3164 / RFC5424 compliant).
+* 💾 **Backup & Restore**:
+  * One-click JSON backup and restore for device configurations and remote mappings.
+  * Full backward-compatibility with legacy backup files.
+* 🔄 **OTA (Over-The-Air) & Partitioning**:
+  * Built-in OTA updates for both firmware and LittleFS filesystem from the web interface.
 
 ---
 
-### Brief explanation[^1]:
-Uses 2 interrupts:  
-- if PAYLOAD and RX → decode the frame [^3]  
-- if PAYLOAD and TX_READY → send the frame, decode it [^3]  
+## 🛠️ Supported Hardware
+
+| Hardware Board | Chip | Flash | Frequency | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **LilyGo T-Beam v1.2** | ESP32 | 4MB | 868 MHz (SX1276) | Recommended / Full support |
+| **LilyGo LoRa32 v2.1 (T3 v1.6.1)** | ESP32 | 4MB | 868 MHz (SX1276) | Integrated OLED |
+| **Heltec LoRa32 v2** | ESP32 | 8MB | 868 MHz (SX1276) | Integrated OLED |
+| **LilyGo T3-S3** | ESP32-S3 | 4MB | 868 MHz (SX1262/SX1276) | High-performance S3 SoC |
 
 ---
 
-### platformio[^2] :
-_First time or when a JSON in data folder is modified:_  
-1. build filesystem image  
-2. upload filesystem image  
+## 🚀 Quick Start Guide
 
-_After any other changes:_  
-- upload and monitor  
-- make sure `CONFIG_ESP_TIMER_SUPPORTS_ISR_DISPATCH_METHOD` remains enabled in `sdkconfig` so ESP timers can run callbacks from ISR context  
+### 1. Flash the Firmware
+Download the latest ready-to-flash binaries from the [Releases](https://github.com/NH-Networks/Omni-IO/releases) page:
+* Use the **merged single-file binary** (`<Board>.bin`) with [ESP Web Tools](https://esphome.github.io/esp-web-tools/) or `esptool.py`.
 
-[^1]: I use an SX1276. If CC1101/SX1262: Feel free to use the old code (not checked/guaranteed).  
-[^2]: I use Visual Studio Code Insider.  
-[^3]: Decoding can be verbose (RSSI, Timing, …).  
+### 2. Connect to WiFi
+1. On first boot, the ESP32 creates a setup Access Point named **`iohc-setup`**.
+2. Connect to this WiFi network from your phone or PC.
+3. The captive portal will open automatically. Select your home WiFi network and enter your password.
+
+### 3. Open the Web Interface
+Once connected to your network, open your web browser and navigate to:
+👉 **[http://omni-io.local](http://omni-io.local)**  
+*(or use the device IP address shown on the OLED screen / Serial monitor)*
 
 ---
 
-## Web Interface (Experimental)
+## 🏠 Home Assistant Integration
 
-This project now includes an experimental web interface to control IOHC devices.
+When MQTT is enabled, Omni-IO automatically exposes your blinds and covers to Home Assistant via MQTT Discovery:
 
-### Setup & Access
-1. **Configure WiFi** – on first boot the device starts an access point named `iohc-setup`.  
-   Connect and follow the WiFiManager portal to enter your WiFi credentials.  
-2. **Build and Upload Filesystem** – upload web files in `extras/web_interface_data/` via LittleFS.  
-3. **Build and Upload Firmware** – flash main firmware with PlatformIO.  
-4. **Find ESP32 IP** – check Serial Monitor for IP.  
-5. **Access the Interface** – open browser at IP or `http://miopenio.local` if mDNS is supported.  
+1. In the Web UI, go to **Settings → MQTT**.
+2. Enter your MQTT Broker IP, port, username, and password.
+3. Click **Save Settings**.
+4. Home Assistant will immediately discover the covers and their control buttons!
 
+### MQTT Topics Structure
+* **Command Topic**: `iown/<ID>/set` (`OPEN`, `CLOSE`, `STOP`)
+* **Position Set Topic**: `iown/<ID>/position/set` (`0` to `100`)
+* **State Topic**: `iown/<ID>/state` (`OPEN`, `CLOSED`, `OPENING`, `CLOSING`, `STOP`)
+* **Position Feedback**: `iown/<ID>/position` (`0` to `100`)
+* **Availability**: `iown/status` (`online` / `offline`)
 
-1.  **Configure WiFi:**
-    *   On first boot the device starts an access point named `iohc-setup`.
-    *   Connect to this AP and follow the WiFiManager captive portal to enter
-        your WiFi credentials.
+---
 
-2.  **Build and Upload Filesystem:**
-    *   The web interface files (`index.html`, `style.css`, `script.js`) are located in `extras/web_interface_data/`.
-    *   These files need to be uploaded to the ESP32's LittleFS filesystem.
-    *   Using PlatformIO:
-        *   First, build the filesystem image: `pio run --target buildfs` (or use the PlatformIO IDE option for building the filesystem image).
-        *   Then, upload the filesystem image: `pio run --target uploadfs` (or use the PlatformIO IDE option for uploading).
-    *   **Note:** You only need to rebuild and re-upload the filesystem image if you make changes to the files in `extras/web_interface_data/`.
-    *   **Device files:** Copy your device definition files (for example `extras/1W.json`) into the LittleFS root before building.
-        Without these files the `/api/devices` endpoint returns an empty list and the web interface will show no devices.
+## 📖 Terminal & Serial Commands
 
-3.  **Build and Upload Firmware:**
-    *   Build and upload the main firmware to your ESP32 as usual using PlatformIO (`pio run --target upload` or via the IDE).
+For a full reference of commands available via the Serial Monitor and Web Terminal, see [COMMANDS.md](COMMANDS.md).
 
-4.  **Find ESP32 IP Address:**
-    *   After uploading, open the Serial Monitor.
-    *   When the ESP32 connects to your WiFi network, it will print its IP address. Look for a line like: `Connected to WiFi. IP Address: XXX.XXX.X.XXX`.
+---
 
-5.  **Access the Interface:**
-    *   Open a web browser on a device connected to the same WiFi network as your ESP32.
-    *   Navigate to the IP address you found in the Serial Monitor (e.g., `http://XXX.XXX.X.XXX`) or use `http://miopenio.local` if your network supports mDNS.
+## ⚠️ Disclaimer
 
-### Usage
+This tool is designed for educational, testing, and smart-home integration purposes and is provided "as is" without warranty of any kind. The creators and contributors are not responsible for any misuse, damage, or malfunction caused by using this software or hardware.
 
-The web interface allows you to:
+---
 
-*   **View a list of devices:** The device list is currently populated with placeholder examples. (Future development will integrate this with actual detected/configured devices).
-*   **Send commands:** Select a device, type a command string (e.g., `setTemp 21.0`), and click "Send". (Command processing is currently a placeholder and will acknowledge receipt).
-*   **Live updates:** Logs and device positions are pushed to the browser via WebSockets.
+## 📄 License & Attribution
 
-This feature is under development, and functionality will be expanded in the future.
-
-
-## Home Assistant Discovery
-
-When MQTT is enabled (`#define MQTT` in `include/user_config.h`), the firmware publishes HA discovery messages for every blind.  
-
-
-The `1W.json` file now accepts an optional `travel_time` field per device. This value represents the time in seconds a blind takes to move from fully closed to fully open. It allows the firmware to estimate the current position when no feedback is available. The estimated position is printed to the serial console and shown on the OLED display every second while the blind is moving. When a command is transmitted or received, this position feedback is appended below the action information on the display so that the original message remains visible.
-If these fields (`name` and `travel_time`) are missing, default values are applied using the device description and a 10 second travel time. These defaults are saved back to `1W.json` so subsequent boots load the updated values automatically.
-
-Each blind also publishes a Home Assistant number entity for the travel time. Adjusting this entity updates the `travel_time` value in `1W.json`, allowing calibration directly from the Home Assistant UI without editing files manually.
-
-Each entry can also contain a `paired` boolean that indicates if the blind is paired to a screen. If the field is missing, it is automatically added with a default value of `false` when the file is loaded. The flag is updated automatically when the `pair` or `remove` commands are used.
-
-Sequence numbers for each remote are stored both in `extras/1W.json` and in NVS.
-On boot the value from the file is compared to the one in NVS and the highest
-value is kept so sequence numbers continue uninterrupted even after filesystem
-uploads or resets.
-
-
-It supports `travel_time`, pairing state, and sequence numbers.  
-
-Example payload:  
-```json
-{"name":"IZY1","command_topic":"iown/B60D1A/set","state_topic":"iown/B60D1A/state","position_topic":"iown/B60D1A/position","set_position_topic":"iown/B60D1A/position/set","unique_id":"B60D1A","payload_open":"OPEN","payload_close":"CLOSE","payload_stop":"STOP","device_class":"blind","availability_topic":"iown/status"}
-```
-
-
-For each blind the firmware also publishes MQTT button entities that allow
-executing pairing or controller management commands directly from Home Assistant.
-The discovery topics are:
-
-- `homeassistant/button/<id>_pair/config`
-- `homeassistant/button/<id>_add/config`
-- `homeassistant/button/<id>_remove/config`
-
-Each blind along with its control buttons is exposed as an individual device in
-Home Assistant, so the gateway no longer groups all entities into a single
-device list.
-
-Sending `PRESS` to `iown/<id>/pair`, `iown/<id>/add` or `iown/<id>/remove`
-triggers the corresponding command on the blind.
-
-Configure your MQTT broker settings in `include/user_config.h` (`mqtt_server`, `mqtt_user`, `mqtt_password`, `mqtt_discovery_topic`). These values can also be changed at runtime via the `mqttIp`, `mqttUser`, `mqttPass` and `mqttDiscovery` commands. After boot and connection, Home Assistant should automatically discover the covers.
-
-If you don't have an OLED display connected, comment out the `DISPLAY` definition in `include/user_config.h` to disable all display related code.
-
-Once discovery is complete you can control a blind by publishing `OPEN`, `CLOSE`
-or `STOP` to `iown/<id>/set`, or a number between `0` (closed) and `100` (open) to
-`iown/<id>/position/set` to move the blind to a specific position. The firmware
-now uses the device's absolute positioning for these percentage commands, providing
-more accurate movement. For direct access to the raw absolute command where `0`
-means fully open and `100` fully closed, publish to `iown/<id>/absolute/set`.
-When an `OPEN` or `CLOSE` command is received, it immediately publishes the new
-state (`open` or `closed`) to `iown/<id>/state` so Home Assistant can update the
-cover status.
-
-While a blind is in motion the current position percentage is published every
-second to `iown/<id>/position`. The `state` topic is also updated with
-`OPENING`, `CLOSING` or `STOP` depending on the movement. When the blind stops
-moving, the state reverts to `OPEN`, `CLOSE` or `STOP` according to the final
-position.
-
-The gateway publishes `online` every minute to `iown/status` and has a Last Will
-configured to send `offline` on the same topic if it disconnects unexpectedly.
-Home Assistant uses this message to mark all covers as unavailable when the
-gateway goes offline.
-
-
-#### **License**
-
-Image [miopen.io](https://miopen.io) © 2025 by [djbenbe](https://creativecommons.org) is licensed under [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/)
-<img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="CC" style="width:0.2em; height:0.2em; margin-left:.2em;">
-<img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="BY" style="width:0.2em; height:0.2em;margin-left:.2em;">
-<img src="https://mirrors.creativecommons.org/presskit/icons/nc.svg" alt="NC" style="width:0.2em; height:0.2em; margin-left:.2em;">
-<img src="https://mirrors.creativecommons.org/presskit/icons/nd.svg" alt="ND" style="width:0.2em; height:0.2em; margin-left:.2em;">
+* Code licensed under open-source terms.
+* Documentation & Graphic assets © 2025–2026 by [djbenbe](https://creativecommons.org) and contributors, licensed under [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/).

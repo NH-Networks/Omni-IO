@@ -17,7 +17,7 @@
 #endif
 
 #ifndef SYSLOG_APP
-#define SYSLOG_APP "MIOPENIO" // rsyslog will use this as %PROGRAMNAME%
+#define SYSLOG_APP "OMNI-IO" // rsyslog will use this as %PROGRAMNAME%
 #endif
 
 // Define SYSLOG_RFC5424 to send RFC5424 instead of RFC3164
