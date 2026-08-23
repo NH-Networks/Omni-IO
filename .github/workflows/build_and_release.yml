@@ -81,7 +81,8 @@ jobs:
           cat > changelog.md <<EOF
           ## Omni-IO Release ${{ github.ref_name }}
 
-          ### What's New in v3.2.0
+          ### What's New in v1.0.1
+          - **Brand-New Omni-IO Identity & Logo**: Fresh modern visual identity, vector SVG & high-resolution PNG branding across the Web UI and docs.
           - **OLED Display Controls**: Runtime-configurable screensaver timeout (10–3600s), screen-off timeout (0s to disable, or 60–86400s), dim levels (Low, Medium, High), and CPU temperature toggle.
           - **Multi-language Support (i18n)**: Fully translated Web UI settings in Dutch (NL), English (EN), German (DE), and French (FR).
           - **Persistent Settings (NVS)**: All display and system preferences are persisted across reboots via ESP32 NVS.
