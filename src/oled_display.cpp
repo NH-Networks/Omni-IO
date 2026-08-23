@@ -516,7 +516,7 @@ void displayTask(void *) {
 #endif
                 lastLines = currentLines;
             }
-        } else if (secondsSinceNoData < offSecs) {
+        } else if (offSecs == 0 || secondsSinceNoData < offSecs) {
             setTimerSpeed(slow);
             if (!taskDisplayOn) {
                 display.ssd1306_command(SSD1306_DISPLAYON);

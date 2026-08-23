@@ -977,12 +977,12 @@ void handleApiDisplaySet(AsyncWebServerRequest *request, JsonObject &doc, JsonOb
     setScreensaverTimeout(static_cast<uint16_t>(val));
   }
 
-  // screenOffTimeout
+  // screenOffTimeout (0 = disable screen-off, or 60..86400)
   if (doc["screenOffTimeout"].is<JsonVariant>()) {
     int val = doc["screenOffTimeout"] | -1;
-    if (val < 60 || val > 86400) {
+    if (val != 0 && (val < 60 || val > 86400)) {
       request->send(400, "application/json",
-                    "{\"success\":false,\"message\":\"screenOffTimeout must be 60..86400\"}");
+                    "{\"success\":false,\"message\":\"screenOffTimeout must be 0 or 60..86400\"}");
       return;
     }
     setScreenOffTimeout(static_cast<uint16_t>(val));
