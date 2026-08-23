@@ -887,7 +887,7 @@ void handleApiInfo(AsyncWebServerRequest *request, JsonObject &root) {
   root["environment"] = "unknown";
 #endif
 #else
-  root["version"] = "dev";
+  root["version"] = "3.3.0";
 #endif
   root["uptimeMs"] = millis();
   root["freeHeap"] = ESP.getFreeHeap();
