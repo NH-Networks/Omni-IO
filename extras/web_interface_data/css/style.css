@@ -782,3 +782,78 @@ footer {
   background: rgba(255, 255, 255, 0.08);
 }
 
+/* Tooltip / Explanation Icons */
+.tip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-accent2);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: bold;
+  font-style: normal;
+  cursor: pointer;
+  margin-left: 5px;
+  vertical-align: middle;
+  position: relative;
+  opacity: 0.85;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  user-select: none;
+  line-height: 1;
+}
+.tip-icon:hover, .tip-icon:focus {
+  opacity: 1;
+  transform: scale(1.12);
+}
+.tip-icon .tip-content {
+  visibility: hidden;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #1e293b;
+  color: #f8fafc;
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  font-size: 0.78rem;
+  font-weight: normal;
+  line-height: 1.4;
+  width: max-content;
+  max-width: 260px;
+  white-space: normal;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+  border: 1px solid var(--color7);
+}
+.tip-icon .tip-content::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -6px;
+  border-width: 6px;
+  border-style: solid;
+  border-color: #1e293b transparent transparent transparent;
+}
+.tip-icon:hover .tip-content,
+.tip-icon:focus .tip-content,
+.tip-icon.active .tip-content {
+  visibility: visible;
+  opacity: 1;
+}
+.dark-mode .tip-icon .tip-content {
+  background-color: #0f172a;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+.dark-mode .tip-icon .tip-content::after {
+  border-color: #0f172a transparent transparent transparent;
+}
+
+
