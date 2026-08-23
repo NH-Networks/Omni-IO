@@ -106,9 +106,16 @@ When MQTT is enabled, Omni-IO automatically exposes your blinds and covers to Ho
 
 ---
 
-## 📖 Terminal & Serial Commands
+## 📚 Documentation & Guides
 
-For a full reference of commands available via the Serial Monitor and Web Terminal, see [COMMANDS.md](COMMANDS.md).
+Comprehensive guides and technical documentation are available in the [`docs/`](docs/) directory:
+
+* 🔌 **[Hardware Setup & Pinouts](docs/HARDWARE_SETUP.md)** — Detailed wiring diagrams, pin definitions, antenna sizing, and board comparison.
+* 🔄 **[Pairing & Calibration Guide](docs/PAIRING_GUIDE.md)** — Step-by-step motor pairing, travel time measurement, and wall remote mapping.
+* 🏠 **[Home Assistant Integration](docs/HOME_ASSISTANT.md)** — Zero-config MQTT discovery, dashboard cards, and automation examples.
+* 🌐 **[REST API & MQTT Reference](docs/API_AND_MQTT_REFERENCE.md)** — Complete API documentation for all REST endpoints, WebSockets, and MQTT topics.
+* 🔧 **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** — Common issues and fixes for WiFi, mDNS, RF range, and OLED screens.
+* 💻 **[Terminal & Serial Commands](COMMANDS.md)** — Full command reference for the serial console and web terminal.
 
 ---
 
