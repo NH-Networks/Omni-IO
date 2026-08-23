@@ -420,7 +420,7 @@ static void restoreConfigAfterFilesystemUpdate() {
 
 void handleDownloadBackup(AsyncWebServerRequest *request) {
   JsonDocument backup;
-  backup["format"] = "miopen-backup";
+  backup["format"] = "omni-io-backup";
   backup["version"] = 1;
 
   JsonDocument devices;
@@ -438,7 +438,7 @@ void handleDownloadBackup(AsyncWebServerRequest *request) {
   }
 
   AsyncResponseStream *response = request->beginResponseStream("application/json");
-  response->addHeader("Content-Disposition", "attachment; filename=miopen-backup.json");
+  response->addHeader("Content-Disposition", "attachment; filename=omni-io-backup.json");
   serializeJson(backup, *response);
   request->send(response);
 }
@@ -705,7 +705,7 @@ static bool isValidIpString(const String &value) {
 }
 
 void handleApiNetworkGet(AsyncWebServerRequest *request, JsonObject &root) {
-  root["hostname"] = WiFi.getHostname() ? WiFi.getHostname() : "MiOpenIO";
+  root["hostname"] = WiFi.getHostname() ? WiFi.getHostname() : "Omni-IO";
   root["dhcp"] = true;
   root["connected"] = WiFi.status() == WL_CONNECTED;
   root["ip"] = WiFi.localIP().toString();
@@ -737,7 +737,7 @@ void handleApiNetworkGet(AsyncWebServerRequest *request, JsonObject &root) {
 }
 
 void handleApiNetworkSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
-  String hostname = doc["hostname"] | "MiOpenIO";
+  String hostname = doc["hostname"] | "Omni-IO";
   bool dhcp = doc["dhcp"] | true;
   String ip = doc["ip"] | "";
   String mask = doc["mask"] | "";

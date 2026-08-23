@@ -1,4 +1,4 @@
-# ESP32 4MB OTA layout for MiOpen.IO
+# ESP32 4MB OTA layout for Omni-IO
 # Keeps one LittleFS partition because the firmware mounts a single LittleFS.
 # Name,   Type, SubType, Offset,   Size,     Flags
 nvs,      data, nvs,     0x9000,   0x5000,

@@ -18,7 +18,7 @@
         const tbody = document.querySelector("#remote-table tbody");
 
         try {
-            const remotes = await window.MiOpenApi.requestJson("/api/remotes");
+            const remotes = await window.OmniIoApi.requestJson("/api/remotes");
             tbody.textContent = "";
 
             if (!remotes.length) {
@@ -89,7 +89,7 @@
                 unpairBtnName: app.i18nText("button.unlink", "Unlink"),
                 onPair: async function (deviceId) {
                     try {
-                        const result = await window.MiOpenApi.postJson("/api/command", {
+                        const result = await window.OmniIoApi.postJson("/api/command", {
                             command: "linkRemote " + remoteId + " " + deviceId
                         });
                         await fetchAndDisplayRemotes(app);
@@ -98,7 +98,7 @@
                 },
                 onUnpair: async function (deviceId) {
                     try {
-                        const result = await window.MiOpenApi.postJson("/api/command", {
+                        const result = await window.OmniIoApi.postJson("/api/command", {
                             command: "unlinkRemote " + remoteId + " " + deviceId
                         });
                         await fetchAndDisplayRemotes(app);
@@ -111,7 +111,7 @@
                     }
 
                     try {
-                        const result = await window.MiOpenApi.postJson("/api/command", {
+                        const result = await window.OmniIoApi.postJson("/api/command", {
                             RemoteId: remoteId,
                             command: "editRemote " + newName
                         });
@@ -122,7 +122,7 @@
                 },
                 onDelete: async function () {
                     try {
-                        const result = await window.MiOpenApi.postJson("/api/command", {
+                        const result = await window.OmniIoApi.postJson("/api/command", {
                             command: "delRemote " + remoteId
                         });
                         await fetchAndDisplayRemotes(app);
@@ -157,7 +157,7 @@
                     }
 
                     try {
-                        const result = await window.MiOpenApi.postJson("/api/command", {
+                        const result = await window.OmniIoApi.postJson("/api/command", {
                             command: "newRemote " + id + " " + newName
                         });
                         await fetchAndDisplayRemotes(app);
@@ -181,7 +181,8 @@
         window.editRemote = app.editRemote;
     }
 
-    window.MiOpenRemotes = {
+    window.OmniIoRemotes = {
         init: init
     };
+    window.MiOpenRemotes = window.OmniIoRemotes;
 })();

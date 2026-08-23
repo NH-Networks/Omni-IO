@@ -79,7 +79,7 @@ jobs:
       - name: Generate release notes
         run: |
           cat > changelog.md <<EOF
-          ## MiOpen.IO Release ${{ github.ref_name }}
+          ## Omni-IO Release ${{ github.ref_name }}
 
           ### What's New in v3.2.0
           - **OLED Display Controls**: Runtime-configurable screensaver timeout (10–3600s), screen-off timeout (0s to disable, or 60–86400s), dim levels (Low, Medium, High), and CPU temperature toggle.

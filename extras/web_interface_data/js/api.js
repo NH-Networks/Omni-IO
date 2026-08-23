@@ -60,10 +60,11 @@
         window.URL.revokeObjectURL(link.href);
     }
 
-    window.MiOpenApi = {
+    window.OmniIoApi = {
         downloadFile: downloadFile,
         postJson: postJson,
         requestJson: requestJson,
         uploadFile: uploadFile
     };
+    window.MiOpenApi = window.OmniIoApi;
 })();
