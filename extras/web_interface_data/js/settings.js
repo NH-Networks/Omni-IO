@@ -305,6 +305,7 @@
             app.elements.fallbackSaveButton.disabled = false;
         }
     }
+
     async function loadDisplayConfig(app) {
         if (!app.elements.displayEnabledInput) {
             return;
@@ -319,6 +320,23 @@
             const config = await window.MiOpenApi.requestJson("/api/display");
             const enabled = config.enabled !== false;
             app.elements.displayEnabledInput.checked = enabled;
+
+            if (app.elements.displayScreensaverTimeoutInput) {
+                app.elements.displayScreensaverTimeoutInput.value =
+                    config.screensaverTimeout !== undefined ? config.screensaverTimeout : 60;
+            }
+            if (app.elements.displayOffTimeoutInput) {
+                app.elements.displayOffTimeoutInput.value =
+                    config.screenOffTimeout !== undefined ? config.screenOffTimeout : 3600;
+            }
+            if (app.elements.displayDimLevelSelect) {
+                app.elements.displayDimLevelSelect.value =
+                    config.dimLevel !== undefined ? String(config.dimLevel) : "0";
+            }
+            if (app.elements.displayCpuTempInput) {
+                app.elements.displayCpuTempInput.checked = config.showCpuTemp !== false;
+            }
+
             setDisplayStatus(
                 app,
                 enabled
@@ -353,9 +371,27 @@
             app.i18nText("status.display_saving", "Saving display setting...")
         );
         try {
-            const result = await window.MiOpenApi.postJson("/api/display", {
+            const payload = {
                 enabled: requestedEnabled
-            });
+            };
+
+            if (app.elements.displayScreensaverTimeoutInput) {
+                const ssVal = parseInt(app.elements.displayScreensaverTimeoutInput.value, 10);
+                if (!isNaN(ssVal)) payload.screensaverTimeout = ssVal;
+            }
+            if (app.elements.displayOffTimeoutInput) {
+                const offVal = parseInt(app.elements.displayOffTimeoutInput.value, 10);
+                if (!isNaN(offVal)) payload.screenOffTimeout = offVal;
+            }
+            if (app.elements.displayDimLevelSelect) {
+                const dimVal = parseInt(app.elements.displayDimLevelSelect.value, 10);
+                payload.dimLevel = isNaN(dimVal) ? 0 : dimVal;
+            }
+            if (app.elements.displayCpuTempInput) {
+                payload.showCpuTemp = app.elements.displayCpuTempInput.checked;
+            }
+
+            const result = await window.MiOpenApi.postJson("/api/display", payload);
             const enabled = result.enabled !== false;
             app.elements.displayEnabledInput.checked = enabled;
             setSettingsStatus(
@@ -538,25 +574,30 @@
 
         function activate(name) {
             tabs.forEach(function (tab) {
-                tab.classList.toggle("active", tab.dataset.settingsTab === name);
+                const isActive = tab.dataset.settingsTab === name;
+                tab.classList.toggle("active", isActive);
             });
             panels.forEach(function (panel) {
                 const isActive = panel.dataset.settingsPanel === name;
                 panel.classList.toggle("active", isActive);
-                panel.hidden = !isActive;
+                if (isActive) {
+                    panel.removeAttribute("hidden");
+                    panel.style.setProperty("display", "grid", "important");
+                } else {
+                    panel.setAttribute("hidden", "hidden");
+                    panel.style.setProperty("display", "none", "important");
+                }
             });
         }
 
         tabs.forEach(function (tab) {
-            tab.addEventListener("click", function () {
+            tab.addEventListener("click", function (e) {
+                if (e && typeof e.preventDefault === "function") e.preventDefault();
                 activate(tab.dataset.settingsTab);
             });
         });
 
-        const activeTab = tabs.find(function (tab) {
-            return tab.classList.contains("active");
-        });
-        activate(activeTab ? activeTab.dataset.settingsTab : "integration");
+        activate("integration");
     }
 
     let restartInFlight = false;

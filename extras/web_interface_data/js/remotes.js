@@ -146,7 +146,7 @@
                 btnShowDelete: false,
                 btnShowCancel: false,
                 timingLabel: app.i18nText("popup.remote_name_label", "Remote Name:"),
-                defaultValue: app.elements.lastAddrInput.value.trim(),
+                defaultValue: (app && app.elements && app.elements.lastAddrInput && app.elements.lastAddrInput.value) ? app.elements.lastAddrInput.value.trim() : "",
                 onSave: async function (addr, newName) {
                     const id = addr.trim();
                     if (!id) {

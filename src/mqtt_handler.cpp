@@ -53,13 +53,19 @@ void mqttFuncHandler(const char *cmd);
 static void mqttPostConnectTask(void*);
 static void handleMqttConnectImpl();
 
+#ifdef FIRMWARE_VERSION
+#define IOHC_SW_VERSION FIRMWARE_VERSION
+#else
+#define IOHC_SW_VERSION "3.3.0"
+#endif
+
 static void populateGatewayDevice(JsonVariant variant) {
     JsonObject device = variant.to<JsonObject>();
     device["identifiers"] = GATEWAY_ID;
     device["name"] = "My Open IO Gateway";
     device["manufacturer"] = "Somfy";
     device["model"] = "IO Blind Bridge";
-    device["sw_version"] = "1.0.0";
+    device["sw_version"] = IOHC_SW_VERSION;
 }
 
 static void syncWebPosition(const std::string &id, int position) {
@@ -167,7 +173,7 @@ static void publishButtonDiscovery(const std::string &id, const std::string &nam
     device["name"] = name;
     device["manufacturer"] = "Somfy";
     device["model"] = "IO Blind Bridge";
-    device["sw_version"] = "1.0.0";
+    device["sw_version"] = IOHC_SW_VERSION;
     device["serial_number"] = key;
     device["via_device"] = GATEWAY_ID;
 
@@ -195,7 +201,7 @@ void publishTravelTimeDiscovery(const std::string &id, const std::string &name,
     device["name"] = name;
     device["manufacturer"] = "Somfy";
     device["model"] = "IO Blind Bridge";
-    device["sw_version"] = "1.0.0";
+    device["sw_version"] = IOHC_SW_VERSION;
     device["serial_number"] = key;
     device["via_device"] = GATEWAY_ID;
 
@@ -240,7 +246,7 @@ void publishDiscovery(const std::string &id, const std::string &name, const std:
     device["name"] = name;
     device["manufacturer"] = "Somfy";
     device["model"] = "IO Blind Bridge";
-    device["sw_version"] = "1.0.0";
+    device["sw_version"] = IOHC_SW_VERSION;
     device["serial_number"] = key;
     device["via_device"] = GATEWAY_ID;
 
@@ -503,7 +509,7 @@ static void publishIohcFrameDiscovery() {
     device["name"] = "My Open IO Gateway";
     device["manufacturer"] = "Somfy";
     device["model"] = "IO Blind Bridge";
-    device["sw_version"] = "1.0.0";
+    device["sw_version"] = IOHC_SW_VERSION;
 
     std::string cfg;
     size_t cfgLen = serializeJson(configDoc, cfg);

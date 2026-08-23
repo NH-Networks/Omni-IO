@@ -361,7 +361,9 @@ static void runConfigPortal(const std::string& ssid, bool hasWifiConfiguration) 
         const long millisRemaining = portalTimeoutMs == 0 ? 0 : static_cast<long>(portalTimeoutMs) - static_cast<long>(millis() - portalStartTime);
         if (portalTimeoutMs > 0) {
             auto remainingTime = millisToMinutesAndSeconds(millisRemaining);
-            displayCustomMessage("Remaining time", format("%2dm %02ds", std::get<0>(remainingTime), std::get<1>(remainingTime)).c_str());
+            char timeBuf[32];
+            snprintf(timeBuf, sizeof(timeBuf), "%2dm %02ds", std::get<0>(remainingTime), std::get<1>(remainingTime));
+            displayCustomMessage("Remaining time", timeBuf);
         } else {
             displayCustomMessage("Remaining time", "disabled");
         }
