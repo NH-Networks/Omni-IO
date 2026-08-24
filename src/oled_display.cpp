@@ -153,28 +153,28 @@ const uint8_t PROGMEM wifiIcons[4][7] = {
     }, // all three filled
 };
 
-const uint8_t PROGMEM mqttIcons[3][2*7] = {
-     {
+const uint8_t PROGMEM mqttIcons[3][10] = {
+    {
         B00111000, B11100000,
         B01100000, B00110000,
         B11000000, B00011000,
         B01100000, B00110000,
         B00111000, B11100000,
-    }, // empty chain ends
+    }, // empty / connecting chain ends
     {
         B00111000, B11100000,
         B01100000, B00110000,
         B11001111, B10011000,
         B01100000, B00110000,
         B00111000, B11100000,
-    }, // filled chain ends
+    }, // connected / filled chain ends
     {
         B00011100, B00111000,
         B01100011, B00001100,
         B11000000, B00001100,
         B11000011, B00011000,
         B01110000, B11100000,
-    }, // broken chain ends
+    }, // disconnected / broken chain ends
 };
 
 int mqttStatusToIconIndex() {
@@ -184,9 +184,26 @@ int mqttStatusToIconIndex() {
     case ConnState::Connected:
         return 1;
     case ConnState::Disconnected:
+    default:
         return 2;
     };
-    return 2;
+}
+
+static const char* getMqttStatusText() {
+#if defined(MQTT)
+    if (mqtt_server.empty()) {
+        return "Disabled";
+    }
+    switch (mqttStatus) {
+        case ConnState::Connected:
+            return "Connected";
+        case ConnState::Connecting:
+            return "Connecting...";
+        case ConnState::Disconnected:
+            return "Disconnected";
+    }
+#endif
+    return "Disabled";
 }
 
 const bool fast = true;
@@ -369,27 +386,34 @@ void drawHeader() {
     drawLogo(0, 0);
 
 #if defined(MQTT)
-    const auto mqttIcon = mqttIcons[mqttStatusToIconIndex()];
-    display.drawBitmap(127-8-1-16, 5, mqttIcon, 16, 5, SSD1306_WHITE);
+    if (!mqtt_server.empty()) {
+        const auto mqttIcon = mqttIcons[mqttStatusToIconIndex()];
+        display.drawBitmap(127-8-1-16, 5, mqttIcon, 16, 5, SSD1306_WHITE);
+    }
 #endif
 
     const auto wifiIcon = wifiIcons[min(wifiStatus.signalStrengthPercent.load(), 99) / 25];
     display.drawBitmap(127-8, 3, wifiIcon, 8, 7, SSD1306_WHITE);
 
     if (cpuTempEnabled.load()) {
-        display.setCursor(82, 4);
+        display.setCursor(74, 4);
         display.printf("%.0fC", temperatureRead());
     }
 }
 
 void drawFooter() {
+    display.setCursor(1, 56);
     if (wifiStatus.connectionStatus == ConnState::Connected) {
-        display.setCursor(1, 56);
-        if (getSecondsSinceStart() / 10 % 2 == 0) {
+        const int cycle = (getSecondsSinceStart() / 6) % 3;
+        if (cycle == 0) {
             display.println("http://omni-io.local");
-        } else {
+        } else if (cycle == 1) {
             display.printf("IP: %s\n", WiFi.localIP().toString().c_str());
+        } else {
+            display.printf("MQTT: %s\n", getMqttStatusText());
         }
+    } else {
+        display.println("WiFi: Disconnected");
     }
 }
 
@@ -418,6 +442,18 @@ void drawData(const std::vector<std::string>& currentLines) {
         display.setCursor(0, 20);
         const bool hasData = drawContents(currentLines);
         if (!hasData) {
+            display.setCursor(1, 20);
+            if (wifiStatus.connectionStatus == ConnState::Connected) {
+                String ssid = WiFi.SSID();
+                if (ssid.length() > 10) ssid = ssid.substring(0, 8) + "..";
+                display.printf("WiFi: %s (%d%%)\n", ssid.c_str(), wifiStatus.signalStrengthPercent.load());
+            } else {
+                display.println("WiFi: Disconnected");
+            }
+            display.setCursor(1, 32);
+            display.printf("MQTT: %s\n", getMqttStatusText());
+            display.setCursor(1, 44);
+            display.println("Status: Ready (868MHz)");
             setTimerSpeed(slow);
         }
     }
@@ -426,22 +462,28 @@ void drawData(const std::vector<std::string>& currentLines) {
 }
 
 void drawLogo() {
-    const int x = 50.0 * std::rand() / RAND_MAX;
-    const int y = 30.0 * std::rand() / RAND_MAX;
+    const int x = 30.0 * std::rand() / RAND_MAX;
+    const int y = 14.0 * std::rand() / RAND_MAX;
     drawLogo(x, y);
 
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
 
+    int textY = y + 14;
     if (cpuTempEnabled.load()) {
-        display.setCursor(x, y + 16);
+        display.setCursor(x, textY);
         display.printf("CPU: %.0fC", temperatureRead());
+        textY += 10;
     }
 
     if (wifiStatus.connectionStatus == ConnState::Connected) {
-        display.setCursor(x, y + (cpuTempEnabled.load() ? 26 : 16));
+        display.setCursor(x, textY);
         display.print(WiFi.localIP().toString().c_str());
+        textY += 10;
     }
+
+    display.setCursor(x, textY);
+    display.printf("MQTT: %s", getMqttStatusText());
 }
 
 void displayTask(void *) {
@@ -488,7 +530,7 @@ void displayTask(void *) {
             if (now != lastDrawnTime) dirty = true;
             if (wifiStatus.rssi != lastRssi) dirty = true;
 #if defined(MQTT)
-            int currentMqttIcon = mqttStatusToIconIndex();
+            int currentMqttIcon = mqtt_server.empty() ? -2 : mqttStatusToIconIndex();
             if (currentMqttIcon != lastMqttIcon) dirty = true;
 #endif
 
