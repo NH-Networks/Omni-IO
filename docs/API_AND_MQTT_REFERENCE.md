@@ -11,7 +11,7 @@ Returns general firmware and hardware information.
 * **Response `200 OK`**:
 ```json
 {
-  "version": "1.0.1",
+  "version": "1.0.2",
   "branch": "master",
   "chip": "ESP32-D0WDQ6",
   "flash_size": 4194304,
