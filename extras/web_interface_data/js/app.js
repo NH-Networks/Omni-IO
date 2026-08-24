@@ -221,6 +221,8 @@
         }
     }
 
+    var _wsPositionRaf = {};
+
     function initWebSocket(app) {
         var wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
         var ws = new WebSocket(wsScheme + "://" + window.location.host + "/ws");

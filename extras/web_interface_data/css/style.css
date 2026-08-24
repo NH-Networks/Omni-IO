@@ -140,6 +140,10 @@ nav .items:hover {
   background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent2) 100%);
   color: var(--color-header-text);
   padding: 10px 16px;
+  min-height: 48px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
   border-radius: var(--radius) var(--radius) 0 0;
   margin: 0;
   position: relative;
@@ -150,14 +154,36 @@ nav .items:hover {
   letter-spacing: -0.01em;
   box-shadow: var(--shadow-sm);
 }
-.title #select-log, .title div {
+.title h2 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0;
+}
+.title #select-log {
   position: absolute;
   right: 12px;
   top: 50%;
   transform: translateY(-50%);
 }
 .title .btn {
-  top: auto;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+.title .btn.add, .title .btn.close {
+  right: 12px;
+}
+.title .btn.help {
+  right: 52px;
+}
+.title .btn:hover {
+  transform: translateY(calc(-50% - 1px));
+  box-shadow: var(--shadow-sm);
+  background-color: rgba(255, 255, 255, 0.12);
+}
+.title .btn:active {
+  transform: translateY(-50%) scale(0.95);
 }
 #status-messages p.log-warning {
   color: #f59e0b;
@@ -315,9 +341,6 @@ th {
 }
 .btn.help {
   background: url("../img/help.svg") center / 20px no-repeat;
-}
-.title .help {
-    right: 52px;
 }
 .device-selection label {
     line-height: 44px;

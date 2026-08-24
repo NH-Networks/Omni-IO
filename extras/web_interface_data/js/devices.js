@@ -23,12 +23,6 @@
                 return;
             }
 
-            if (typeof durationSeconds === "number" && durationSeconds > 0) {
-                deviceEl.style.transitionDuration = durationSeconds.toFixed(2) + "s";
-            } else {
-                deviceEl.style.transitionDuration = "";
-            }
-
             var clamped = Math.max(0, Math.min(100, Number(percent) || 0));
             deviceEl.style.background = "linear-gradient(to top, var(--color-input) " +
                 clamped + "%, var(--color-accent3) " + clamped + "%)";
