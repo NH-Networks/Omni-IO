@@ -87,13 +87,19 @@ jobs:
 
           ## ✨ What's New in ${{ github.ref_name }}
 
-          * 🎨 **Brand-New Official Omni-IO Logo & Vector Branding**:
-            * Complete replacement of the legacy logo with the official **Omni-IO** identity.
-            * Added crisp, scalable vector SVG (\`extras/web_interface_data/img/logo.svg\`) and high-resolution PNG (\`extras/web_interface_data/img/logo.png\`).
-            * Updated asset cache-busting query strings (\`?v=1.0.1\`) across the Web UI and favicon to ensure immediate cache invalidation in browsers.
-          * 📺 **OLED Display Controls**: Runtime-configurable screensaver timeout (10–3600s), screen-off timeout (0s to disable, or 60–86400s), dim levels (Low, Medium, High), and CPU temperature toggle.
-          * 🌐 **Multi-language Support (i18n)**: Fully translated Web UI settings in Dutch (NL), English (EN), German (DE), and French (FR).
-          * 💾 **Persistent Settings (NVS)**: All display and system preferences are persisted across reboots via ESP32 NVS.
+          * 🏠 **Device Room Grouping with Master Controls**:
+            * Group devices into customizable rooms and zones with quick sorting.
+            * Master Room Controls allowing one-click Open, Close, Stop, and Vent across all devices in a room.
+            * Visual real-time position sync across room members.
+          * 📡 **Live MQTT Status Indicator & Health Monitoring**:
+            * Header status badge showing real-time MQTT broker connectivity and connection status.
+          * 🎬 **Real-Time Motion Animation & WebSocket Sync**:
+            * Real-time rolling/tilting animations during motor movement.
+            * Motion completion synchronization across connected WebSocket clients with auto-clearing motion state.
+          * ⚡ **Performance & UI Refinements**:
+            * GPU hardware acceleration hints and smooth scrolling for a seamless mobile & desktop experience.
+            * Interactive logo click navigation back to primary Devices view.
+            * Visual polish and hover improvements.
 
           ---
 
