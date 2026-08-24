@@ -1220,10 +1220,28 @@ void handleApiSunGet(AsyncWebServerRequest *request, JsonObject &root) {
   configObj["minElevation"] = cfg.minElevation;
   configObj["radiationThreshold"] = cfg.radiationThreshold;
   configObj["maxCloudCover"] = cfg.maxCloudCover;
+  configObj["useIncidenceAngle"] = cfg.useIncidenceAngle;
+  configObj["facadeAzimuth"] = cfg.facadeAzimuth;
+
   configObj["sunOnDelayMin"] = cfg.sunOnDelayMin;
   configObj["sunOffDelayMin"] = cfg.sunOffDelayMin;
+  configObj["minHoldDurationMin"] = cfg.minHoldDurationMin;
+
   configObj["maxWindSpeed"] = cfg.maxWindSpeed;
+  configObj["maxWindGust"] = cfg.maxWindGust;
+  configObj["windLockoutMin"] = cfg.windLockoutMin;
   configObj["windAction"] = cfg.windAction.c_str();
+
+  configObj["rainSafetyEnabled"] = cfg.rainSafetyEnabled;
+  configObj["rainAction"] = cfg.rainAction.c_str();
+  configObj["rainLockoutMin"] = cfg.rainLockoutMin;
+
+  configObj["tempFilterEnabled"] = cfg.tempFilterEnabled;
+  configObj["minTemperature"] = cfg.minTemperature;
+
+  configObj["hotDayForecastEnabled"] = cfg.hotDayForecastEnabled;
+  configObj["hotDayThresholdTemp"] = cfg.hotDayThresholdTemp;
+
   configObj["nightAutoOpen"] = cfg.nightAutoOpen;
 
   JsonObject screensObj = configObj.createNestedObject("screens");
@@ -1235,17 +1253,27 @@ void handleApiSunGet(AsyncWebServerRequest *request, JsonObject &root) {
   metricsObj["elevation"] = met.elevation;
   metricsObj["azimuth"] = met.azimuth;
   metricsObj["directRadiation"] = met.directRadiation;
+  metricsObj["effectiveRadiation"] = met.effectiveRadiation;
   metricsObj["cloudCover"] = met.cloudCover;
   metricsObj["temperature"] = met.temperature;
   metricsObj["windSpeed"] = met.windSpeed;
+  metricsObj["windGusts"] = met.windGusts;
+  metricsObj["windDirection"] = met.windDirection;
+  metricsObj["precipitation"] = met.precipitation;
+  metricsObj["weatherCode"] = met.weatherCode;
+  metricsObj["forecastMaxTemp"] = met.forecastMaxTemp;
+  metricsObj["forecastPrecipProb"] = met.forecastPrecipProb;
   metricsObj["isDay"] = met.isDay;
   metricsObj["lastUpdateEpoch"] = met.lastUpdateEpoch;
+  metricsObj["lockoutRemainingSec"] = met.lockoutRemainingSec;
+  metricsObj["lockoutReason"] = met.lockoutReason.c_str();
 
   root["condition"] = sun->getConditionString();
   root["actionActive"] = sun->isActionActive();
   root["sunnyElapsedSec"] = sun->getSunnyElapsedSeconds();
   root["cloudyElapsedSec"] = sun->getCloudyElapsedSeconds();
   root["countdownSec"] = sun->getNextActionCountdownSeconds();
+  root["lockoutRemainingSec"] = sun->getLockoutRemainingSeconds();
 }
 
 void handleApiSunSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
@@ -1260,10 +1288,28 @@ void handleApiSunSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObject
   if (doc.containsKey("minElevation")) cfg.minElevation = doc["minElevation"].as<float>();
   if (doc.containsKey("radiationThreshold")) cfg.radiationThreshold = doc["radiationThreshold"].as<float>();
   if (doc.containsKey("maxCloudCover")) cfg.maxCloudCover = doc["maxCloudCover"].as<float>();
+  if (doc.containsKey("useIncidenceAngle")) cfg.useIncidenceAngle = doc["useIncidenceAngle"].as<bool>();
+  if (doc.containsKey("facadeAzimuth")) cfg.facadeAzimuth = doc["facadeAzimuth"].as<float>();
+
   if (doc.containsKey("sunOnDelayMin")) cfg.sunOnDelayMin = doc["sunOnDelayMin"].as<uint16_t>();
   if (doc.containsKey("sunOffDelayMin")) cfg.sunOffDelayMin = doc["sunOffDelayMin"].as<uint16_t>();
+  if (doc.containsKey("minHoldDurationMin")) cfg.minHoldDurationMin = doc["minHoldDurationMin"].as<uint16_t>();
+
   if (doc.containsKey("maxWindSpeed")) cfg.maxWindSpeed = doc["maxWindSpeed"].as<float>();
+  if (doc.containsKey("maxWindGust")) cfg.maxWindGust = doc["maxWindGust"].as<float>();
+  if (doc.containsKey("windLockoutMin")) cfg.windLockoutMin = doc["windLockoutMin"].as<uint16_t>();
   if (doc.containsKey("windAction")) cfg.windAction = doc["windAction"].as<const char*>();
+
+  if (doc.containsKey("rainSafetyEnabled")) cfg.rainSafetyEnabled = doc["rainSafetyEnabled"].as<bool>();
+  if (doc.containsKey("rainAction")) cfg.rainAction = doc["rainAction"].as<const char*>();
+  if (doc.containsKey("rainLockoutMin")) cfg.rainLockoutMin = doc["rainLockoutMin"].as<uint16_t>();
+
+  if (doc.containsKey("tempFilterEnabled")) cfg.tempFilterEnabled = doc["tempFilterEnabled"].as<bool>();
+  if (doc.containsKey("minTemperature")) cfg.minTemperature = doc["minTemperature"].as<float>();
+
+  if (doc.containsKey("hotDayForecastEnabled")) cfg.hotDayForecastEnabled = doc["hotDayForecastEnabled"].as<bool>();
+  if (doc.containsKey("hotDayThresholdTemp")) cfg.hotDayThresholdTemp = doc["hotDayThresholdTemp"].as<float>();
+
   if (doc.containsKey("nightAutoOpen")) cfg.nightAutoOpen = doc["nightAutoOpen"].as<bool>();
 
   if (doc.containsKey("screens") && doc["screens"].is<JsonObject>()) {

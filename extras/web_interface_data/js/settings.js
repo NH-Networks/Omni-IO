@@ -722,12 +722,26 @@
         });
     }
 
+    function getWeatherCodeName(code, app) {
+        if (code === 0) return app.i18nText("weather.clear", "Helder");
+        if (code >= 1 && code <= 3) return app.i18nText("weather.partly_cloudy", "Licht bewolkt");
+        if (code >= 45 && code <= 48) return app.i18nText("weather.fog", "Mist");
+        if (code >= 51 && code <= 55) return app.i18nText("weather.drizzle", "Motregen");
+        if (code >= 61 && code <= 65) return app.i18nText("weather.rain", "Regen");
+        if (code >= 71 && code <= 77) return app.i18nText("weather.snow", "Sneeuw");
+        if (code >= 80 && code <= 82) return app.i18nText("weather.showers", "Buien");
+        if (code >= 95 && code <= 99) return app.i18nText("weather.thunderstorm", "Onweer");
+        return app.i18nText("weather.overcast", "Bewolkt");
+    }
+
     function renderSunMetrics(app, data) {
         if (!data || !app.elements.sunConditionBadge) return;
         const met = data.metrics || {};
         const cond = data.condition || "disabled";
         const isActive = data.actionActive || false;
         const countdown = data.countdownSec || 0;
+        const lockoutSec = data.lockoutRemainingSec || met.lockoutRemainingSec || 0;
+        const lockoutReason = met.lockoutReason || "";
 
         function getCompassName(deg) {
             if (deg === undefined || isNaN(deg)) return "-";
@@ -740,6 +754,9 @@
         if (app.elements.sunMetricRadiation) {
             app.elements.sunMetricRadiation.textContent = (met.directRadiation !== undefined ? Math.round(met.directRadiation) : "-") + " W/m²";
         }
+        if (app.elements.sunMetricEffective) {
+            app.elements.sunMetricEffective.textContent = (met.effectiveRadiation !== undefined ? Math.round(met.effectiveRadiation) : "-") + " W/m²";
+        }
         if (app.elements.sunMetricCloud) {
             app.elements.sunMetricCloud.textContent = (met.cloudCover !== undefined ? Math.round(met.cloudCover) : "-") + "%";
         }
@@ -750,10 +767,19 @@
             app.elements.sunMetricAzimuth.textContent = getCompassName(met.azimuth);
         }
         if (app.elements.sunMetricWind) {
-            app.elements.sunMetricWind.textContent = (met.windSpeed !== undefined ? met.windSpeed.toFixed(1) : "-") + " km/h";
+            const speed = met.windSpeed !== undefined ? met.windSpeed.toFixed(0) : "-";
+            const gusts = met.windGusts !== undefined ? met.windGusts.toFixed(0) : "-";
+            app.elements.sunMetricWind.textContent = `${speed} km/h (vlaag: ${gusts})`;
         }
         if (app.elements.sunMetricTemp) {
-            app.elements.sunMetricTemp.textContent = (met.temperature !== undefined ? met.temperature.toFixed(1) : "-") + " °C";
+            const temp = met.temperature !== undefined ? met.temperature.toFixed(1) : "-";
+            const maxT = met.forecastMaxTemp !== undefined && met.forecastMaxTemp > -40 ? met.forecastMaxTemp.toFixed(1) : "-";
+            app.elements.sunMetricTemp.textContent = `${temp} °C (max: ${maxT}°C)`;
+        }
+        if (app.elements.sunMetricRain) {
+            const precip = met.precipitation !== undefined ? met.precipitation.toFixed(1) : "0.0";
+            const wName = getWeatherCodeName(met.weatherCode || 0, app);
+            app.elements.sunMetricRain.textContent = `${precip} mm/h (${wName})`;
         }
 
         const badge = app.elements.sunConditionBadge;
@@ -767,7 +793,7 @@
             case "disabled":
                 badgeText = app.i18nText("sun_state.disabled", "Uitgeschakeld");
                 badgeColor = "#777";
-                descText = app.i18nText("sun_state.disabled_desc", "Zon automatisering staat uit.");
+                descText = app.i18nText("sun_state.disabled_desc", "Zon & weer automatisering staat uit.");
                 break;
             case "sunny":
                 badgeText = app.i18nText("sun_state.sunny", "☀️ Volle zon op gevel");
@@ -781,8 +807,22 @@
                     descText = app.i18nText("sun_state.sun_active", "Zon actief.");
                 }
                 break;
+            case "hot_day_precool":
+                badgeText = app.i18nText("sun_state.hot_day_precool", "☀️ Hittedag Koeling");
+                badgeColor = "#ea580c";
+                if (isActive) {
+                    descText = app.i18nText("sun_state.precool_closed", "Preventieve hittedag-koeling actief. Schermen gesloten tegen opwarming.");
+                } else {
+                    descText = app.i18nText("sun_state.precool_closing", "Hete dag voorspeld. Schermen worden preventief gesloten...");
+                }
+                break;
+            case "cold_hold":
+                badgeText = app.i18nText("sun_state.cold_hold", "❄️ Passieve Warmte (Koud Weer)");
+                badgeColor = "#2563eb";
+                descText = app.i18nText("sun_state.cold_hold_desc", "Zon schijnt, maar buitentemperatuur is laag. Schermen blijven open om gratis te verwarmen.");
+                break;
             case "cloudy":
-                badgeText = app.i18nText("sun_state.cloudy", "⛅ Bewolkt / Lage straling");
+                badgeText = app.i18nText("sun_state.cloudy", "⛅ Bewolkt / Weinig straling");
                 badgeColor = "#4b5563";
                 if (isActive && countdown > 0) {
                     const min = Math.ceil(countdown / 60);
@@ -792,13 +832,13 @@
                 }
                 break;
             case "outside_facade":
-                badgeText = app.i18nText("sun_state.outside_facade", "🧭 Zon buiten bereik gevel");
+                badgeText = app.i18nText("sun_state.outside_facade", "🧭 Zon buiten gevelbereik");
                 badgeColor = "#6b7280";
                 if (isActive && countdown > 0) {
                     const min = Math.ceil(countdown / 60);
                     descText = app.i18nText("sun_state.opening_in", `Zon voorbij gevel. Schermen openen over ${min} min...`);
                 } else {
-                    descText = app.i18nText("sun_state.outside_desc", "Zon schijnt niet rechtstreeks op deze gevel.");
+                    descText = app.i18nText("sun_state.outside_desc", "Zon schijnt momenteel niet rechtstreeks op deze gevel.");
                 }
                 break;
             case "night":
@@ -806,10 +846,29 @@
                 badgeColor = "#374151";
                 descText = app.i18nText("sun_state.night_desc", "Zon is onder de horizon.");
                 break;
+            case "rain_alert":
+                badgeText = app.i18nText("sun_state.rain_alert", "🌧️ Regen / Onweer Alarm");
+                badgeColor = "#0284c7";
+                descText = app.i18nText("sun_state.rain_desc", "Neerslag gedetecteerd! Schermen zijn direct ingetrokken ter bescherming.");
+                break;
             case "wind_alert":
-                badgeText = app.i18nText("sun_state.wind_alert", "💨 Windbeveiliging actief");
+                badgeText = app.i18nText("sun_state.wind_alert", "💨 Wind- & Storm Alarm");
                 badgeColor = "#dc2626";
-                descText = app.i18nText("sun_state.wind_desc", "Harde wind gedetecteerd! Schermen zijn ingetrokken voor veiligheid.");
+                descText = app.i18nText("sun_state.wind_desc", "Harde wind of zware windstoten gedetecteerd! Schermen zijn beschermd.");
+                break;
+            case "safety_lockout":
+                badgeText = app.i18nText("sun_state.safety_lockout", "🛡️ Veiligheidsvergrendeling");
+                badgeColor = "#9333ea";
+                const lockMin = Math.ceil(lockoutSec / 60);
+                const reasonStr = (lockoutReason === "rain")
+                    ? app.i18nText("sun_state.lockout_rain_reason", "droogloop na regen")
+                    : app.i18nText("sun_state.lockout_wind_reason", "rusttijd na storm");
+                descText = app.i18nText("sun_state.lockout_desc", `Veiligheidsslot actief (${reasonStr}). Vrijgave over ${lockMin} min.`);
+                break;
+            case "manual_hold":
+                badgeText = app.i18nText("sun_state.manual_hold", "✋ Handmatige Pauze");
+                badgeColor = "#4f46e5";
+                descText = app.i18nText("sun_state.manual_hold_desc", "Handmatige bediening actief; automatisering gepauzeerd.");
                 break;
             default:
                 badgeText = cond;
@@ -824,26 +883,46 @@
 
     async function loadSunConfig(app) {
         try {
-            const data = await window.MiOpenApi.requestJson("/api/sun");
+            const data = await window.OmniIoApi.requestJson("/api/sun");
             const cfg = data.config || {};
             if (app.elements.sunEnabledInput) app.elements.sunEnabledInput.checked = !!cfg.enabled;
             if (app.elements.sunLatInput && cfg.latitude !== undefined) app.elements.sunLatInput.value = cfg.latitude;
             if (app.elements.sunLonInput && cfg.longitude !== undefined) app.elements.sunLonInput.value = cfg.longitude;
+
             if (app.elements.sunAzimuthStartInput && cfg.azimuthStart !== undefined) app.elements.sunAzimuthStartInput.value = cfg.azimuthStart;
             if (app.elements.sunAzimuthEndInput && cfg.azimuthEnd !== undefined) app.elements.sunAzimuthEndInput.value = cfg.azimuthEnd;
             if (app.elements.sunMinElevationInput && cfg.minElevation !== undefined) app.elements.sunMinElevationInput.value = cfg.minElevation;
+            if (app.elements.sunFacadeAzimuthInput && cfg.facadeAzimuth !== undefined) app.elements.sunFacadeAzimuthInput.value = cfg.facadeAzimuth;
+            if (app.elements.sunUseIncidenceInput) app.elements.sunUseIncidenceInput.checked = !!cfg.useIncidenceAngle;
+
             if (app.elements.sunRadiationThreshInput && cfg.radiationThreshold !== undefined) app.elements.sunRadiationThreshInput.value = cfg.radiationThreshold;
             if (app.elements.sunCloudThreshInput && cfg.maxCloudCover !== undefined) app.elements.sunCloudThreshInput.value = cfg.maxCloudCover;
+
             if (app.elements.sunDelayOnInput && cfg.sunOnDelayMin !== undefined) app.elements.sunDelayOnInput.value = cfg.sunOnDelayMin;
             if (app.elements.sunDelayOffInput && cfg.sunOffDelayMin !== undefined) app.elements.sunDelayOffInput.value = cfg.sunOffDelayMin;
+            if (app.elements.sunMinHoldInput && cfg.minHoldDurationMin !== undefined) app.elements.sunMinHoldInput.value = cfg.minHoldDurationMin;
+
+            if (app.elements.sunRainEnabledInput) app.elements.sunRainEnabledInput.checked = cfg.rainSafetyEnabled !== undefined ? !!cfg.rainSafetyEnabled : true;
+            if (app.elements.sunRainActionSelect && cfg.rainAction !== undefined) app.elements.sunRainActionSelect.value = cfg.rainAction;
+            if (app.elements.sunRainLockoutInput && cfg.rainLockoutMin !== undefined) app.elements.sunRainLockoutInput.value = cfg.rainLockoutMin;
+
             if (app.elements.sunMaxWindInput && cfg.maxWindSpeed !== undefined) app.elements.sunMaxWindInput.value = cfg.maxWindSpeed;
+            if (app.elements.sunMaxWindGustInput && cfg.maxWindGust !== undefined) app.elements.sunMaxWindGustInput.value = cfg.maxWindGust;
             if (app.elements.sunWindActionSelect && cfg.windAction !== undefined) app.elements.sunWindActionSelect.value = cfg.windAction;
+            if (app.elements.sunWindLockoutInput && cfg.windLockoutMin !== undefined) app.elements.sunWindLockoutInput.value = cfg.windLockoutMin;
+
+            if (app.elements.sunTempFilterEnabledInput) app.elements.sunTempFilterEnabledInput.checked = cfg.tempFilterEnabled !== undefined ? !!cfg.tempFilterEnabled : true;
+            if (app.elements.sunMinTempInput && cfg.minTemperature !== undefined) app.elements.sunMinTempInput.value = cfg.minTemperature;
+
+            if (app.elements.sunHotdayEnabledInput) app.elements.sunHotdayEnabledInput.checked = !!cfg.hotDayForecastEnabled;
+            if (app.elements.sunHotdayTempInput && cfg.hotDayThresholdTemp !== undefined) app.elements.sunHotdayTempInput.value = cfg.hotDayThresholdTemp;
+
             if (app.elements.sunNightAutoOpenInput) app.elements.sunNightAutoOpenInput.checked = cfg.nightAutoOpen !== undefined ? !!cfg.nightAutoOpen : true;
 
             sunScreensCache = cfg.screens || {};
 
             // Fetch and render screen list
-            const remotes = await window.MiOpenApi.requestJson("/api/remotes").catch(() => []);
+            const remotes = await window.OmniIoApi.requestJson("/api/remotes").catch(() => []);
             renderSunScreensList(app, remotes, cfg);
 
             renderSunMetrics(app, data);
@@ -852,7 +931,7 @@
                 sunIntervalTimer = setInterval(function () {
                     const sunPanel = document.querySelector('[data-settings-panel="sun"]');
                     if (sunPanel && sunPanel.classList.contains("active")) {
-                        window.MiOpenApi.requestJson("/api/sun").then(function (d) {
+                        window.OmniIoApi.requestJson("/api/sun").then(function (d) {
                             renderSunMetrics(app, d);
                         }).catch(function () {});
                     }
@@ -880,20 +959,38 @@
             azimuthStart: app.elements.sunAzimuthStartInput ? parseFloat(app.elements.sunAzimuthStartInput.value) || 120 : 120,
             azimuthEnd: app.elements.sunAzimuthEndInput ? parseFloat(app.elements.sunAzimuthEndInput.value) || 260 : 260,
             minElevation: app.elements.sunMinElevationInput ? parseFloat(app.elements.sunMinElevationInput.value) || 10 : 10,
+            facadeAzimuth: app.elements.sunFacadeAzimuthInput ? parseFloat(app.elements.sunFacadeAzimuthInput.value) || 180 : 180,
+            useIncidenceAngle: app.elements.sunUseIncidenceInput ? app.elements.sunUseIncidenceInput.checked : false,
+
             radiationThreshold: app.elements.sunRadiationThreshInput ? parseFloat(app.elements.sunRadiationThreshInput.value) || 200 : 200,
             maxCloudCover: app.elements.sunCloudThreshInput ? parseFloat(app.elements.sunCloudThreshInput.value) || 75 : 75,
             sunOnDelayMin: app.elements.sunDelayOnInput ? parseInt(app.elements.sunDelayOnInput.value, 10) || 5 : 5,
             sunOffDelayMin: app.elements.sunDelayOffInput ? parseInt(app.elements.sunDelayOffInput.value, 10) || 15 : 15,
+            minHoldDurationMin: app.elements.sunMinHoldInput ? parseInt(app.elements.sunMinHoldInput.value, 10) || 10 : 10,
+
+            rainSafetyEnabled: app.elements.sunRainEnabledInput ? app.elements.sunRainEnabledInput.checked : true,
+            rainAction: app.elements.sunRainActionSelect ? app.elements.sunRainActionSelect.value : "open",
+            rainLockoutMin: app.elements.sunRainLockoutInput ? parseInt(app.elements.sunRainLockoutInput.value, 10) || 20 : 20,
+
             maxWindSpeed: app.elements.sunMaxWindInput ? parseFloat(app.elements.sunMaxWindInput.value) || 35 : 35,
+            maxWindGust: app.elements.sunMaxWindGustInput ? parseFloat(app.elements.sunMaxWindGustInput.value) || 45 : 45,
             windAction: app.elements.sunWindActionSelect ? app.elements.sunWindActionSelect.value : "open",
+            windLockoutMin: app.elements.sunWindLockoutInput ? parseInt(app.elements.sunWindLockoutInput.value, 10) || 30 : 30,
+
+            tempFilterEnabled: app.elements.sunTempFilterEnabledInput ? app.elements.sunTempFilterEnabledInput.checked : true,
+            minTemperature: app.elements.sunMinTempInput ? parseFloat(app.elements.sunMinTempInput.value) || 19.0 : 19.0,
+
+            hotDayForecastEnabled: app.elements.sunHotdayEnabledInput ? app.elements.sunHotdayEnabledInput.checked : false,
+            hotDayThresholdTemp: app.elements.sunHotdayTempInput ? parseFloat(app.elements.sunHotdayTempInput.value) || 26.0 : 26.0,
+
             nightAutoOpen: app.elements.sunNightAutoOpenInput ? app.elements.sunNightAutoOpenInput.checked : true,
             screens: screens
         };
 
         setSettingsStatus(app, app.i18nText("status.saving", "Opslaan..."));
         try {
-            await window.MiOpenApi.postJson("/api/sun", payload);
-            setSettingsStatus(app, app.i18nText("status.sun_saved", "Zon automatisering instellingen opgeslagen!"), false, 4000);
+            await window.OmniIoApi.postJson("/api/sun", payload);
+            setSettingsStatus(app, app.i18nText("status.sun_saved", "Zon & weer automatisering instellingen opgeslagen!"), false, 4000);
             await loadSunConfig(app);
         } catch (e) {
             setSettingsStatus(app, app.i18nText("status.error_saving", "Fout bij opslaan: ") + (e.message || e), true, 6000);
@@ -903,7 +1000,7 @@
     async function evaluateSunNow(app) {
         setSettingsStatus(app, app.i18nText("status.measuring", "Meting ophalen en evalueren..."));
         try {
-            await window.MiOpenApi.postJson("/api/sun/evaluate", {});
+            await window.OmniIoApi.postJson("/api/sun/evaluate", {});
             setSettingsStatus(app, app.i18nText("status.measured", "Meting voltooid!"), false, 3000);
             await loadSunConfig(app);
         } catch (e) {

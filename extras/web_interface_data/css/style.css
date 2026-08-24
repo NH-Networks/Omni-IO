@@ -863,4 +863,23 @@ footer p {
   border-color: #0f172a transparent transparent transparent;
 }
 
+/* Sun & Weather Automation Subsections */
+.sun-subcard {
+  background: rgba(90, 110, 140, 0.05);
+  border: 1px solid rgba(90, 110, 140, 0.15);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-top: 14px;
+}
+.sun-subcard-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text);
+}
+
+
 
