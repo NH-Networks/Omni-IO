@@ -1194,16 +1194,21 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
 #if defined(MQTT) || defined(WEBSERVER)
                 std::string id = bytesToHexString(r.node, sizeof(r.node));
 #endif
-#if defined(MQTT)
                 const char *state = "STOP";
                 if (r.movement == remote::Movement::Opening) {
                     state = pos >= 99.5f ? "OPEN" : "STOP";
                 } else if (r.movement == remote::Movement::Closing) {
                     state = pos <= 0.5f ? "CLOSE" : "STOP";
                 }
+#if defined(MQTT)
                 if (state != r.lastPublishedState) {
                     publishCoverState(id, state);
                     r.lastPublishedState = state;
+                }
+#endif
+#if defined(WEBSERVER)
+                if (r.movement != remote::Movement::Idle) {
+                    broadcastWebDeviceAction(r, state);
                 }
 #endif
                 if (r.lastPublishedPosition != pos) {

@@ -9,6 +9,9 @@
         });
     }
 
+    // Timeout map to auto-clear motion state if no stop packet arrives
+    var _stateTimers = {};
+
     function updateDeviceFill(deviceId, percent, durationSeconds) {
         // Cancel any pending RAF for this device — only the latest update matters
         if (_rafPending[deviceId]) {
@@ -26,10 +29,20 @@
             var clamped = Math.max(0, Math.min(100, Number(percent) || 0));
             deviceEl.style.background = "linear-gradient(to top, var(--color-input) " +
                 clamped + "%, var(--color-accent3) " + clamped + "%)";
+
+            // If movement reached boundaries, clear motion state
+            if ((clamped >= 100 && deviceEl.dataset.state === "OPENING") ||
+                (clamped <= 0 && deviceEl.dataset.state === "CLOSING")) {
+                var stateEl = deviceEl.querySelector(".device-state");
+                if (stateEl) {
+                    stateEl.textContent = "";
+                }
+                deviceEl.dataset.state = "STOP";
+            }
         });
     }
 
-    function setDeviceState(deviceId, state, source) {
+    function setDeviceState(app, deviceId, state, source) {
         var deviceEl = document.querySelector('.device[data-id="' + deviceId + '"]');
         if (!deviceEl) {
             return;
@@ -40,11 +53,40 @@
             return;
         }
 
-        var normalizedState = state || "STOP";
+        if (_stateTimers[deviceId]) {
+            clearTimeout(_stateTimers[deviceId]);
+            delete _stateTimers[deviceId];
+        }
+
+        var normalizedState = String(state || "STOP").toUpperCase();
         var normalizedSource = source || "gateway";
-        stateEl.textContent = normalizedState + " - " + normalizedSource;
-        deviceEl.dataset.state = normalizedState;
-        deviceEl.dataset.source = normalizedSource;
+
+        var isMoving = normalizedState === "OPENING" || normalizedState === "CLOSING";
+
+        if (isMoving) {
+            stateEl.textContent = normalizedState + " - " + normalizedSource;
+            deviceEl.dataset.state = normalizedState;
+            deviceEl.dataset.source = normalizedSource;
+
+            // Safety fallback: auto-clear back to idle after travel_time + 2s
+            var cached = (app && app.state && app.state.devicesCache) ?
+                app.state.devicesCache.find(function (d) { return d.id === deviceId; }) : null;
+            var travelSec = (cached && cached.travel_time > 0) ? cached.travel_time : 15;
+            _stateTimers[deviceId] = setTimeout(function () {
+                delete _stateTimers[deviceId];
+                if (deviceEl.dataset.state === normalizedState) {
+                    deviceEl.dataset.state = "STOP";
+                    stateEl.textContent = (cached && cached.active === false) ? "inactive" : "";
+                }
+            }, (travelSec + 2) * 1000);
+        } else {
+            // Idle / Stopped / Completed
+            var cached = (app && app.state && app.state.devicesCache) ?
+                app.state.devicesCache.find(function (d) { return d.id === deviceId; }) : null;
+            stateEl.textContent = (cached && cached.active === false) ? "inactive" : "";
+            deviceEl.dataset.state = normalizedState;
+            deviceEl.dataset.source = normalizedSource;
+        }
     }
 
     function applyDeviceAction(app, data) {
@@ -68,7 +110,7 @@
         }
 
         updateDeviceFill(data.id, current, animDuration);
-        setDeviceState(data.id, state, source);
+        setDeviceState(app, data.id, state, source);
 
         if (cached && typeof current !== "undefined") {
             cached.position = Math.max(0, Math.min(100, Number(current) || 0));
