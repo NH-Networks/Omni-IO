@@ -12,7 +12,7 @@ def get_version():
             stderr=subprocess.DEVNULL
         ).decode().strip()
     except Exception:
-        return "1.0.2"
+        return "1.0.3"
 
 
 def get_branch():

@@ -834,3 +834,160 @@ footer p {
   display: grid;
   gap: 8px;
 }
+
+/* MQTT Live Status Pill in Header */
+.mqtt-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 20px;
+  padding: 4px 10px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease, transform 0.15s ease;
+  margin-left: auto;
+}
+.mqtt-pill:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+.mqtt-pill:active {
+  transform: scale(0.96);
+}
+.mqtt-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background-color: #94a3b8;
+  display: inline-block;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+.mqtt-dot.connected {
+  background-color: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  animation: mqttPulse 2.5s infinite;
+}
+.mqtt-dot.connecting {
+  background-color: #f59e0b;
+  box-shadow: 0 0 6px #f59e0b;
+}
+.mqtt-dot.disconnected {
+  background-color: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+}
+.mqtt-dot.disabled {
+  background-color: #64748b;
+  opacity: 0.6;
+}
+.mqtt-text {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--color-header-text);
+  text-transform: uppercase;
+}
+
+@keyframes mqttPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+/* Room / Group Filter Bar & Chips */
+.room-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color7);
+}
+.room-chip {
+  background: var(--color-input);
+  color: var(--color-text);
+  border: 1px solid var(--color-input-border, var(--color7));
+  border-radius: 16px;
+  padding: 5px 12px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.room-chip:hover {
+  background: var(--color7);
+  transform: translateY(-1px);
+}
+.room-chip.active {
+  background: var(--color-accent2);
+  color: #ffffff;
+  border-color: var(--color-accent2);
+  box-shadow: var(--shadow-sm);
+}
+.room-chip-count {
+  font-size: 0.72rem;
+  background: rgba(0, 0, 0, 0.12);
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+.room-chip.active .room-chip-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+/* Room Group Header inside Device List */
+.room-group-block {
+  margin-bottom: 14px;
+}
+.room-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 4px 8px;
+  margin-bottom: 6px;
+  border-bottom: 1px dashed var(--color7);
+}
+.room-group-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.room-group-actions {
+  display: flex;
+  gap: 6px;
+}
+.room-group-actions .btn {
+  height: 28px;
+  width: 28px;
+  font-size: 0;
+  border-radius: var(--radius-sm);
+}
+.device-room-badge {
+  font-size: 0.72rem;
+  background: rgba(90, 110, 140, 0.12);
+  color: var(--color-text);
+  padding: 2px 6px;
+  border-radius: 6px;
+  margin-top: 2px;
+  display: inline-block;
+  opacity: 0.85;
+}
+.dark-mode .device-room-badge {
+  background: rgba(255, 255, 255, 0.08);
+}
+

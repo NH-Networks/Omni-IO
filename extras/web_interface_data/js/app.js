@@ -195,8 +195,31 @@
         }
     }
 
-    // Per-device RAF handle for WebSocket position bursts
-    var _wsPositionRaf = {};
+    function updateMqttStatus(app, statusData) {
+        var dot = document.getElementById("mqtt-indicator-dot");
+        var pill = document.getElementById("mqtt-status-pill");
+        var text = document.getElementById("mqtt-status-text");
+        if (!dot || !pill) return;
+
+        var isConnected = !!(statusData && statusData.connected);
+        var isEnabled = statusData && typeof statusData.enabled !== "undefined" ? !!statusData.enabled : isConnected;
+        var state = statusData && statusData.state ? statusData.state : (isConnected ? "connected" : (isEnabled ? "disconnected" : "disabled"));
+
+        dot.className = "mqtt-dot " + state;
+        if (!isEnabled) {
+            dot.className = "mqtt-dot disabled";
+            pill.title = app.i18nText("mqtt.disabled", "MQTT: Disabled");
+        } else if (isConnected) {
+            dot.className = "mqtt-dot connected";
+            pill.title = app.i18nText("mqtt.connected", "MQTT: Connected");
+        } else if (state === "connecting") {
+            dot.className = "mqtt-dot connecting";
+            pill.title = app.i18nText("mqtt.connecting", "MQTT: Connecting...");
+        } else {
+            dot.className = "mqtt-dot disconnected";
+            pill.title = app.i18nText("mqtt.disconnected", "MQTT: Disconnected");
+        }
+    }
 
     function initWebSocket(app) {
         var wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
@@ -222,6 +245,8 @@
                     app.applyDeviceAction(data);
                 } else if (data.type === "init") {
                     app.fetchAndDisplayDevices();
+                } else if (data.type === "mqtt_status") {
+                    updateMqttStatus(app, data);
                 } else if (data.type === "lastaddr") {
                     if (app.elements.lastAddrInput) {
                         app.elements.lastAddrInput.value = data.address || "";
@@ -376,11 +401,29 @@
             app.fetchAndDisplayRemotes();
         });
 
+        var mqttPill = document.getElementById("mqtt-status-pill");
+        if (mqttPill) {
+            mqttPill.addEventListener("click", function () {
+                if (typeof window.showPage === "function") {
+                    window.showPage("settings");
+                }
+                var mqttTab = document.querySelector('[data-settings-target="mqtt"]');
+                if (mqttTab) {
+                    mqttTab.click();
+                }
+            });
+        }
+
         window.OmniIoApi.requestJson("/api/info").then(function (info) {
             var el = document.getElementById("firmware-version");
             if (el && info.version) {
                 el.textContent = "Firmware: " + info.version + (info.branch ? " (" + info.branch + ")" : "");
             }
+            updateMqttStatus(app, {
+                connected: info.mqttConnected,
+                enabled: info.mqttEnabled,
+                state: info.mqttState
+            });
         }).catch(function () {});
 
         app.loadLogBuffer();

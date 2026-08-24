@@ -80,6 +80,26 @@
         labelTiming.textContent = popupOptions.timingLabel || "timing:";
         inputTiming.value = showTiming ? (popupOptions.defaultTiming || "") : "";
 
+        const labelRoom = document.getElementById("label-room");
+        const inputRoom = document.getElementById("popup-input-room");
+        const roomSuggestionsList = document.getElementById("room-suggestions-list");
+        const showRoom = !!popupOptions.showRoom;
+        if (labelRoom) labelRoom.style.display = showRoom ? "block" : "none";
+        if (inputRoom) {
+            inputRoom.style.display = showRoom ? "block" : "none";
+            inputRoom.value = showRoom ? (popupOptions.defaultRoom || "") : "";
+        }
+        if (roomSuggestionsList && showRoom && Array.isArray(popupOptions.roomSuggestions)) {
+            roomSuggestionsList.textContent = "";
+            popupOptions.roomSuggestions.forEach(function (r) {
+                if (r) {
+                    const opt = document.createElement("option");
+                    opt.value = r;
+                    roomSuggestionsList.appendChild(opt);
+                }
+            });
+        }
+
         deleteBtn.style.display = popupOptions.btnShowDelete ? "block" : "none";
         cancelBtn.style.display = popupOptions.btnShowCancel ? "block" : "none";
         confirmBtn.style.display = "none";
@@ -171,8 +191,9 @@
             const value = showInput ? input.value : true;
             const timingValue = showTiming ? inputTiming.value : undefined;
             const deviceValue = showDevicePopup ? devicePopup.value : undefined;
+            const roomValue = showRoom && inputRoom ? inputRoom.value.trim() : undefined;
             if (popupOptions.onSave) {
-                popupOptions.onSave(value, timingValue, deviceValue);
+                popupOptions.onSave(value, timingValue, deviceValue, roomValue);
             }
             closePopup();
         };

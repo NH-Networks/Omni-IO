@@ -146,8 +146,17 @@ Omni-IO exposes a WebSocket server at `ws://<device_ip>/ws` or `ws://omni-io.loc
 * **Position Updates**: Broadcast in JSON format:
 ```json
 {
-  "event": "position",
-  "deviceId": "B60D1A",
+  "type": "position",
+  "id": "B60D1A",
   "position": 75
+}
+```
+* **MQTT Status Updates**: Broadcast in real-time on broker connect/disconnect:
+```json
+{
+  "type": "mqtt_status",
+  "connected": true,
+  "enabled": true,
+  "state": "connected"
 }
 ```

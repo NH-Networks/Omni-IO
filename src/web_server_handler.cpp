@@ -126,6 +126,22 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     String twoWPayload;
     serializeJson(twoWDoc, twoWPayload);
     client->text(twoWPayload);
+
+    JsonDocument mqttDoc;
+    mqttDoc["type"] = "mqtt_status";
+#if defined(MQTT)
+    mqttDoc["connected"] = mqttClient.connected();
+    mqttDoc["enabled"] = !mqtt_server.empty();
+    mqttDoc["state"] = mqttStatus == ConnState::Connected ? "connected" :
+                       (mqttStatus == ConnState::Connecting ? "connecting" : "disconnected");
+#else
+    mqttDoc["connected"] = false;
+    mqttDoc["enabled"] = false;
+    mqttDoc["state"] = "disabled";
+#endif
+    String mqttPayload;
+    serializeJson(mqttDoc, mqttPayload);
+    client->text(mqttPayload);
   }
 }
 
@@ -165,6 +181,21 @@ void broadcastLastAddress(const String &addr) {
   JsonDocument doc;
   doc["type"] = "lastaddr";
   doc["address"] = addr;
+  String payload;
+  serializeJson(doc, payload);
+  ws.textAll(payload);
+}
+
+void broadcastMqttStatus(bool connected, bool enabled, const char *state) {
+  JsonDocument doc;
+  doc["type"] = "mqtt_status";
+  doc["connected"] = connected;
+  doc["enabled"] = enabled;
+  if (state) {
+    doc["state"] = state;
+  } else {
+    doc["state"] = connected ? "connected" : (enabled ? "disconnected" : "disabled");
+  }
   String payload;
   serializeJson(doc, payload);
   ws.textAll(payload);
@@ -897,8 +928,13 @@ void handleApiInfo(AsyncWebServerRequest *request, JsonObject &root) {
   root["ip"] = WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : "";
 #if defined(MQTT)
   root["mqttConnected"] = mqttClient.connected();
+  root["mqttEnabled"] = !mqtt_server.empty();
   root["mqttState"] = mqttStatus == ConnState::Connected ? "connected" :
                       (mqttStatus == ConnState::Connecting ? "connecting" : "disconnected");
+#else
+  root["mqttConnected"] = false;
+  root["mqttEnabled"] = false;
+  root["mqttState"] = "disabled";
 #endif
 }
 

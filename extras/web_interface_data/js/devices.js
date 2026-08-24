@@ -91,9 +91,118 @@
         return button;
     }
 
+    // Room / Group Local Storage Helpers
+    function getDeviceRooms() {
+        try {
+            return JSON.parse(localStorage.getItem("omni_device_rooms") || "{}");
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function setDeviceRoom(deviceId, room) {
+        var rooms = getDeviceRooms();
+        if (room && room.trim()) {
+            rooms[deviceId] = room.trim();
+        } else {
+            delete rooms[deviceId];
+        }
+        localStorage.setItem("omni_device_rooms", JSON.stringify(rooms));
+    }
+
+    function getAllUniqueRooms(devices) {
+        var rooms = getDeviceRooms();
+        var unique = {};
+        (devices || []).forEach(function (d) {
+            var r = rooms[d.id];
+            if (r && r.trim()) {
+                unique[r.trim()] = true;
+            }
+        });
+        return Object.keys(unique).sort();
+    }
+
+    var activeRoomFilter = "all";
+
+    function runGroupAction(app, deviceList, action) {
+        deviceList.forEach(function (d) {
+            runAction(app, d.id, action).catch(function () {});
+        });
+    }
+
+    function renderRoomFilterBar(app, devices) {
+        var bar = document.getElementById("room-filter-bar");
+        if (!bar) return;
+
+        var rooms = getDeviceRooms();
+        var uniqueRooms = getAllUniqueRooms(devices);
+
+        if (uniqueRooms.length === 0) {
+            bar.style.display = "none";
+            bar.textContent = "";
+            return;
+        }
+
+        bar.style.display = "flex";
+        bar.textContent = "";
+
+        // "All" chip
+        var allChip = document.createElement("button");
+        allChip.type = "button";
+        allChip.className = "room-chip" + (activeRoomFilter === "all" ? " active" : "");
+        allChip.innerHTML = "<span>" + app.i18nText("filter.all_rooms", "All Rooms") + "</span> <span class='room-chip-count'>" + devices.length + "</span>";
+        allChip.onclick = function () {
+            activeRoomFilter = "all";
+            fetchAndDisplayDevices(app);
+        };
+        bar.appendChild(allChip);
+
+        // Room chips
+        uniqueRooms.forEach(function (roomName) {
+            var count = devices.filter(function (d) { return rooms[d.id] === roomName; }).length;
+            var chip = document.createElement("button");
+            chip.type = "button";
+            chip.className = "room-chip" + (activeRoomFilter === roomName ? " active" : "");
+            chip.innerHTML = "<span>" + roomName + "</span> <span class='room-chip-count'>" + count + "</span>";
+            chip.onclick = function () {
+                activeRoomFilter = roomName;
+                fetchAndDisplayDevices(app);
+            };
+            bar.appendChild(chip);
+        });
+
+        // "Unassigned" chip
+        var unassignedCount = devices.filter(function (d) { return !rooms[d.id]; }).length;
+        if (unassignedCount > 0 && uniqueRooms.length > 0) {
+            var unassignedChip = document.createElement("button");
+            unassignedChip.type = "button";
+            unassignedChip.className = "room-chip" + (activeRoomFilter === "__unassigned__" ? " active" : "");
+            unassignedChip.innerHTML = "<span>" + app.i18nText("filter.unassigned", "Unassigned") + "</span> <span class='room-chip-count'>" + unassignedCount + "</span>";
+            unassignedChip.onclick = function () {
+                activeRoomFilter = "__unassigned__";
+                fetchAndDisplayDevices(app);
+            };
+            bar.appendChild(unassignedChip);
+        }
+    }
+
     function buildDeviceListItem(app, device) {
+        var nameContainer = document.createElement("div");
+        nameContainer.style.display = "flex";
+        nameContainer.style.flexDirection = "column";
+
         var nameSpan = document.createElement("span");
         nameSpan.textContent = device.name;
+        nameContainer.appendChild(nameSpan);
+
+        var rooms = getDeviceRooms();
+        var roomName = rooms[device.id];
+        if (roomName) {
+            var roomBadge = document.createElement("span");
+            roomBadge.classList.add("device-room-badge");
+            roomBadge.textContent = "📍 " + roomName;
+            nameContainer.appendChild(roomBadge);
+        }
 
         var stateSpan = document.createElement("span");
         stateSpan.classList.add("device-state");
@@ -102,7 +211,7 @@
         var listItem = document.createElement("li");
         listItem.classList.add("device");
         listItem.dataset.id = device.id;
-        listItem.appendChild(nameSpan);
+        listItem.appendChild(nameContainer);
         listItem.appendChild(stateSpan);
 
         listItem.appendChild(createDeviceButton("up", "open", function () {
@@ -131,6 +240,9 @@
                 }
             } catch (error) {}
 
+            var currentRooms = getDeviceRooms();
+            var existingRoom = currentRooms[currentDevice.id] || "";
+
             app.openPopup(
                 app.i18nText("popup.edit_device_title", "Edit Device"),
                 app.i18nText("popup.adjust_name", "Adjust the name:"),
@@ -148,14 +260,20 @@
                     showSave: true,
                     showInput: true,
                     showTiming: true,
+                    showRoom: true,
                     btnShowDelete: true,
                     defaultValue: currentDevice.name,
                     defaultTiming: currentDevice.travel_time,
+                    defaultRoom: existingRoom,
+                    roomSuggestions: getAllUniqueRooms(app.state.devicesCache),
                     pairLabel: app.i18nText("popup.pair_label_device", "Add / Remove the device to the physical screen"),
                     deleteInfo: app.i18nText("popup.delete_device_info", "Only use when the device is not linked to a physical screen."),
-                    onSave: async function (newName, newTiming) {
+                    onSave: async function (newName, newTiming, deviceVal, newRoom) {
                         try {
-                            if (newName.trim() && newName !== currentDevice.name) {
+                            if (typeof newRoom !== "undefined") {
+                                setDeviceRoom(currentDevice.id, newRoom);
+                            }
+                            if (newName && newName.trim() && newName !== currentDevice.name) {
                                 await window.OmniIoApi.postJson("/api/command", {
                                     deviceId: currentDevice.id,
                                     command: "edit1W " + newName
@@ -190,6 +308,7 @@
                         } catch (error) {}
                     },
                     onDelete: async function () {
+                        setDeviceRoom(currentDevice.id, null);
                         await window.OmniIoApi.postJson("/api/command", {
                             deviceId: currentDevice.id,
                             command: "del1W"
@@ -226,12 +345,65 @@
                 ph.parentNode.removeChild(ph);
             }
 
-            // --- Diff-based update ---
-            // Build map of incoming devices
-            var incomingMap = {};
-            devices.forEach(function (d) { incomingMap[d.id] = d; });
+            renderRoomFilterBar(app, devices);
 
-            // Remove list items that are no longer in the API response
+            var rooms = getDeviceRooms();
+            var displayedDevices = devices;
+            if (activeRoomFilter === "__unassigned__") {
+                displayedDevices = devices.filter(function (d) { return !rooms[d.id]; });
+            } else if (activeRoomFilter !== "all") {
+                displayedDevices = devices.filter(function (d) { return rooms[d.id] === activeRoomFilter; });
+            }
+
+            var groupContainer = document.getElementById("room-groups-container");
+            if (groupContainer) {
+                groupContainer.textContent = "";
+                if (activeRoomFilter !== "all" && displayedDevices.length > 0) {
+                    var groupBlock = document.createElement("div");
+                    groupBlock.className = "room-group-header";
+
+                    var groupTitle = document.createElement("div");
+                    groupTitle.className = "room-group-title";
+                    var currentTitle = activeRoomFilter === "__unassigned__" ? app.i18nText("filter.unassigned", "Unassigned") : activeRoomFilter;
+                    groupTitle.innerHTML = "<span>📍 " + currentTitle + "</span> <span class='room-chip-count'>" + displayedDevices.length + "</span>";
+
+                    var actions = document.createElement("div");
+                    actions.className = "room-group-actions";
+
+                    var openAllBtn = document.createElement("button");
+                    openAllBtn.className = "btn open";
+                    openAllBtn.title = app.i18nText("button.open_all", "Open All");
+                    openAllBtn.textContent = "▲";
+                    openAllBtn.onclick = function () { runGroupAction(app, displayedDevices, "open"); };
+
+                    var stopAllBtn = document.createElement("button");
+                    stopAllBtn.className = "btn stop";
+                    stopAllBtn.title = app.i18nText("button.stop_all", "Stop All");
+                    stopAllBtn.textContent = "■";
+                    stopAllBtn.onclick = function () { runGroupAction(app, displayedDevices, "stop"); };
+
+                    var closeAllBtn = document.createElement("button");
+                    closeAllBtn.className = "btn down";
+                    closeAllBtn.title = app.i18nText("button.close_all", "Close All");
+                    closeAllBtn.textContent = "▼";
+                    closeAllBtn.onclick = function () { runGroupAction(app, displayedDevices, "close"); };
+
+                    actions.appendChild(openAllBtn);
+                    actions.appendChild(stopAllBtn);
+                    actions.appendChild(closeAllBtn);
+
+                    groupBlock.appendChild(groupTitle);
+                    groupBlock.appendChild(actions);
+                    groupContainer.appendChild(groupBlock);
+                }
+            }
+
+            // --- Diff-based update ---
+            // Build map of incoming displayed devices
+            var incomingMap = {};
+            displayedDevices.forEach(function (d) { incomingMap[d.id] = d; });
+
+            // Remove list items that are no longer in the displayed devices
             var existingItems = Array.from(deviceList.querySelectorAll("li.device"));
             existingItems.forEach(function (li) {
                 if (!incomingMap[li.dataset.id]) {
@@ -239,26 +411,35 @@
                 }
             });
 
-            // Update or insert devices in order
-            var existingIds = Array.from(deviceList.querySelectorAll("li.device")).map(function (li) {
-                return li.dataset.id;
-            });
-
-            if (devices.length === 0) {
+            if (displayedDevices.length === 0) {
                 deviceList.textContent = "";
                 var empty = document.createElement("li");
                 empty.textContent = app.i18nText("list.no_devices_available", "No devices available.");
                 deviceList.appendChild(empty);
             } else {
-                devices.forEach(function (device, index) {
+                displayedDevices.forEach(function (device, index) {
                     var existingLi = deviceList.querySelector('li.device[data-id="' + device.id + '"]');
 
                     if (existingLi) {
-                        // Patch name if changed
+                        // Patch name and room badge
                         var nameSpan = existingLi.querySelector("span:first-child");
                         if (nameSpan && nameSpan.textContent !== device.name) {
                             nameSpan.textContent = device.name;
                         }
+                        var roomBadge = existingLi.querySelector(".device-room-badge");
+                        var assignedRoom = rooms[device.id];
+                        if (assignedRoom && !roomBadge) {
+                            var rb = document.createElement("span");
+                            rb.className = "device-room-badge";
+                            rb.textContent = "📍 " + assignedRoom;
+                            var nameContainer = existingLi.querySelector("div");
+                            if (nameContainer) nameContainer.appendChild(rb);
+                        } else if (!assignedRoom && roomBadge) {
+                            roomBadge.parentNode.removeChild(roomBadge);
+                        } else if (assignedRoom && roomBadge && roomBadge.textContent !== "📍 " + assignedRoom) {
+                            roomBadge.textContent = "📍 " + assignedRoom;
+                        }
+
                         // Patch state if inactive status changed
                         var stateSpan = existingLi.querySelector(".device-state");
                         if (stateSpan && device.active === false && stateSpan.textContent === "") {

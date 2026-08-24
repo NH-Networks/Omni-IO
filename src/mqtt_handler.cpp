@@ -424,6 +424,9 @@ void connectToMqtt() {
     addLogMessage(String("Connecting to MQTT at ") + mqtt_server.c_str() + ":" + String(mqtt_port));
     mqttStatus = ConnState::Connecting;
     updateDisplayStatus();
+#if defined(WEBSERVER)
+    broadcastMqttStatus(false, true, "connecting");
+#endif
     mqttClient.connect();
 }
 
@@ -432,6 +435,9 @@ void onMqttConnect(bool sessionPresent) {
     addLogMessage(String("Connected to MQTT at ") + mqtt_server.c_str() + ":" + String(mqtt_port));
     mqttStatus = ConnState::Connected;
     updateDisplayStatus();
+#if defined(WEBSERVER)
+    broadcastMqttStatus(true, true, "connected");
+#endif
 
     //mqttClient.subscribe("iown/powerOn", 0);
     //mqttClient.subscribe("iown/setPresence", 0);
@@ -463,6 +469,9 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
     mqttStatus = ConnState::Disconnected;
     updateDisplayStatus();
     stopHeartbeat();
+#if defined(WEBSERVER)
+    broadcastMqttStatus(false, !mqtt_server.empty(), "disconnected");
+#endif
 }
 
 static void mqttSchedulerTask(void*) {
