@@ -38,6 +38,8 @@
     "label.password":  "Passwort:",
     "label.discovery_topic":  "Discovery Topic:",
     "label.enable_syslog_forwarding":  "Syslog-Weiterleitung aktivieren",
+    "label.timezone":  "Zeitzone:",
+    "label.custom_posix_tz":  "Benutzerdefinierte POSIX-Zeichenfolge:",
     "label.syslog_tag":  "Tag:",
     "placeholder.syslog_tag":  "z.B. meinhaus",
     "note.syslog_privacy":  "Es werden nur GerÃ¤teereignisse gesendet â€” keine Zugangsdaten oder IP-Adressen.",

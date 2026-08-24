@@ -123,7 +123,26 @@
             app.elements.networkDns1Input.value = config.dns1 || "";
             app.elements.networkDns2Input.value = config.dns2 || "";
             app.elements.networkSntpInput.value = config.sntp || "";
-            app.elements.networkTzInput.value = config.tz || "CET-1CEST,M3.5.0,M10.5.0/3";
+            const tz = config.tz || "CET-1CEST,M3.5.0,M10.5.0/3";
+            if (app.elements.networkTzInput) {
+                app.elements.networkTzInput.value = tz;
+            }
+            if (app.elements.networkTzSelect) {
+                let matched = false;
+                for (let i = 0; i < app.elements.networkTzSelect.options.length; i++) {
+                    if (app.elements.networkTzSelect.options[i].value === tz) {
+                        app.elements.networkTzSelect.selectedIndex = i;
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched) {
+                    app.elements.networkTzSelect.value = "custom";
+                    if (app.elements.networkTzCustomWrap) app.elements.networkTzCustomWrap.style.display = "block";
+                } else {
+                    if (app.elements.networkTzCustomWrap) app.elements.networkTzCustomWrap.style.display = "none";
+                }
+            }
             app.elements.networkTimeInput.value = config.time || "Not synchronized";
             setNetworkStatus(app, config.connected ? "Network config loaded" : "Network config loaded, WiFi not connected", !config.connected);
         } catch (error) {
@@ -644,6 +663,19 @@
         if (restartButton) {
             restartButton.addEventListener("click", function () {
                 restartDevice(app, restartButton);
+            });
+        }
+
+        if (app.elements.networkTzSelect) {
+            app.elements.networkTzSelect.addEventListener("change", function () {
+                const val = this.value;
+                if (val === "custom") {
+                    if (app.elements.networkTzCustomWrap) app.elements.networkTzCustomWrap.style.display = "block";
+                    if (app.elements.networkTzInput) app.elements.networkTzInput.focus();
+                } else {
+                    if (app.elements.networkTzCustomWrap) app.elements.networkTzCustomWrap.style.display = "none";
+                    if (app.elements.networkTzInput) app.elements.networkTzInput.value = val;
+                }
             });
         }
     }
