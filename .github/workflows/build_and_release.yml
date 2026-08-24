@@ -79,23 +79,62 @@ jobs:
       - name: Generate release notes
         run: |
           cat > changelog.md <<EOF
-          ## MiOpen.IO Release ${{ github.ref_name }}
+          # 🎉 Omni-IO Release ${{ github.ref_name }}
 
-          ### What's New in v3.2.0
-          - **OLED Display Controls**: Runtime-configurable screensaver timeout (10–3600s), screen-off timeout (0s to disable, or 60–86400s), dim levels (Low, Medium, High), and CPU temperature toggle.
-          - **Multi-language Support (i18n)**: Fully translated Web UI settings in Dutch (NL), English (EN), German (DE), and French (FR).
-          - **Persistent Settings (NVS)**: All display and system preferences are persisted across reboots via ESP32 NVS.
-          - **Optimized CI/CD & Multi-Board Builds**: Automated PlatformIO build pipeline producing ready-to-flash combined binary packages and OTA artifacts for all supported hardware.
+          Welcome to the **${{ github.ref_name }}** release of **Omni-IO**, the next-generation open-source ESP32 gateway and controller for **io-homecontrol®** (868.95 MHz) devices (Somfy, Velux, and compatible HVAC/blinds systems).
 
-          ### Supported Hardware
-          - **LilyGo T-Beam v1.2** (\`LilyGoTBeamV12ESP32\`)
-          - **LilyGo LoRa32 v2.1** (\`LilyGoLoraESP32\`)
-          - **Heltec LoRa32 v2** (\`HeltecLoraV2ESP32\`)
-          - **LilyGo T3-S3** (\`LilyGoT3S3\`)
+          ---
 
-          ### Included Files
-          - Combined flash images (\`*.bin\`): Single-file flash containing bootloader, partition table, firmware, and LittleFS filesystem.
-          - Standalone firmware (\`*_firmware.bin\`) & filesystem (\`*_filesystem.bin\`) for web/OTA update.
+          ## ✨ What's New in ${{ github.ref_name }}
+
+          * 🎨 **Brand-New Official Omni-IO Logo & Vector Branding**:
+            * Complete replacement of the legacy logo with the official **Omni-IO** identity.
+            * Added crisp, scalable vector SVG (\`extras/web_interface_data/img/logo.svg\`) and high-resolution PNG (\`extras/web_interface_data/img/logo.png\`).
+            * Updated asset cache-busting query strings (\`?v=1.0.1\`) across the Web UI and favicon to ensure immediate cache invalidation in browsers.
+          * 📺 **OLED Display Controls**: Runtime-configurable screensaver timeout (10–3600s), screen-off timeout (0s to disable, or 60–86400s), dim levels (Low, Medium, High), and CPU temperature toggle.
+          * 🌐 **Multi-language Support (i18n)**: Fully translated Web UI settings in Dutch (NL), English (EN), German (DE), and French (FR).
+          * 💾 **Persistent Settings (NVS)**: All display and system preferences are persisted across reboots via ESP32 NVS.
+
+          ---
+
+          ## 🌟 Acknowledgments & Credits
+
+          Omni-IO is built with deep gratitude and respect for the pioneering work of the open-source community:
+
+          * **[Velocet](https://github.com/Velocet)** — Author of [Velocet/iown-homecontrol](https://github.com/Velocet/iown-homecontrol): Reverse engineering of the io-homecontrol protocol, CRC calculations, and AES cryptography implementations.
+          * **[cridp](https://github.com/cridp)** — Author of [cridp/iown-homecontrol-esp32sx1276](https://github.com/cridp/iown-homecontrol-esp32sx1276): ESP32 and Semtech SX1276 hardware adaptation.
+          * **[djbenbe](https://github.com/djbenbe)** — Author of [djbenbe/miopen.io](https://github.com/djbenbe/miopen.io/tree/Beta): Core firmware development, UI concept, graphics, and initial integration.
+          * **[rspaargaren](https://github.com/rspaargaren)** — Community documentation, guides, and [io-homecontrol Wiki](https://github.com/rspaargaren/iohomecontrol/wiki).
+          * **[CloudAXS](https://github.com/CloudAXS)** — Web interface architecture, modern responsive UI, and multi-language engine.
+
+          ---
+
+          ## 📚 Complete Guides & Documentation
+
+          Comprehensive documentation has been published in the repository:
+          * 🔌 **[Hardware Setup & Pinouts](docs/HARDWARE_SETUP.md)**: Board comparison, SPI pinouts, antenna specifications, and wiring diagrams.
+          * 🔄 **[Pairing & Calibration Guide](docs/PAIRING_GUIDE.md)**: Motor pairing sequence, travel time calibration, and wall remote mapping.
+          * 🏠 **[Home Assistant Integration](docs/HOME_ASSISTANT.md)**: Zero-config MQTT discovery, dashboard cards, and automation examples.
+          * 🌐 **[REST API & MQTT Reference](docs/API_AND_MQTT_REFERENCE.md)**: Complete endpoint documentation and WebSocket event specifications.
+          * 🔧 **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)**: Solutions for WiFi, mDNS, RF range, and OLED screen issues.
+          * 💻 **[Terminal & Serial Commands](COMMANDS.md)**: Interactive command reference.
+
+          ---
+
+          ## 🛠️ Supported Hardware & Included Files
+
+          | Board | Merged Single-File Flash (\`*.bin\`) | OTA Firmware (\`*_firmware.bin\`) | Filesystem (\`*_filesystem.bin\`) |
+          | :--- | :--- | :--- | :--- |
+          | **LilyGo T-Beam v1.2** | \`LilyGoTBeamV12ESP32.bin\` | \`LilyGoTBeamV12ESP32_firmware.bin\` | \`LilyGoTBeamV12ESP32_filesystem.bin\` |
+          | **LilyGo LoRa32 v2.1** | \`LilyGoLoraESP32.bin\` | \`LilyGoLoraESP32_firmware.bin\` | \`LilyGoLoraESP32_filesystem.bin\` |
+          | **Heltec LoRa32 v2** | \`HeltecLoraV2ESP32.bin\` | \`HeltecLoraV2ESP32_firmware.bin\` | \`HeltecLoraV2ESP32_filesystem.bin\` |
+          | **LilyGo T3-S3** | \`LilyGoT3S3.bin\` | \`LilyGoT3S3_firmware.bin\` | \`LilyGoT3S3_filesystem.bin\` |
+
+          ---
+
+          ### 📦 Flashing Instructions
+          * **First-time Flash**: Use [ESP Web Tools](https://esphome.github.io/esp-web-tools/) or \`esptool.py\` with the combined \`.bin\` file.
+          * **Web OTA Update**: Upload the \`*_firmware.bin\` and \`*_filesystem.bin\` files directly in the Web UI under **Settings → Firmware Update**.
           EOF
 
       - name: Release

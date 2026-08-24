@@ -1,20 +1,17 @@
+# PlatformIO & Build output
 /.pio/
-/.idea/
-/docs/
-compile_commands.json
-sdkconfig
-sdkconfig.HeltecESP32
-CMakeLists.txt
-.idea/inspectionProfiles/Project_Default.xml
-.vscode/settings.json
-.idea/IOWN_Mosto.iml
-include/MQTTHelper_h
-include/user_config.h
-test/variousHeater
-src/CMakeLists.txt
-/.vscode/
-/lib/
 /build/
 /archives/
+compile_commands.json
+
+# IDE & Editor files
+/.idea/
+/.vscode/
+*.swp
+*.orig
 *.org
-include/user_config.h
+
+# ESP-IDF / CMake leftovers
+sdkconfig.HeltecESP32
+CMakeLists.txt
+src/CMakeLists.txt

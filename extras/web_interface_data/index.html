@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title data-i18n="page.title">MiOpen.IO - Device Control</title>
-    <link rel="icon" href="img/logo.png?v=20260823_sun1" />
-    <link rel="stylesheet" href="css/style.css?v=20260823_sun1" />
+    <title data-i18n="page.title">Omni-IO - Device Control</title>
+    <link rel="icon" href="img/logo.png?v=1.0.1" />
+    <link rel="stylesheet" href="css/style.css?v=1.0.1" />
   </head>
 
   <body>
     <header>
-      <img src="img/logo.png?v=20260728c" alt="MiOpen.IO Logo" class="logo" />
+      <img src="img/logo.png?v=1.0.1" alt="Omni-IO Logo" class="logo" />
       <h1 data-i18n="header.title">Device Control</h1>
       <button id="menu-toggle" aria-label="Open menu" aria-expanded="false" type="button">
         <span></span><span></span><span></span>
@@ -649,8 +649,77 @@
                   <input id="net-dns2" placeholder="8.8.8.8" />
                   <input id="net-sntp" placeholder="pool.ntp.org" />
                 </div>
-                <label for="net-tz">Timezone (POSIX):</label>
-                <input id="net-tz" placeholder="CET-1CEST,M3.5.0,M10.5.0/3" />
+                <label for="net-tz-select" data-i18n="label.timezone">Timezone:</label>
+                <select id="net-tz-select" style="width: 100%; margin-bottom: 6px;">
+                  <optgroup label="Europe">
+                    <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Amsterdam, Brussels, Berlin, Paris, Madrid, Rome (CET/CEST)</option>
+                    <option value="GMT0BST,M3.5.0/1,M10.5.0">Europe/London, Dublin (GMT/BST)</option>
+                    <option value="WET0WEST,M3.5.0/1,M10.5.0">Europe/Lisbon, Porto (WET/WEST)</option>
+                    <option value="EET-2EEST,M3.5.0/3,M10.5.0/4">Europe/Athens, Bucharest, Sofia, Kyiv, Helsinki, Tallinn, Riga, Vilnius (EET/EEST)</option>
+                    <option value="MSK-3">Europe/Moscow, St. Petersburg (MSK)</option>
+                    <option value="TRT-3">Europe/Istanbul (TRT)</option>
+                    <option value="GMT0">Atlantic/Reykjavik (UTC/GMT)</option>
+                    <option value="&lt;-01&gt;1&lt;+00&gt;,M3.5.0/0,M10.5.0/1">Atlantic/Azores (AZOT/AZOST)</option>
+                    <option value="WET0WEST,M3.5.0/1,M10.5.0/2">Atlantic/Canary (WET/WEST)</option>
+                  </optgroup>
+                  <optgroup label="Americas - North">
+                    <option value="EST5EDT,M3.2.0,M11.1.0">America/New_York, Toronto, Miami, Montreal, Boston (Eastern Time)</option>
+                    <option value="CST6CDT,M3.2.0,M11.1.0">America/Chicago, Houston, Dallas, Mexico City, Winnipeg (Central Time)</option>
+                    <option value="MST7MDT,M3.2.0,M11.1.0">America/Denver, Salt Lake City, Calgary, Edmonton (Mountain Time)</option>
+                    <option value="MST7">America/Phoenix, Sonora (Arizona - MST, No DST)</option>
+                    <option value="PST8PDT,M3.2.0,M11.1.0">America/Los_Angeles, San Francisco, Seattle, Vancouver (Pacific Time)</option>
+                    <option value="AKST9AKDT,M3.2.0,M11.1.0">America/Anchorage, Juneau (Alaska Time)</option>
+                    <option value="HST10">Pacific/Honolulu (Hawaii Time)</option>
+                    <option value="AST4ADT,M3.2.0,M11.1.0">America/Halifax, Moncton (Atlantic Time)</option>
+                    <option value="NST3:30NDT,M3.2.0,M11.1.0">America/St_Johns (Newfoundland Time)</option>
+                  </optgroup>
+                  <optgroup label="Americas - Central &amp; South">
+                    <option value="&lt;-05&gt;5">America/Bogota, Lima, Quito, Panama (COT/PET)</option>
+                    <option value="&lt;-04&gt;4">America/Caracas, La Paz, Georgetown (VET/BOT)</option>
+                    <option value="&lt;-04&gt;4&lt;-03&gt;,M9.1.0/24,M4.1.0/24">America/Santiago (Chile Time)</option>
+                    <option value="&lt;-03&gt;3">America/Sao_Paulo, Rio de Janeiro, Brasilia, Buenos Aires, Montevideo</option>
+                  </optgroup>
+                  <optgroup label="Asia &amp; Middle East">
+                    <option value="AST-3">Asia/Riyadh, Kuwait, Doha, Bahrain, Baghdad (AST)</option>
+                    <option value="GST-4">Asia/Dubai, Abu Dhabi, Muscat (GST)</option>
+                    <option value="IST-2IDT,M3.4.4/26,M10.5.0">Asia/Jerusalem, Tel Aviv (IST/IDT)</option>
+                    <option value="&lt;-0330&gt;3:30">Asia/Tehran (IRST)</option>
+                    <option value="IST-5:30">Asia/Kolkata, Mumbai, New Delhi, Colombo (IST)</option>
+                    <option value="&lt;-0545&gt;5:45">Asia/Kathmandu (NPT)</option>
+                    <option value="&lt;-06&gt;6">Asia/Dhaka, Almaty, Astana (BST)</option>
+                    <option value="&lt;-0630&gt;6:30">Asia/Yangon (MMT)</option>
+                    <option value="&lt;-07&gt;7">Asia/Bangkok, Jakarta, Hanoi, Ho Chi Minh (ICT/WIB)</option>
+                    <option value="CST-8">Asia/Singapore, Hong Kong, Beijing, Shanghai, Taipei, Manila, Kuala Lumpur (SGT/HKT/CST)</option>
+                    <option value="JST-9">Asia/Tokyo, Osaka, Seoul, Pyongyang (JST/KST)</option>
+                  </optgroup>
+                  <optgroup label="Australia &amp; Oceania">
+                    <option value="AWST-8">Australia/Perth (Western Australia)</option>
+                    <option value="ACST-9:30">Australia/Darwin (Northern Territory)</option>
+                    <option value="ACST-9:30ACDT,M10.1.0,M4.1.0/3">Australia/Adelaide (South Australia)</option>
+                    <option value="AEST-10">Australia/Brisbane (Queensland)</option>
+                    <option value="AEST-10AEDT,M10.1.0,M4.1.0/3">Australia/Sydney, Melbourne, Canberra, Hobart (AEST/AEDT)</option>
+                    <option value="NZST-12NZDT,M9.5.0,M4.1.0/3">Pacific/Auckland, Wellington (NZST/NZDT)</option>
+                    <option value="&lt;-12&gt;12">Pacific/Fiji, Suva</option>
+                    <option value="&lt;-10&gt;10">Pacific/Tahiti, Papeete</option>
+                    <option value="&lt;-11&gt;11">Pacific/Pago_Pago, Midway</option>
+                  </optgroup>
+                  <optgroup label="Africa">
+                    <option value="EET-2EEST,M4.5.5/0,M10.5.4/24">Africa/Cairo (EET/EEST)</option>
+                    <option value="WAT-1">Africa/Lagos, Algiers, Casablanca, Tunis (WAT/CET)</option>
+                    <option value="SAST-2">Africa/Johannesburg, Cape Town, Pretoria, Harare (SAST)</option>
+                    <option value="EAT-3">Africa/Nairobi, Addis Ababa, Dar es Salaam (EAT)</option>
+                  </optgroup>
+                  <optgroup label="Universal">
+                    <option value="UTC0">UTC / GMT (Coordinated Universal Time)</option>
+                  </optgroup>
+                  <optgroup label="Custom">
+                    <option value="custom">Custom (Manual POSIX String)...</option>
+                  </optgroup>
+                </select>
+                <div id="net-tz-custom-wrap" style="display: none; margin-bottom: 6px;">
+                  <label for="net-tz" data-i18n="label.custom_posix_tz" style="font-size: 0.85em; opacity: 0.85;">Custom POSIX String:</label>
+                  <input id="net-tz" placeholder="CET-1CEST,M3.5.0,M10.5.0/3" />
+                </div>
                 <label for="net-time">Current System Time:</label>
                 <input id="net-time" readonly="readonly" placeholder="Not synchronized" />
                 <div
@@ -756,7 +825,7 @@
     </main>
     <footer>
       <p data-i18n="footer.rights">
-        MiOpen.IO 2025 - 2026 | Created with ❤️ by CloudAXS
+        Omni-IO 2025 - 2026 | Created with ❤️ by CloudAXS
       </p>
       <p class="footer-credits" data-i18n="footer.credits">
         based on the work by djbenbe &amp; rspaargaren.
@@ -857,14 +926,14 @@
         </div>
       </div>
     </div>
-    <script src="js/i18n.js?v=20260823_sun1"></script>
-    <script src="js/toast.js?v=20260823_sun1"></script>
-    <script src="js/api.js?v=20260823_sun1"></script>
-    <script src="js/popup.js?v=20260823_sun1"></script>
-    <script src="js/devices.js?v=20260823_sun1"></script>
-    <script src="js/remotes.js?v=20260823_sun1"></script>
-    <script src="js/settings.js?v=20260823_sun1"></script>
-    <script src="js/app.js?v=20260823_sun1"></script>
-    <script src="js/menu.js?v=20260823_sun1"></script>
+    <script src="js/i18n.js?v=1.0.1"></script>
+    <script src="js/toast.js?v=1.0.1"></script>
+    <script src="js/api.js?v=1.0.1"></script>
+    <script src="js/popup.js?v=1.0.1"></script>
+    <script src="js/devices.js?v=1.0.1"></script>
+    <script src="js/remotes.js?v=1.0.1"></script>
+    <script src="js/settings.js?v=1.0.1"></script>
+    <script src="js/app.js?v=1.0.1"></script>
+    <script src="js/menu.js?v=1.0.1"></script>
   </body>
 </html>

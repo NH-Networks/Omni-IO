@@ -123,11 +123,11 @@ static void handleWifiConnected() {
         updateDisplayStatus();
 
         if (!mdnsStarted) {
-            if (!MDNS.begin("miopenio")) {
+            if (!MDNS.begin("omni-io")) {
                 Serial.println("WiFi: mDNS start failed");
             } else {
                 mdnsStarted = true;
-                Serial.println("WiFi: mDNS started at http://miopenio.local");
+                Serial.println("WiFi: mDNS started at http://omni-io.local");
             }
         }
 
@@ -193,9 +193,9 @@ static bool parseIPAddressValue(const String &value, IPAddress &address) {
 }
 
 static String getSavedHostname() {
-    String hostname = readNetworkString(NVS_KEY_NET_HOST, "MiOpenIO");
+    String hostname = readNetworkString(NVS_KEY_NET_HOST, "Omni-IO");
     hostname.trim();
-    return hostname.length() > 0 ? hostname : String("MiOpenIO");
+    return hostname.length() > 0 ? hostname : String("Omni-IO");
 }
 
 static void applySavedNetworkSettings() {

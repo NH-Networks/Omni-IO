@@ -26,7 +26,7 @@
 
     async function loadLastAddress(app) {
         try {
-            const data = await window.MiOpenApi.requestJson("/api/lastaddr");
+            const data = await window.OmniIoApi.requestJson("/api/lastaddr");
             app.elements.lastAddrInput.value = data.address || "";
         } catch (error) {
             console.error("Error fetching last address", error);
@@ -35,7 +35,7 @@
 
     async function loadMqttConfig(app) {
         try {
-            const config = await window.MiOpenApi.requestJson("/api/mqtt");
+            const config = await window.OmniIoApi.requestJson("/api/mqtt");
             app.elements.mqttUserInput.value = config.user || "";
             app.elements.mqttServerInput.value = config.server || "";
             app.elements.mqttPasswordInput.value = config.password || "";
@@ -52,7 +52,7 @@
             app.i18nText("status.settings_saving", "Saving settings...")
         );
         try {
-            const result = await window.MiOpenApi.postJson("/api/mqtt", {
+            const result = await window.OmniIoApi.postJson("/api/mqtt", {
                 user: app.elements.mqttUserInput.value,
                 server: app.elements.mqttServerInput.value,
                 password: app.elements.mqttPasswordInput.value,
@@ -88,7 +88,7 @@
             return;
         }
         try {
-            const config = await window.MiOpenApi.requestJson("/api/wifi");
+            const config = await window.OmniIoApi.requestJson("/api/wifi");
             app.elements.wifiSsidInput.value = config.ssid || config.currentSsid || "";
             if (app.elements.wifiPasswordInput) {
                 app.elements.wifiPasswordInput.value = "";
@@ -114,7 +114,7 @@
             return;
         }
         try {
-            const config = await window.MiOpenApi.requestJson("/api/network");
+            const config = await window.OmniIoApi.requestJson("/api/network");
             app.elements.networkHostnameInput.value = config.hostname || "";
             app.elements.networkDhcpInput.checked = config.dhcp !== false;
             app.elements.networkIpInput.value = config.ip || "";
@@ -123,7 +123,26 @@
             app.elements.networkDns1Input.value = config.dns1 || "";
             app.elements.networkDns2Input.value = config.dns2 || "";
             app.elements.networkSntpInput.value = config.sntp || "";
-            app.elements.networkTzInput.value = config.tz || "CET-1CEST,M3.5.0,M10.5.0/3";
+            const tz = config.tz || "CET-1CEST,M3.5.0,M10.5.0/3";
+            if (app.elements.networkTzInput) {
+                app.elements.networkTzInput.value = tz;
+            }
+            if (app.elements.networkTzSelect) {
+                let matched = false;
+                for (let i = 0; i < app.elements.networkTzSelect.options.length; i++) {
+                    if (app.elements.networkTzSelect.options[i].value === tz) {
+                        app.elements.networkTzSelect.selectedIndex = i;
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched) {
+                    app.elements.networkTzSelect.value = "custom";
+                    if (app.elements.networkTzCustomWrap) app.elements.networkTzCustomWrap.style.display = "block";
+                } else {
+                    if (app.elements.networkTzCustomWrap) app.elements.networkTzCustomWrap.style.display = "none";
+                }
+            }
             app.elements.networkTimeInput.value = config.time || "Not synchronized";
             setNetworkStatus(app, config.connected ? "Network config loaded" : "Network config loaded, WiFi not connected", !config.connected);
         } catch (error) {
@@ -138,7 +157,7 @@
         app.elements.networkSaveButton.disabled = true;
         setNetworkStatus(app, "Saving network config...");
         try {
-            const result = await window.MiOpenApi.postJson("/api/network", {
+            const result = await window.OmniIoApi.postJson("/api/network", {
                 hostname: app.elements.networkHostnameInput.value,
                 dhcp: app.elements.networkDhcpInput.checked,
                 ip: app.elements.networkIpInput.value,
@@ -218,7 +237,7 @@
         openWifiScanModal(app, "Scanning WiFi networks...");
         setWifiStatus(app, "Scanning WiFi networks...");
         try {
-            const scanResult = await window.MiOpenApi.requestJson("/api/wifi-scan");
+            const scanResult = await window.OmniIoApi.requestJson("/api/wifi-scan");
             renderWifiScanResults(app, scanResult);
             const networks = Array.isArray(scanResult) ? scanResult : (scanResult && Array.isArray(scanResult.networks) ? scanResult.networks : []);
             if (networks.length > 0) {
@@ -245,7 +264,7 @@
         app.elements.wifiConfigSaveButton.disabled = true;
         setWifiStatus(app, "Saving WiFi settings...");
         try {
-            const result = await window.MiOpenApi.postJson("/api/wifi", {
+            const result = await window.OmniIoApi.postJson("/api/wifi", {
                 ssid: ssid,
                 password: app.elements.wifiPasswordInput ? app.elements.wifiPasswordInput.value : ""
             });
@@ -273,7 +292,7 @@
             return;
         }
         try {
-            const config = await window.MiOpenApi.requestJson("/api/fallback");
+            const config = await window.OmniIoApi.requestJson("/api/fallback");
             app.elements.fallbackEnabledInput.checked = config.enabled !== false;
             app.elements.fallbackRetriesBootInput.value = config.retriesBoot || 3;
             app.elements.fallbackRetriesRunningInput.value = config.retriesRunning || 3;
@@ -291,7 +310,7 @@
         }
         app.elements.fallbackSaveButton.disabled = true;
         try {
-            const result = await window.MiOpenApi.postJson("/api/fallback", {
+            const result = await window.OmniIoApi.postJson("/api/fallback", {
                 enabled: app.elements.fallbackEnabledInput.checked,
                 retriesBoot: Number(app.elements.fallbackRetriesBootInput.value || 3),
                 retriesRunning: Number(app.elements.fallbackRetriesRunningInput.value || 3),
@@ -317,7 +336,7 @@
         );
 
         try {
-            const config = await window.MiOpenApi.requestJson("/api/display");
+            const config = await window.OmniIoApi.requestJson("/api/display");
             const enabled = config.enabled !== false;
             app.elements.displayEnabledInput.checked = enabled;
 
@@ -391,7 +410,7 @@
                 payload.showCpuTemp = app.elements.displayCpuTempInput.checked;
             }
 
-            const result = await window.MiOpenApi.postJson("/api/display", payload);
+            const result = await window.OmniIoApi.postJson("/api/display", payload);
             const enabled = result.enabled !== false;
             app.elements.displayEnabledInput.checked = enabled;
             setSettingsStatus(
@@ -432,7 +451,7 @@
             return;
         }
         try {
-            const config = await window.MiOpenApi.requestJson("/api/syslog");
+            const config = await window.OmniIoApi.requestJson("/api/syslog");
             app.elements.syslogEnabledInput.checked = config.enabled !== false;
             app.elements.syslogServerInput.value = config.server || "";
             app.elements.syslogPortInput.value = config.port || "";
@@ -454,7 +473,7 @@
             app.elements.syslogUpdateButton.disabled = true;
         }
         try {
-            const result = await window.MiOpenApi.postJson("/api/syslog", {
+            const result = await window.OmniIoApi.postJson("/api/syslog", {
                 enabled: app.elements.syslogEnabledInput.checked,
                 server: app.elements.syslogServerInput.value,
                 port: parseInt(app.elements.syslogPortInput.value, 10),
@@ -479,7 +498,7 @@
         syslogTestInFlight = true;
         if (app.elements.syslogTestButton) app.elements.syslogTestButton.disabled = true;
         try {
-            const result = await window.MiOpenApi.postJson("/api/syslog/test", {});
+            const result = await window.OmniIoApi.postJson("/api/syslog/test", {});
             if (result.success) {
             } else {
             }
@@ -608,7 +627,7 @@
         if (button) button.disabled = true;
         setSettingsStatus(app, app.i18nText("status.restarting", "Herstart bezig..."));
         try {
-            await window.MiOpenApi.postJson("/api/restart", {});
+            await window.OmniIoApi.postJson("/api/restart", {});
             setSettingsStatus(app, app.i18nText("status.restarted", "ESP wordt herstart, pagina herlaadt over 8 seconden..."));
             setTimeout(function () {
                 window.location.reload();
@@ -644,6 +663,19 @@
         if (restartButton) {
             restartButton.addEventListener("click", function () {
                 restartDevice(app, restartButton);
+            });
+        }
+
+        if (app.elements.networkTzSelect) {
+            app.elements.networkTzSelect.addEventListener("change", function () {
+                const val = this.value;
+                if (val === "custom") {
+                    if (app.elements.networkTzCustomWrap) app.elements.networkTzCustomWrap.style.display = "block";
+                    if (app.elements.networkTzInput) app.elements.networkTzInput.focus();
+                } else {
+                    if (app.elements.networkTzCustomWrap) app.elements.networkTzCustomWrap.style.display = "none";
+                    if (app.elements.networkTzInput) app.elements.networkTzInput.value = val;
+                }
             });
         }
     }
@@ -1017,7 +1049,8 @@
         };
     }
 
-    window.MiOpenSettings = {
+    window.OmniIoSettings = {
         init: init
     };
+    window.MiOpenSettings = window.OmniIoSettings;
 })();

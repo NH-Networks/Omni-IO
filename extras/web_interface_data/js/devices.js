@@ -3,7 +3,7 @@
     var _rafPending = {};
 
     async function runAction(app, deviceId, action) {
-        await window.MiOpenApi.postJson("/api/action", {
+        await window.OmniIoApi.postJson("/api/action", {
             deviceId: deviceId,
             action: action
         });
@@ -121,7 +121,7 @@
             }) || device;
 
             try {
-                var freshDevices = await window.MiOpenApi.requestJson("/api/devices");
+                var freshDevices = await window.OmniIoApi.requestJson("/api/devices");
                 app.state.devicesCache = freshDevices;
                 var freshDevice = freshDevices.find(function (candidate) {
                     return candidate.id === device.id;
@@ -156,14 +156,14 @@
                     onSave: async function (newName, newTiming) {
                         try {
                             if (newName.trim() && newName !== currentDevice.name) {
-                                await window.MiOpenApi.postJson("/api/command", {
+                                await window.OmniIoApi.postJson("/api/command", {
                                     deviceId: currentDevice.id,
                                     command: "edit1W " + newName
                                 });
                             }
                             var parsedTiming = parseInt(newTiming, 10);
                             if (!isNaN(parsedTiming) && parsedTiming > 0 && parsedTiming !== currentDevice.travel_time) {
-                                await window.MiOpenApi.postJson("/api/command", {
+                                await window.OmniIoApi.postJson("/api/command", {
                                     deviceId: currentDevice.id,
                                     command: "time1W " + parsedTiming
                                 });
@@ -173,7 +173,7 @@
                     },
                     onPair: async function () {
                         try {
-                            await window.MiOpenApi.postJson("/api/command", {
+                            await window.OmniIoApi.postJson("/api/command", {
                                 deviceId: currentDevice.id,
                                 command: "add"
                             });
@@ -182,7 +182,7 @@
                     },
                     onUnpair: async function () {
                         try {
-                            await window.MiOpenApi.postJson("/api/command", {
+                            await window.OmniIoApi.postJson("/api/command", {
                                 deviceId: currentDevice.id,
                                 command: "remove"
                             });
@@ -190,7 +190,7 @@
                         } catch (error) {}
                     },
                     onDelete: async function () {
-                        await window.MiOpenApi.postJson("/api/command", {
+                        await window.OmniIoApi.postJson("/api/command", {
                             deviceId: currentDevice.id,
                             command: "del1W"
                         });
@@ -217,7 +217,7 @@
         }
 
         try {
-            var devices = await window.MiOpenApi.requestJson("/api/devices");
+            var devices = await window.OmniIoApi.requestJson("/api/devices");
             app.state.devicesCache = devices;
 
             // Remove placeholder if present
@@ -310,7 +310,7 @@
         }
 
         try {
-            await window.MiOpenApi.postJson("/api/command", {
+            await window.OmniIoApi.postJson("/api/command", {
                 deviceId: selectedDeviceId,
                 command: commandStr
             });
@@ -335,7 +335,7 @@
                         return;
                     }
                     try {
-                        await window.MiOpenApi.postJson("/api/command", {
+                        await window.OmniIoApi.postJson("/api/command", {
                             command: "new1W " + newName
                         });
                         await fetchAndDisplayDevices(app);
@@ -361,7 +361,8 @@
         };
     }
 
-    window.MiOpenDevices = {
+    window.OmniIoDevices = {
         init: init
     };
+    window.MiOpenDevices = window.OmniIoDevices;
 })();
