@@ -51,6 +51,19 @@
         }
 
 
+        const logo = document.querySelector("header img.logo");
+        if (logo) {
+            logo.addEventListener("click", function () {
+                window.showPage("devices");
+            });
+            logo.addEventListener("keydown", function (e) {
+                if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    window.showPage("devices");
+                }
+            });
+        }
+
         if (!pageElement("devices") || pageElement("devices").style.display === "none") {
             window.showPage("devices");
         }
