@@ -25,6 +25,12 @@
             mqttServerInput: document.getElementById("mqtt-server"),
             mqttUpdateButton: document.getElementById("mqtt-update"),
             mqttUserInput: document.getElementById("mqtt-user"),
+            esphomeEnabledInput: document.getElementById("esphome-enabled"),
+            esphomeNameInput: document.getElementById("esphome-name"),
+            esphomePortInput: document.getElementById("esphome-port"),
+            esphomePasswordInput: document.getElementById("esphome-password"),
+            esphomeUpdateButton: document.getElementById("esphome-update"),
+            esphomeStatus: document.getElementById("esphome-status"),
             wifiSsidInput: document.getElementById("wifi-ssid"),
             wifiPasswordInput: document.getElementById("wifi-password"),
             wifiScanButton: document.getElementById("wifi-scan-btn"),
@@ -287,6 +293,11 @@
                 if (typeof app.updateMqttConfig === "function") app.updateMqttConfig();
             });
         }
+        if (app.elements.esphomeUpdateButton) {
+            app.elements.esphomeUpdateButton.addEventListener("click", function () {
+                if (typeof app.updateEspHomeConfig === "function") app.updateEspHomeConfig();
+            });
+        }
         if (app.elements.wifiScanButton) {
             app.elements.wifiScanButton.addEventListener("click", function () {
                 if (typeof app.scanWifiNetworks === "function") app.scanWifiNetworks();
@@ -430,6 +441,7 @@
 
         app.loadLogBuffer();
         app.loadMqttConfig();
+        if (typeof app.loadEspHomeConfig === "function") app.loadEspHomeConfig();
         app.loadWifiConfig();
         app.loadNetworkConfig();
         app.loadFallbackConfig();

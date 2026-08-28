@@ -25,6 +25,9 @@
 #if defined(SYSLOG)
 #include <syslog_helper.h>
 #endif
+#if defined(ESPHOME_API)
+#include <esphome_server.h>
+#endif
 #include <WiFiManager.h>
 #include <ESPmDNS.h>
 #include <TickerUsESP32.h>
@@ -68,6 +71,9 @@ static void rssiTimerCb() {
     if (WiFi.status() == WL_CONNECTED) {
         wifiStatus.rssi = WiFi.RSSI();
         wifiStatus.signalStrengthPercent = rssiToQuality(wifiStatus.rssi);
+#if defined(ESPHOME_API)
+        notifyEspHomeDiagnostics();
+#endif
     }
 }
 
@@ -131,6 +137,18 @@ static void handleWifiConnected() {
             }
         }
 
+#if defined(ESPHOME_API)
+        if (mdnsStarted) {
+            MDNS.addService("esphomelib", "tcp", esphome_port);
+            MDNS.addServiceTxt("esphomelib", "tcp", "version", "2024.9.0");
+            MDNS.addServiceTxt("esphomelib", "tcp", "mac", WiFi.macAddress());
+            MDNS.addServiceTxt("esphomelib", "tcp", "platform", "ESP32");
+            MDNS.addServiceTxt("esphomelib", "tcp", "board", "esp32");
+            MDNS.addServiceTxt("esphomelib", "tcp", "network", "wifi");
+        }
+        startEspHomeServer();
+#endif
+
         ensureWebServerStarted();
         onMqttAfterWifi();
 #if defined(SYSLOG)
@@ -155,6 +173,9 @@ static void configureWifiDisconnected() {
         MDNS.end();
     }
     mdnsStarted = false;
+#if defined(ESPHOME_API)
+    stopEspHomeServer();
+#endif
     updateDisplayStatus();
 }
 

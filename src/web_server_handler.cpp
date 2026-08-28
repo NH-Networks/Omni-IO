@@ -29,6 +29,9 @@ constexpr time_t MIN_VALID_NTP_EPOCH = 1600000000; // ~Sept 2020
 #if defined(SYSLOG)
 #include <syslog_helper.h>
 #endif
+#if defined(ESPHOME_API)
+#include <esphome_server.h>
+#endif
 #include <tokens.h>
 
 AsyncWebServer server(80);
@@ -936,6 +939,19 @@ void handleApiInfo(AsyncWebServerRequest *request, JsonObject &root) {
   root["mqttEnabled"] = false;
   root["mqttState"] = "disabled";
 #endif
+#if defined(ESPHOME_API)
+  root["esphomeRunning"] = isEspHomeServerRunning();
+  root["esphomeClients"] = getEspHomeConnectedClients();
+  root["esphomePort"] = esphome_port;
+  root["esphomeEnabled"] = esphome_enabled;
+  root["esphomeName"] = esphome_name.c_str();
+#else
+  root["esphomeRunning"] = false;
+  root["esphomeClients"] = 0;
+  root["esphomePort"] = 0;
+  root["esphomeEnabled"] = false;
+  root["esphomeName"] = "";
+#endif
 }
 
 void handleApiLogs(AsyncWebServerRequest *request, JsonArray &root) {
@@ -1241,6 +1257,75 @@ void handleApiMqttSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObjec
 }
 #endif
 
+#if defined(ESPHOME_API)
+void handleApiEspHomeGet(AsyncWebServerRequest *request, JsonObject &root) {
+  root["enabled"] = esphome_enabled;
+  root["port"] = esphome_port;
+  root["password"] = esphome_password.c_str();
+  root["name"] = esphome_name.c_str();
+  root["running"] = isEspHomeServerRunning();
+  root["clients"] = getEspHomeConnectedClients();
+}
+
+void handleApiEspHomeSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
+  bool changed = false;
+
+  if (doc["enabled"].is<bool>()) {
+    esphome_enabled = doc["enabled"].as<bool>();
+    nvs_write_bool(NVS_KEY_ESPHOME_EN, esphome_enabled);
+    changed = true;
+  }
+
+  if (doc["port"].is<JsonVariant>()) {
+    JsonVariant portVariant = doc["port"];
+    int portVal = -1;
+    if (portVariant.is<uint16_t>() || portVariant.is<int>() || portVariant.is<long>()) {
+      portVal = portVariant.as<int>();
+    } else if (portVariant.is<const char*>()) {
+      portVal = atoi(portVariant.as<const char*>());
+    }
+    if (portVal > 0 && portVal <= 65535) {
+      esphome_port = static_cast<uint16_t>(portVal);
+      nvs_write_u16(NVS_KEY_ESPHOME_PORT, esphome_port);
+      changed = true;
+    }
+  }
+
+  if (doc["password"].is<const char*>()) {
+    esphome_password = doc["password"].as<const char*>();
+    nvs_write_string(NVS_KEY_ESPHOME_PWD, esphome_password);
+    changed = true;
+  }
+
+  if (doc["name"].is<const char*>()) {
+    String n = doc["name"].as<const char*>();
+    n.trim();
+    if (!n.isEmpty()) {
+      esphome_name = n.c_str();
+      nvs_write_string(NVS_KEY_ESPHOME_NAME, esphome_name);
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    if (isEspHomeServerRunning()) {
+      stopEspHomeServer();
+    }
+    if (esphome_enabled && WiFi.status() == WL_CONNECTED) {
+      startEspHomeServer();
+    }
+  }
+
+  root["success"] = true;
+  root["message"] = "ESPHome configuration updated";
+  root["enabled"] = esphome_enabled;
+  root["port"] = esphome_port;
+  root["name"] = esphome_name.c_str();
+  root["running"] = isEspHomeServerRunning();
+  root["clients"] = getEspHomeConnectedClients();
+}
+#endif
+
 void handleFirmwareUpdate(AsyncWebServerRequest *request) {
   if (Update.hasError()) {
     request->send(500, "application/json",
@@ -1367,6 +1452,9 @@ void setupWebServer() {
 #if defined(MQTT)
   server.on("/api/mqtt", HTTP_GET, jsonGet(handleApiMqttGet));
 #endif
+#if defined(ESPHOME_API)
+  server.on("/api/esphome", HTTP_GET, jsonGet(handleApiEspHomeGet));
+#endif
   server.on("/api/command", HTTP_POST, jsonPost(handleApiCommand));
   server.on("/api/action", HTTP_POST, jsonPost(handleApiAction));
   server.on("/api/wifi", HTTP_POST, jsonPost(handleApiWifiSet));
@@ -1377,6 +1465,9 @@ void setupWebServer() {
 #endif
 #if defined(MQTT)
   server.on("/api/mqtt", HTTP_POST, jsonPost(handleApiMqttSet));
+#endif
+#if defined(ESPHOME_API)
+  server.on("/api/esphome", HTTP_POST, jsonPost(handleApiEspHomeSet));
 #endif
 #if defined(SYSLOG)
   server.on("/api/syslog/test", HTTP_POST, jsonPost(handleApiSyslogTest));

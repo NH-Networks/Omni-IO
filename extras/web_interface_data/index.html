@@ -222,6 +222,54 @@
                 </button>
               </div>
             </section>
+            <section id="esphome-settings-section">
+              <div class="title">
+                <h2 data-i18n="section.esphome_settings">ESPHome (Home Assistant)</h2>
+              </div>
+              <div class="card">
+                <label class="setting-toggle" for="esphome-enabled">
+                  <input
+                    type="checkbox"
+                    id="esphome-enabled"
+                    checked="checked"
+                  />
+                  <span data-i18n="label.enable_esphome"
+                    >Enable ESPHome Native API</span
+                  >
+                </label>
+                <label for="esphome-name" data-i18n="label.esphome_name"
+                  >Device Name:</label
+                >
+                <input
+                  id="esphome-name"
+                  data-i18n-placeholder="placeholder.esphome_name"
+                  placeholder="omni-io"
+                />
+                <label for="esphome-port" data-i18n="label.port">Port:</label>
+                <input
+                  type="number"
+                  id="esphome-port"
+                  data-i18n-placeholder="placeholder.esphome_port"
+                  placeholder="6053"
+                />
+                <label for="esphome-password" data-i18n="label.password"
+                  >Password:</label
+                >
+                <input
+                  type="password"
+                  id="esphome-password"
+                  data-i18n-placeholder="placeholder.esphome_password"
+                  placeholder="Password (optional)"
+                />
+                <p class="settings-note" data-i18n="note.esphome_info">
+                  Home Assistant will automatically discover Omni-IO under Settings &rarr; Devices &amp; Services via mDNS without requiring an MQTT broker.
+                </p>
+                <div id="esphome-status" class="status-indicator"></div>
+                <button id="esphome-update" data-i18n="button.update">
+                  Update
+                </button>
+              </div>
+            </section>
             <section id="display-settings-section">
               <div class="title">
                 <h2 data-i18n="section.display_settings">Display</h2>

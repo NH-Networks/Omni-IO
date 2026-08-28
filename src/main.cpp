@@ -34,6 +34,9 @@
 #if defined(MQTT)
 #include <mqtt_handler.h>
 #endif
+#if defined(ESPHOME_API)
+#include <esphome_server.h>
+#endif
 #include <wifi_helper.h>
 #include <nvs_helpers.h>
 #include "log_buffer.h"
@@ -295,6 +298,9 @@ void setup() {
     initWifi();
 #if defined(MQTT)
     initMqtt();
+#endif
+#if defined(ESPHOME_API)
+    initEspHomeServer();
 #endif
     Cmd::kbd_tick.attach_ms(500, Cmd::cmdFuncHandler);
 

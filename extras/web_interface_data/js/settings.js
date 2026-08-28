@@ -73,6 +73,60 @@
         }
     }
 
+    async function loadEspHomeConfig(app) {
+        try {
+            const config = await window.OmniIoApi.requestJson("/api/esphome");
+            if (app.elements.esphomeEnabledInput) {
+                app.elements.esphomeEnabledInput.checked = !!config.enabled;
+            }
+            if (app.elements.esphomeNameInput) {
+                app.elements.esphomeNameInput.value = config.name || "omni-io";
+            }
+            if (app.elements.esphomePortInput) {
+                app.elements.esphomePortInput.value = config.port || 6053;
+            }
+            if (app.elements.esphomePasswordInput) {
+                app.elements.esphomePasswordInput.value = config.password || "";
+            }
+            if (app.elements.esphomeStatus) {
+                const statusText = config.running
+                    ? `${app.i18nText("status.esphome_running", "Running on port")} ${config.port} (${config.clients || 0} ${app.i18nText("status.esphome_clients", "connected")})`
+                    : app.i18nText("status.esphome_stopped", "Stopped");
+                app.elements.esphomeStatus.textContent = statusText;
+                app.elements.esphomeStatus.className = "status-indicator " + (config.running ? "success" : "idle");
+            }
+        } catch (error) {
+            console.error("Error fetching ESPHome config", error);
+        }
+    }
+
+    async function updateEspHomeConfig(app) {
+        setSettingsStatus(
+            app,
+            app.i18nText("status.settings_saving", "Saving settings...")
+        );
+        try {
+            await window.OmniIoApi.postJson("/api/esphome", {
+                enabled: app.elements.esphomeEnabledInput ? app.elements.esphomeEnabledInput.checked : true,
+                name: app.elements.esphomeNameInput ? app.elements.esphomeNameInput.value : "omni-io",
+                port: app.elements.esphomePortInput ? parseInt(app.elements.esphomePortInput.value, 10) : 6053,
+                password: app.elements.esphomePasswordInput ? app.elements.esphomePasswordInput.value : ""
+            });
+            setSettingsStatus(
+                app,
+                app.i18nText("status.esphome_saved", "ESPHome settings saved")
+            );
+            loadEspHomeConfig(app);
+        } catch (error) {
+            console.error("Error updating ESPHome config", error);
+            setSettingsStatus(
+                app,
+                app.i18nText("status.esphome_save_error", "Saving ESPHome settings failed"),
+                true
+            );
+        }
+    }
+
     function setWifiStatus(app, message, isError) {
         if (app.elements.wifiConfigStatus) {
             app.elements.wifiConfigStatus.textContent = message || "";
@@ -692,6 +746,12 @@
         };
         app.updateMqttConfig = function () {
             return updateMqttConfig(app);
+        };
+        app.loadEspHomeConfig = function () {
+            return loadEspHomeConfig(app);
+        };
+        app.updateEspHomeConfig = function () {
+            return updateEspHomeConfig(app);
         };
         app.loadWifiConfig = function () {
             return loadWifiConfig(app);

@@ -39,6 +39,12 @@ inline std::string mqtt_password = "";
 inline std::string mqtt_discovery_topic = "homeassistant";
 inline uint16_t mqtt_port = 1883;
 
+#define ESPHOME_API                  // Native ESPHome API server for Home Assistant
+inline bool esphome_enabled = true;
+inline uint16_t esphome_port = 6053;
+inline std::string esphome_password = "";
+inline std::string esphome_name = "omni-io";
+
 #define SYSLOG                       // Comment out to disable remote syslog
 #define SYSLOG_SECRET "7a06c4100d82ed8d"  // Shared token — Graylog drops messages without it
 inline bool syslog_enabled = false;     // Allow runtime control of syslog forwarding

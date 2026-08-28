@@ -33,6 +33,10 @@ static constexpr char NVS_KEY_FB_ENABLED[] = "fb_enabled";
 static constexpr char NVS_KEY_FB_BOOT[] = "fb_boot";
 static constexpr char NVS_KEY_FB_RUN[] = "fb_run";
 static constexpr char NVS_KEY_FB_TIMEOUT[] = "fb_timeout";
+static constexpr char NVS_KEY_ESPHOME_EN[] = "esp_en";
+static constexpr char NVS_KEY_ESPHOME_PORT[] = "esp_port";
+static constexpr char NVS_KEY_ESPHOME_PWD[] = "esp_pwd";
+static constexpr char NVS_KEY_ESPHOME_NAME[] = "esp_name";
 
 
 bool nvs_init();
