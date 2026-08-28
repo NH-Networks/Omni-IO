@@ -145,6 +145,7 @@ static void handleWifiConnected() {
             MDNS.addServiceTxt("esphomelib", "tcp", "platform", "ESP32");
             MDNS.addServiceTxt("esphomelib", "tcp", "board", "esp32");
             MDNS.addServiceTxt("esphomelib", "tcp", "network", "wifi");
+            MDNS.addServiceTxt("esphomelib", "tcp", "friendly_name", "Omni-IO Gateway");
         }
         startEspHomeServer();
 #endif

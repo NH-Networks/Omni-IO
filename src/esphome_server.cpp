@@ -59,15 +59,13 @@ public:
     }
 
     void writeVarintField(uint32_t field, uint64_t val) {
-        if (val == 0) return; // proto3 default: skip 0
         writeTag(field, 0);
         writeVarint(val);
     }
 
     void writeBoolField(uint32_t field, bool val) {
-        if (!val) return;
         writeTag(field, 0);
-        writeVarint(1);
+        writeVarint(val ? 1 : 0);
     }
 
     void writeFixed32Field(uint32_t field, uint32_t val) {
@@ -79,7 +77,6 @@ public:
     }
 
     void writeFloatField(uint32_t field, float val) {
-        if (val == 0.0f) return;
         union { float f; uint32_t u; } conv;
         conv.f = val;
         writeFixed32Field(field, conv.u);
@@ -192,7 +189,7 @@ struct ClientSession {
 
 constexpr size_t MAX_CLIENTS = 4;
 ClientSession s_clients[MAX_CLIENTS];
-std::mutex s_clientsMutex;
+std::recursive_mutex s_clientsMutex;
 
 int s_serverSocket = -1;
 TaskHandle_t s_serverTaskHandle = nullptr;
@@ -220,10 +217,15 @@ bool sendFrame(int sock, uint16_t msgType, const ProtoWriter &writer) {
 }
 
 void broadcastFrameToSubscribers(uint16_t msgType, const ProtoWriter &writer) {
-    std::lock_guard<std::mutex> lock(s_clientsMutex);
+    std::lock_guard<std::recursive_mutex> lock(s_clientsMutex);
     for (size_t i = 0; i < MAX_CLIENTS; i++) {
         if (s_clients[i].socketFd >= 0 && s_clients[i].subscribedStates) {
-            sendFrame(s_clients[i].socketFd, msgType, writer);
+            if (!sendFrame(s_clients[i].socketFd, msgType, writer)) {
+                close(s_clients[i].socketFd);
+                s_clients[i].socketFd = -1;
+                s_clients[i].authenticated = false;
+                s_clients[i].subscribedStates = false;
+            }
         }
     }
 }
@@ -269,15 +271,15 @@ void handleConnectRequest(int sock, ProtoReader &reader, ClientSession &session)
 
 void handleDeviceInfoRequest(int sock) {
     ProtoWriter writer;
-    writer.writeBoolField(1, false); // uses_password = false
+    writer.writeBoolField(1, !esphome_password.empty());                         // uses_password
     writer.writeStringField(2, esphome_name.empty() ? "omni-io" : esphome_name); // name
     writer.writeStringField(3, WiFi.macAddress().c_str());                        // mac_address
     writer.writeStringField(4, "2024.9.0");                                      // esphome_version
     writer.writeStringField(5, __DATE__ " " __TIME__);                           // compilation_time
     writer.writeStringField(6, "Omni-IO Gateway");                               // model
+    writer.writeVarintField(10, 80);                                             // webserver_port = 80
     writer.writeStringField(12, "NH-Networks");                                  // manufacturer
     writer.writeStringField(13, "Omni-IO Gateway");                              // friendly_name
-    writer.writeVarintField(10, 80);                                             // webserver_port = 80
 
     sendFrame(sock, EspHomeMsg::DEVICE_INFO_RESPONSE, writer);
 }
@@ -292,6 +294,7 @@ void sendCoverEntityList(int sock, const std::string &hexId, const std::string &
         w.writeStringField(1, objId);         // object_id
         w.writeFixed32Field(2, key);          // key
         w.writeStringField(3, name);          // name
+        w.writeStringField(4, objId);         // unique_id
         w.writeBoolField(5, false);           // assumed_state = false
         w.writeBoolField(6, true);            // supports_position = true
         w.writeBoolField(7, false);           // supports_tilt = false
@@ -309,13 +312,14 @@ void sendCoverEntityList(int sock, const std::string &hexId, const std::string &
         w.writeStringField(1, objId);                // object_id
         w.writeFixed32Field(2, key);                 // key
         w.writeStringField(3, name + " Travel Time");// name
-        w.writeStringField(4, "mdi:timer-outline");  // icon
-        w.writeFloatField(5, 0.0f);                  // min_value
-        w.writeFloatField(6, 120.0f);                // max_value
-        w.writeFloatField(7, 1.0f);                  // step
-        w.writeVarintField(9, 1);                    // entity_category = 1 (config)
-        w.writeStringField(10, "s");                 // unit_of_measurement
-        w.writeVarintField(11, 2);                   // mode = 2 (slider)
+        w.writeStringField(4, objId);                // unique_id
+        w.writeStringField(5, "mdi:timer-outline");  // icon
+        w.writeFloatField(6, 0.0f);                  // min_value
+        w.writeFloatField(7, 120.0f);                // max_value
+        w.writeFloatField(8, 1.0f);                  // step
+        w.writeVarintField(10, 1);                   // entity_category = 1 (config)
+        w.writeStringField(11, "s");                 // unit_of_measurement
+        w.writeVarintField(12, 3);                   // mode = 3 (slider)
 
         sendFrame(sock, EspHomeMsg::LIST_ENTITIES_NUMBER_RESPONSE, w);
     }
@@ -329,7 +333,8 @@ void sendCoverEntityList(int sock, const std::string &hexId, const std::string &
         w.writeStringField(1, objId);                // object_id
         w.writeFixed32Field(2, key);                 // key
         w.writeStringField(3, name + " Pair");       // name
-        w.writeStringField(4, "mdi:link");           // icon
+        w.writeStringField(4, objId);                // unique_id
+        w.writeStringField(5, "mdi:link");           // icon
         w.writeVarintField(6, 1);                    // entity_category = 1 (config)
 
         sendFrame(sock, EspHomeMsg::LIST_ENTITIES_BUTTON_RESPONSE, w);
@@ -344,7 +349,8 @@ void sendCoverEntityList(int sock, const std::string &hexId, const std::string &
         w.writeStringField(1, objId);                        // object_id
         w.writeFixed32Field(2, key);                         // key
         w.writeStringField(3, name + " Add");                // name
-        w.writeStringField(4, "mdi:plus-circle-outline");    // icon
+        w.writeStringField(4, objId);                        // unique_id
+        w.writeStringField(5, "mdi:plus-circle-outline");    // icon
         w.writeVarintField(6, 1);                            // entity_category = 1 (config)
 
         sendFrame(sock, EspHomeMsg::LIST_ENTITIES_BUTTON_RESPONSE, w);
@@ -359,7 +365,8 @@ void sendCoverEntityList(int sock, const std::string &hexId, const std::string &
         w.writeStringField(1, objId);                        // object_id
         w.writeFixed32Field(2, key);                         // key
         w.writeStringField(3, name + " Remove");             // name
-        w.writeStringField(4, "mdi:minus-circle-outline");   // icon
+        w.writeStringField(4, objId);                        // unique_id
+        w.writeStringField(5, "mdi:minus-circle-outline");   // icon
         w.writeVarintField(6, 1);                            // entity_category = 1 (config)
 
         sendFrame(sock, EspHomeMsg::LIST_ENTITIES_BUTTON_RESPONSE, w);
@@ -385,12 +392,13 @@ void handleListEntitiesRequest(int sock) {
         w.writeStringField(1, objId);                // object_id
         w.writeFixed32Field(2, key);                 // key
         w.writeStringField(3, "WiFi RSSI");          // name
-        w.writeStringField(4, "mdi:wifi");           // icon
-        w.writeStringField(5, "dBm");                // unit_of_measurement
-        w.writeVarintField(6, 0);                    // accuracy_decimals = 0
-        w.writeStringField(8, "signal_strength");    // device_class
-        w.writeVarintField(9, 1);                    // state_class = 1 (measurement)
-        w.writeVarintField(10, 2);                   // entity_category = 2 (diagnostic)
+        w.writeStringField(4, objId);                // unique_id
+        w.writeStringField(5, "mdi:wifi");           // icon
+        w.writeStringField(6, "dBm");                // unit_of_measurement
+        w.writeVarintField(7, 0);                    // accuracy_decimals = 0
+        w.writeStringField(9, "signal_strength");    // device_class
+        w.writeVarintField(10, 1);                   // state_class = 1 (measurement)
+        w.writeVarintField(11, 2);                   // entity_category = 2 (diagnostic)
 
         sendFrame(sock, EspHomeMsg::LIST_ENTITIES_SENSOR_RESPONSE, w);
     }
@@ -404,12 +412,13 @@ void handleListEntitiesRequest(int sock) {
         w.writeStringField(1, objId);                // object_id
         w.writeFixed32Field(2, key);                 // key
         w.writeStringField(3, "Free Memory");        // name
-        w.writeStringField(4, "mdi:memory");         // icon
-        w.writeStringField(5, "B");                  // unit_of_measurement
-        w.writeVarintField(6, 0);                    // accuracy_decimals = 0
-        w.writeStringField(8, "data_size");          // device_class
-        w.writeVarintField(9, 1);                    // state_class = 1 (measurement)
-        w.writeVarintField(10, 2);                   // entity_category = 2 (diagnostic)
+        w.writeStringField(4, objId);                // unique_id
+        w.writeStringField(5, "mdi:memory");         // icon
+        w.writeStringField(6, "B");                  // unit_of_measurement
+        w.writeVarintField(7, 0);                    // accuracy_decimals = 0
+        w.writeStringField(9, "data_size");          // device_class
+        w.writeVarintField(10, 1);                   // state_class = 1 (measurement)
+        w.writeVarintField(11, 2);                   // entity_category = 2 (diagnostic)
 
         sendFrame(sock, EspHomeMsg::LIST_ENTITIES_SENSOR_RESPONSE, w);
     }
@@ -423,8 +432,9 @@ void handleListEntitiesRequest(int sock) {
         w.writeStringField(1, objId);                // object_id
         w.writeFixed32Field(2, key);                 // key
         w.writeStringField(3, "IP Address");         // name
-        w.writeStringField(4, "mdi:ip-network");     // icon
-        w.writeVarintField(5, 2);                    // entity_category = 2 (diagnostic)
+        w.writeStringField(4, objId);                // unique_id
+        w.writeStringField(5, "mdi:ip-network");     // icon
+        w.writeVarintField(6, 2);                    // entity_category = 2 (diagnostic)
 
         sendFrame(sock, EspHomeMsg::LIST_ENTITIES_TEXT_SENSOR_RESPONSE, w);
     }
@@ -813,7 +823,7 @@ void esphomeServerTask(void *param) {
         int maxFd = s_serverSocket;
 
         {
-            std::lock_guard<std::mutex> lock(s_clientsMutex);
+            std::lock_guard<std::recursive_mutex> lock(s_clientsMutex);
             for (size_t i = 0; i < MAX_CLIENTS; i++) {
                 if (s_clients[i].socketFd >= 0) {
                     FD_SET(s_clients[i].socketFd, &readFds);
@@ -840,11 +850,17 @@ void esphomeServerTask(void *param) {
             socklen_t clientLen = sizeof(clientAddr);
             int newSock = accept(s_serverSocket, reinterpret_cast<struct sockaddr*>(&clientAddr), &clientLen);
             if (newSock >= 0) {
-                // Set TCP_NODELAY
+                // Set TCP_NODELAY and socket timeouts (3s) to prevent hanging
                 int flag = 1;
                 setsockopt(newSock, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<char*>(&flag), sizeof(int));
 
-                std::lock_guard<std::mutex> lock(s_clientsMutex);
+                struct timeval tvTimeout;
+                tvTimeout.tv_sec = 3;
+                tvTimeout.tv_usec = 0;
+                setsockopt(newSock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<char*>(&tvTimeout), sizeof(tvTimeout));
+                setsockopt(newSock, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<char*>(&tvTimeout), sizeof(tvTimeout));
+
+                std::lock_guard<std::recursive_mutex> lock(s_clientsMutex);
                 bool slotFound = false;
                 for (size_t i = 0; i < MAX_CLIENTS; i++) {
                     if (s_clients[i].socketFd < 0) {
@@ -869,7 +885,7 @@ void esphomeServerTask(void *param) {
 
         // Process data from active clients
         {
-            std::lock_guard<std::mutex> lock(s_clientsMutex);
+            std::lock_guard<std::recursive_mutex> lock(s_clientsMutex);
             for (size_t i = 0; i < MAX_CLIENTS; i++) {
                 if (s_clients[i].socketFd >= 0) {
                     if (FD_ISSET(s_clients[i].socketFd, &readFds)) {
@@ -889,7 +905,7 @@ void esphomeServerTask(void *param) {
 
     // Cleanup when stopping
     {
-        std::lock_guard<std::mutex> lock(s_clientsMutex);
+        std::lock_guard<std::recursive_mutex> lock(s_clientsMutex);
         for (size_t i = 0; i < MAX_CLIENTS; i++) {
             if (s_clients[i].socketFd >= 0) {
                 close(s_clients[i].socketFd);
@@ -928,7 +944,7 @@ void initEspHomeServer() {
         esphome_name = name;
     }
 
-    std::lock_guard<std::mutex> lock(s_clientsMutex);
+    std::lock_guard<std::recursive_mutex> lock(s_clientsMutex);
     for (size_t i = 0; i < MAX_CLIENTS; i++) {
         s_clients[i].socketFd = -1;
     }
@@ -979,7 +995,11 @@ void startEspHomeServer() {
 void stopEspHomeServer() {
     if (!s_serverRunning) return;
     s_serverRunning = false;
-    // Server task will close sockets and delete itself
+    if (s_serverSocket >= 0) {
+        close(s_serverSocket);
+        s_serverSocket = -1;
+    }
+    // Server task will close client sockets and delete itself
 }
 
 bool isEspHomeServerRunning() {
@@ -987,7 +1007,7 @@ bool isEspHomeServerRunning() {
 }
 
 uint16_t getEspHomeConnectedClients() {
-    std::lock_guard<std::mutex> lock(s_clientsMutex);
+    std::lock_guard<std::recursive_mutex> lock(s_clientsMutex);
     uint16_t count = 0;
     for (size_t i = 0; i < MAX_CLIENTS; i++) {
         if (s_clients[i].socketFd >= 0 && s_clients[i].authenticated) {
@@ -1079,7 +1099,7 @@ void syncEspHomeDevices() {
     // If device list was changed (added, removed, renamed), notify connected clients by re-dumping
     if (!s_serverRunning) return;
 
-    std::lock_guard<std::mutex> lock(s_clientsMutex);
+    std::lock_guard<std::recursive_mutex> lock(s_clientsMutex);
     for (size_t i = 0; i < MAX_CLIENTS; i++) {
         if (s_clients[i].socketFd >= 0 && s_clients[i].authenticated) {
             handleListEntitiesRequest(s_clients[i].socketFd);
