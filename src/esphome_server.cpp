@@ -1094,6 +1094,19 @@ void notifyEspHomeCoverState(const std::string &id, const char *state) {
     broadcastFrameToSubscribers(EspHomeMsg::COVER_STATE_RESPONSE, cw);
 }
 
+void notifyEspHomeTravelTime(const std::string &id, uint32_t travelTime) {
+    if (!s_serverRunning) return;
+
+    std::string lowerId = id;
+    std::transform(lowerId.begin(), lowerId.end(), lowerId.begin(), ::tolower);
+    uint32_t key = espHomeFnv1a("cover_" + lowerId + "_travel_time");
+
+    ProtoWriter w;
+    w.writeFixed32Field(1, key);
+    w.writeFloatField(2, static_cast<float>(travelTime));
+    broadcastFrameToSubscribers(EspHomeMsg::NUMBER_STATE_RESPONSE, w);
+}
+
 void notifyEspHomeDiagnostics() {
     if (!s_serverRunning) return;
 
@@ -1114,16 +1127,18 @@ void notifyEspHomeDiagnostics() {
 }
 
 void syncEspHomeDevices() {
-    // If device list was changed (added, removed, renamed), notify connected clients by re-dumping
+    // When the device list changes (add, remove, rename), close active client connections.
+    // Home Assistant's ESPHome client will immediately reconnect (within 1-2 seconds)
+    // and invoke device_info_and_list_entities() to dynamically refresh and register all entities.
     if (!s_serverRunning) return;
 
     std::lock_guard<std::recursive_mutex> lock(s_clientsMutex);
     for (size_t i = 0; i < MAX_CLIENTS; i++) {
-        if (s_clients[i].socketFd >= 0 && s_clients[i].authenticated) {
-            handleListEntitiesRequest(s_clients[i].socketFd);
-            if (s_clients[i].subscribedStates) {
-                dumpInitialStates(s_clients[i].socketFd);
-            }
+        if (s_clients[i].socketFd >= 0) {
+            close(s_clients[i].socketFd);
+            s_clients[i].socketFd = -1;
+            s_clients[i].authenticated = false;
+            s_clients[i].subscribedStates = false;
         }
     }
 }

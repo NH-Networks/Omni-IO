@@ -1207,7 +1207,8 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
         it->positionTracker.setTravelTime(travelTime);
         save();
 #if defined(ESPHOME_API)
-        syncEspHomeDevices();
+        std::string id = bytesToHexString(it->node, sizeof(it->node));
+        notifyEspHomeTravelTime(id, travelTime);
 #endif
         return true;
     }

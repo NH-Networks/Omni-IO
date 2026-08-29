@@ -64,6 +64,7 @@ uint16_t getEspHomeConnectedClients();
 // State notification functions called by Omni-IO core
 void notifyEspHomeCoverPosition(const std::string &id, float position);
 void notifyEspHomeCoverState(const std::string &id, const char *state);
+void notifyEspHomeTravelTime(const std::string &id, uint32_t travelTime);
 void notifyEspHomeDiagnostics();
 void syncEspHomeDevices();
 
@@ -77,6 +78,7 @@ inline bool isEspHomeServerRunning() { return false; }
 inline uint16_t getEspHomeConnectedClients() { return 0; }
 inline void notifyEspHomeCoverPosition(const std::string &, float) {}
 inline void notifyEspHomeCoverState(const std::string &, const char *) {}
+inline void notifyEspHomeTravelTime(const std::string &, uint32_t) {}
 inline void notifyEspHomeDiagnostics() {}
 inline void syncEspHomeDevices() {}
 
