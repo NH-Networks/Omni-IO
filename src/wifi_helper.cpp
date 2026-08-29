@@ -138,14 +138,16 @@ static void handleWifiConnected() {
         }
 
 #if defined(ESPHOME_API)
-        if (mdnsStarted) {
+        if (mdnsStarted && esphome_enabled) {
             MDNS.addService("esphomelib", "tcp", esphome_port);
             MDNS.addServiceTxt("esphomelib", "tcp", "version", "2024.9.0");
             MDNS.addServiceTxt("esphomelib", "tcp", "mac", WiFi.macAddress());
             MDNS.addServiceTxt("esphomelib", "tcp", "platform", "ESP32");
             MDNS.addServiceTxt("esphomelib", "tcp", "board", "esp32");
             MDNS.addServiceTxt("esphomelib", "tcp", "network", "wifi");
-            MDNS.addServiceTxt("esphomelib", "tcp", "friendly_name", "Omni-IO Gateway");
+            MDNS.addServiceTxt("esphomelib", "tcp", "friendly_name", esphome_name.empty() ? "Omni-IO Gateway" : esphome_name.c_str());
+            MDNS.addServiceTxt("esphomelib", "tcp", "project_name", "NH-Networks.Omni-IO");
+            MDNS.addServiceTxt("esphomelib", "tcp", "project_version", "3.3.0");
         }
         startEspHomeServer();
 #endif
@@ -521,6 +523,8 @@ void saveWiFiCredentials(const String &ssid, const String &password) {
 }
 
 void clearWifi() {
-    WiFi.eraseAP();
+    WiFiManager wm;
+    wm.resetSettings();
+    WiFi.disconnect(true, true);
     esp_restart();
 }

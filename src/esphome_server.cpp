@@ -197,17 +197,23 @@ bool s_serverRunning = false;
 
 // Helpers to send plaintext framed messages
 bool sendFrame(int sock, uint16_t msgType, const uint8_t *payload, size_t payloadLen) {
-    ProtoWriter header;
-    header.buffer.push_back(0x00); // Plaintext framing preamble
-    header.writeVarint(payloadLen);
-    header.writeVarint(msgType);
-
-    ssize_t sentHdr = send(sock, header.buffer.data(), header.buffer.size(), 0);
-    if (sentHdr < 0) return false;
-
+    ProtoWriter msg;
+    msg.buffer.push_back(0x00); // Plaintext framing preamble
+    msg.writeVarint(payloadLen);
+    msg.writeVarint(msgType);
     if (payloadLen > 0 && payload != nullptr) {
-        ssize_t sentPayload = send(sock, payload, payloadLen, 0);
-        if (sentPayload < 0) return false;
+        msg.buffer.insert(msg.buffer.end(), payload, payload + payloadLen);
+    }
+
+    std::lock_guard<std::recursive_mutex> lock(s_clientsMutex);
+    if (sock < 0) return false;
+
+    size_t total = msg.buffer.size();
+    size_t sent = 0;
+    while (sent < total) {
+        ssize_t res = send(sock, msg.buffer.data() + sent, total - sent, 0);
+        if (res <= 0) return false;
+        sent += res;
     }
     return true;
 }
@@ -277,6 +283,8 @@ void handleDeviceInfoRequest(int sock) {
     writer.writeStringField(4, "2024.9.0");                                      // esphome_version
     writer.writeStringField(5, __DATE__ " " __TIME__);                           // compilation_time
     writer.writeStringField(6, "Omni-IO Gateway");                               // model
+    writer.writeStringField(8, "NH-Networks.Omni-IO");                           // project_name
+    writer.writeStringField(9, ESPHOME_FIRMWARE_VERSION);                        // project_version
     writer.writeVarintField(10, 80);                                             // webserver_port = 80
     writer.writeStringField(12, "NH-Networks");                                  // manufacturer
     writer.writeStringField(13, "Omni-IO Gateway");                              // friendly_name
@@ -294,11 +302,11 @@ void sendCoverEntityList(int sock, const std::string &hexId, const std::string &
         w.writeStringField(1, objId);         // object_id
         w.writeFixed32Field(2, key);          // key
         w.writeStringField(3, name);          // name
-        w.writeStringField(4, objId);         // unique_id
         w.writeBoolField(5, false);           // assumed_state = false
         w.writeBoolField(6, true);            // supports_position = true
         w.writeBoolField(7, false);           // supports_tilt = false
         w.writeStringField(8, "blind");       // device_class = "blind"
+        w.writeBoolField(12, true);           // supports_stop = true
 
         sendFrame(sock, EspHomeMsg::LIST_ENTITIES_COVER_RESPONSE, w);
     }
@@ -312,14 +320,13 @@ void sendCoverEntityList(int sock, const std::string &hexId, const std::string &
         w.writeStringField(1, objId);                // object_id
         w.writeFixed32Field(2, key);                 // key
         w.writeStringField(3, name + " Travel Time");// name
-        w.writeStringField(4, objId);                // unique_id
         w.writeStringField(5, "mdi:timer-outline");  // icon
         w.writeFloatField(6, 0.0f);                  // min_value
         w.writeFloatField(7, 120.0f);                // max_value
         w.writeFloatField(8, 1.0f);                  // step
         w.writeVarintField(10, 1);                   // entity_category = 1 (config)
         w.writeStringField(11, "s");                 // unit_of_measurement
-        w.writeVarintField(12, 3);                   // mode = 3 (slider)
+        w.writeVarintField(12, 2);                   // mode = 2 (slider)
 
         sendFrame(sock, EspHomeMsg::LIST_ENTITIES_NUMBER_RESPONSE, w);
     }
@@ -333,9 +340,8 @@ void sendCoverEntityList(int sock, const std::string &hexId, const std::string &
         w.writeStringField(1, objId);                // object_id
         w.writeFixed32Field(2, key);                 // key
         w.writeStringField(3, name + " Pair");       // name
-        w.writeStringField(4, objId);                // unique_id
         w.writeStringField(5, "mdi:link");           // icon
-        w.writeVarintField(6, 1);                    // entity_category = 1 (config)
+        w.writeVarintField(7, 1);                    // entity_category = 1 (config)
 
         sendFrame(sock, EspHomeMsg::LIST_ENTITIES_BUTTON_RESPONSE, w);
     }
@@ -349,9 +355,8 @@ void sendCoverEntityList(int sock, const std::string &hexId, const std::string &
         w.writeStringField(1, objId);                        // object_id
         w.writeFixed32Field(2, key);                         // key
         w.writeStringField(3, name + " Add");                // name
-        w.writeStringField(4, objId);                        // unique_id
         w.writeStringField(5, "mdi:plus-circle-outline");    // icon
-        w.writeVarintField(6, 1);                            // entity_category = 1 (config)
+        w.writeVarintField(7, 1);                            // entity_category = 1 (config)
 
         sendFrame(sock, EspHomeMsg::LIST_ENTITIES_BUTTON_RESPONSE, w);
     }
@@ -365,9 +370,8 @@ void sendCoverEntityList(int sock, const std::string &hexId, const std::string &
         w.writeStringField(1, objId);                        // object_id
         w.writeFixed32Field(2, key);                         // key
         w.writeStringField(3, name + " Remove");             // name
-        w.writeStringField(4, objId);                        // unique_id
         w.writeStringField(5, "mdi:minus-circle-outline");   // icon
-        w.writeVarintField(6, 1);                            // entity_category = 1 (config)
+        w.writeVarintField(7, 1);                            // entity_category = 1 (config)
 
         sendFrame(sock, EspHomeMsg::LIST_ENTITIES_BUTTON_RESPONSE, w);
     }
@@ -392,13 +396,12 @@ void handleListEntitiesRequest(int sock) {
         w.writeStringField(1, objId);                // object_id
         w.writeFixed32Field(2, key);                 // key
         w.writeStringField(3, "WiFi RSSI");          // name
-        w.writeStringField(4, objId);                // unique_id
         w.writeStringField(5, "mdi:wifi");           // icon
         w.writeStringField(6, "dBm");                // unit_of_measurement
         w.writeVarintField(7, 0);                    // accuracy_decimals = 0
         w.writeStringField(9, "signal_strength");    // device_class
         w.writeVarintField(10, 1);                   // state_class = 1 (measurement)
-        w.writeVarintField(11, 2);                   // entity_category = 2 (diagnostic)
+        w.writeVarintField(13, 2);                   // entity_category = 2 (diagnostic)
 
         sendFrame(sock, EspHomeMsg::LIST_ENTITIES_SENSOR_RESPONSE, w);
     }
@@ -412,13 +415,12 @@ void handleListEntitiesRequest(int sock) {
         w.writeStringField(1, objId);                // object_id
         w.writeFixed32Field(2, key);                 // key
         w.writeStringField(3, "Free Memory");        // name
-        w.writeStringField(4, objId);                // unique_id
         w.writeStringField(5, "mdi:memory");         // icon
         w.writeStringField(6, "B");                  // unit_of_measurement
         w.writeVarintField(7, 0);                    // accuracy_decimals = 0
         w.writeStringField(9, "data_size");          // device_class
         w.writeVarintField(10, 1);                   // state_class = 1 (measurement)
-        w.writeVarintField(11, 2);                   // entity_category = 2 (diagnostic)
+        w.writeVarintField(13, 2);                   // entity_category = 2 (diagnostic)
 
         sendFrame(sock, EspHomeMsg::LIST_ENTITIES_SENSOR_RESPONSE, w);
     }
@@ -432,9 +434,8 @@ void handleListEntitiesRequest(int sock) {
         w.writeStringField(1, objId);                // object_id
         w.writeFixed32Field(2, key);                 // key
         w.writeStringField(3, "IP Address");         // name
-        w.writeStringField(4, objId);                // unique_id
         w.writeStringField(5, "mdi:ip-network");     // icon
-        w.writeVarintField(6, 2);                    // entity_category = 2 (diagnostic)
+        w.writeVarintField(7, 2);                    // entity_category = 2 (diagnostic)
 
         sendFrame(sock, EspHomeMsg::LIST_ENTITIES_TEXT_SENSOR_RESPONSE, w);
     }
@@ -551,11 +552,23 @@ void handleCoverCommand(ProtoReader &reader) {
             } else if (hasPosition) {
                 int openPct = static_cast<int>(std::round(position * 100.0f));
                 openPct = std::clamp(openPct, 0, 100);
-                int closeVal = 100 - openPct; // io-homecontrol 0=open, 100=closed
-                t.push_back(std::to_string(closeVal));
-                t.push_back(r.description);
-                IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Absolute, &t);
-                addLogMessage(String("ESPHome cover position: ") + r.description.c_str() + " -> " + String(openPct) + "%");
+                if (openPct == 100) {
+                    t.push_back("open");
+                    t.push_back(r.description);
+                    IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Open, &t);
+                    addLogMessage(String("ESPHome cover OPEN command (100%): ") + r.description.c_str());
+                } else if (openPct == 0) {
+                    t.push_back("close");
+                    t.push_back(r.description);
+                    IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Close, &t);
+                    addLogMessage(String("ESPHome cover CLOSE command (0%): ") + r.description.c_str());
+                } else {
+                    int closeVal = 100 - openPct; // io-homecontrol 0=open, 100=closed
+                    t.push_back(std::to_string(closeVal));
+                    t.push_back(r.description);
+                    IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Absolute, &t);
+                    addLogMessage(String("ESPHome cover position: ") + r.description.c_str() + " -> " + String(openPct) + "%");
+                }
             } else if (hasLegacyCmd && legacyCmd == 0) {
                 t.push_back("open");
                 t.push_back(r.description);
@@ -601,14 +614,14 @@ void handleButtonCommand(ProtoReader &reader) {
             Tokens t;
             t.push_back("add");
             t.push_back(r.description);
-            IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Pair, &t);
+            IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Add, &t);
             addLogMessage(String("ESPHome add button: ") + r.description.c_str());
             break;
         } else if (espHomeFnv1a("cover_" + hexId + "_remove") == key) {
             Tokens t;
             t.push_back("remove");
             t.push_back(r.description);
-            IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Pair, &t);
+            IOHC::iohcRemote1W::getInstance()->cmd(IOHC::RemoteButton::Remove, &t);
             addLogMessage(String("ESPHome remove button: ") + r.description.c_str());
             break;
         }
@@ -999,7 +1012,12 @@ void stopEspHomeServer() {
         close(s_serverSocket);
         s_serverSocket = -1;
     }
-    // Server task will close client sockets and delete itself
+    // Wait up to 500ms for server task to clean up sockets and terminate
+    int waitMs = 0;
+    while (s_serverTaskHandle != nullptr && waitMs < 500) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+        waitMs += 10;
+    }
 }
 
 bool isEspHomeServerRunning() {
