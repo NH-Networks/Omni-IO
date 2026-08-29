@@ -916,6 +916,7 @@ void esphomeServerTask(void *param) {
             struct sockaddr_in clientAddr;
             socklen_t clientLen = sizeof(clientAddr);
             int newSock = accept(s_serverSocket, reinterpret_cast<struct sockaddr*>(&clientAddr), &clientLen);
+            if (newSock >= 0) {
                 // Set TCP_NODELAY, keepalive, and socket timeouts (3s) to prevent hanging
                 int flag = 1;
                 setsockopt(newSock, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<char*>(&flag), sizeof(int));
