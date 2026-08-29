@@ -369,7 +369,7 @@ void drawHeader() {
     drawLogo(0, 0);
 
 #if defined(MQTT)
-    if (!mqtt_server.empty()) {
+    if (mqtt_enabled) {
         const auto mqttIcon = mqttIcons[mqttStatusToIconIndex()];
         display.drawBitmap(127-8-1-16, 5, mqttIcon, 16, 5, SSD1306_WHITE);
     }
@@ -490,7 +490,7 @@ void displayTask(void *) {
             if (now != lastDrawnTime) dirty = true;
             if (wifiStatus.rssi != lastRssi) dirty = true;
 #if defined(MQTT)
-            int currentMqttIcon = mqtt_server.empty() ? -2 : mqttStatusToIconIndex();
+            int currentMqttIcon = !mqtt_enabled ? -2 : mqttStatusToIconIndex();
             if (currentMqttIcon != lastMqttIcon) dirty = true;
 #endif
 

@@ -19,6 +19,7 @@
             helpDeviceButton: document.getElementById("help-device"),
             helpRemoteButton: document.getElementById("help-remote"),
             lastAddrInput: document.getElementById("last-address"),
+            mqttEnabledInput: document.getElementById("mqtt-enabled"),
             mqttDiscoveryInput: document.getElementById("mqtt-discovery"),
             mqttPasswordInput: document.getElementById("mqtt-password"),
             mqttPortInput: document.getElementById("mqtt-port"),

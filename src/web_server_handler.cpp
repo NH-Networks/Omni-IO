@@ -931,9 +931,10 @@ void handleApiInfo(AsyncWebServerRequest *request, JsonObject &root) {
   root["ip"] = WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : "";
 #if defined(MQTT)
   root["mqttConnected"] = mqttClient.connected();
-  root["mqttEnabled"] = !mqtt_server.empty();
-  root["mqttState"] = mqttStatus == ConnState::Connected ? "connected" :
-                      (mqttStatus == ConnState::Connecting ? "connecting" : "disconnected");
+  root["mqttEnabled"] = mqtt_enabled;
+  root["mqttState"] = !mqtt_enabled ? "disabled" :
+                      (mqttStatus == ConnState::Connected ? "connected" :
+                      (mqttStatus == ConnState::Connecting ? "connecting" : "disconnected"));
 #else
   root["mqttConnected"] = false;
   root["mqttEnabled"] = false;
@@ -1182,6 +1183,7 @@ void handleApiSyslogTest(AsyncWebServerRequest *request, JsonObject &doc, JsonOb
 
 #if defined(MQTT)
 void handleApiMqttGet(AsyncWebServerRequest *request, JsonObject &root) {
+  root["enabled"] = mqtt_enabled;
   root["server"] = mqtt_server.c_str();
   root["user"] = mqtt_user.c_str();
   root["password"] = mqtt_password.c_str();
@@ -1208,6 +1210,16 @@ void handleApiMqttSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObjec
 
   bool mqttChanged = false;
   bool discChanged = false;
+  bool enabledChanged = false;
+
+  if (doc["enabled"].is<bool>()) {
+    bool newEnabled = doc["enabled"].as<bool>();
+    if (newEnabled != mqtt_enabled) {
+      mqtt_enabled = newEnabled;
+      nvs_write_bool(NVS_KEY_MQTT_ENABLED, mqtt_enabled);
+      enabledChanged = true;
+    }
+  }
 
   if (!server.isEmpty()) {
     mqtt_server = server.c_str();
@@ -1246,6 +1258,15 @@ void handleApiMqttSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObjec
     mqttClient.setServer(mqtt_server.c_str(), mqtt_port);
     mqttClient.setCredentials(mqtt_user.c_str(), mqtt_password.c_str());
     mqttClient.setClientId(mqtt_client_id.c_str());
+    if (mqtt_enabled && WiFi.status() == WL_CONNECTED) {
+      connectToMqtt();
+    }
+  } else if (enabledChanged) {
+    if (!mqtt_enabled) {
+      mqttClient.disconnect();
+    } else if (WiFi.status() == WL_CONNECTED && !mqtt_server.empty()) {
+      connectToMqtt();
+    }
   }
 
   if (discChanged && mqttStatus == ConnState::Connected) {
@@ -1254,6 +1275,7 @@ void handleApiMqttSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObjec
 
   root["success"] = true;
   root["message"] = "MQTT configuration updated";
+  root["enabled"] = mqtt_enabled;
 }
 #endif
 

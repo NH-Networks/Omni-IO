@@ -36,6 +36,9 @@
     async function loadMqttConfig(app) {
         try {
             const config = await window.OmniIoApi.requestJson("/api/mqtt");
+            if (app.elements.mqttEnabledInput) {
+                app.elements.mqttEnabledInput.checked = config.enabled !== false;
+            }
             app.elements.mqttUserInput.value = config.user || "";
             app.elements.mqttServerInput.value = config.server || "";
             app.elements.mqttPasswordInput.value = config.password || "";
@@ -53,6 +56,7 @@
         );
         try {
             const result = await window.OmniIoApi.postJson("/api/mqtt", {
+                enabled: app.elements.mqttEnabledInput ? app.elements.mqttEnabledInput.checked : true,
                 user: app.elements.mqttUserInput.value,
                 server: app.elements.mqttServerInput.value,
                 password: app.elements.mqttPasswordInput.value,

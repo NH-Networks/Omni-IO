@@ -11,6 +11,7 @@ static constexpr char NVS_KEY_MQTT_PASSWORD[] = "mqtt_password";
 static constexpr char NVS_KEY_MQTT_DISCOVERY[] = "mqtt_disc_topic";
 static constexpr char NVS_KEY_MQTT_CLIENT_ID[] = "mqtt_client_id";
 static constexpr char NVS_KEY_MQTT_PORT[] = "mqtt_port";
+static constexpr char NVS_KEY_MQTT_ENABLED[] = "mqtt_enabled";
 static constexpr char NVS_KEY_SYSLOG_ENABLED[] = "syslog_enabled";
 static constexpr char NVS_KEY_SYSLOG_SERVER[] = "syslog_server";
 static constexpr char NVS_KEY_SYSLOG_PORT[] = "syslog_port";
