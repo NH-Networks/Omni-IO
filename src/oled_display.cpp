@@ -35,6 +35,9 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/semphr.h>
+#if defined(ESPHOME_API)
+#include <esphome_server.h>
+#endif
 
 // OLED screen dimensions
 #define SCREEN_WIDTH  128
@@ -176,6 +179,32 @@ const uint8_t PROGMEM mqttIcons[3][10] = {
         B01110000, B11100000,
     }, // disconnected / broken chain ends
 };
+
+#if defined(ESPHOME_API)
+// 11x7 bitmaps: ESPHome / Home Assistant status icon
+// Index 0: Waiting / listening (outline house with chimney)
+// Index 1: Connected (solid house with chimney & door)
+const uint8_t PROGMEM espHomeIcons[2][14] = {
+    {
+        B00001100, B10000000, // ....##..#.. (chimney on right)
+        B00010010, B10000000, // ...#..#.#..
+        B00100001, B10000000, // ..#....##..
+        B01111111, B11000000, // .#########. (roof eave)
+        B00100000, B10000000, // ..#.....#.. (walls)
+        B00100000, B10000000, // ..#.....#..
+        B00111111, B10000000, // ..#######.. (base)
+    },
+    {
+        B00001100, B10000000, // ....##..#.. (chimney on right)
+        B00011110, B10000000, // ...####.#..
+        B00111111, B10000000, // ..#######..
+        B01111111, B11000000, // .#########. (roof eave)
+        B00110001, B10000000, // ..##...##.. (walls + door opening)
+        B00110001, B10000000, // ..##...##..
+        B00111111, B10000000, // ..#######.. (base)
+    },
+};
+#endif
 
 int mqttStatusToIconIndex() {
     switch (mqttStatus) {
@@ -375,11 +404,21 @@ void drawHeader() {
     }
 #endif
 
+#if defined(ESPHOME_API)
+    if (esphome_enabled && isEspHomeServerRunning()) {
+        int iconIdx = (getEspHomeConnectedClients() > 0) ? 1 : 0;
+        const auto espIcon = espHomeIcons[iconIdx];
+        int xPos = (mqtt_enabled) ? (127 - 8 - 1 - 16 - 2 - 11) : (127 - 8 - 3 - 11);
+        display.drawBitmap(xPos, 3, espIcon, 11, 7, SSD1306_WHITE);
+    }
+#endif
+
     const auto wifiIcon = wifiIcons[min(wifiStatus.signalStrengthPercent.load(), 99) / 25];
     display.drawBitmap(127-8, 3, wifiIcon, 8, 7, SSD1306_WHITE);
 
     if (cpuTempEnabled.load()) {
-        display.setCursor(74, 4);
+        int cpuX = (mqtt_enabled && esphome_enabled && isEspHomeServerRunning()) ? 62 : 74;
+        display.setCursor(cpuX, 4);
         display.printf("%.0fC", temperatureRead());
     }
 }

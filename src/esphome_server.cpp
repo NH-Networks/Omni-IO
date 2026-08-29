@@ -9,6 +9,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/semphr.h>
+#include <oled_display.h>
 #include <iohcRemote1W.h>
 #include <interact.h>
 #include <log_buffer.h>
@@ -187,6 +188,21 @@ struct ClientSession {
     uint32_t lastActivityMs = 0;
 };
 
+void closeSession(ClientSession &session) {
+    if (session.socketFd >= 0) {
+        close(session.socketFd);
+        session.socketFd = -1;
+        bool wasAuth = session.authenticated;
+        session.authenticated = false;
+        session.subscribedStates = false;
+#if defined(SSD1306_DISPLAY)
+        if (wasAuth) {
+            wakeDisplay();
+        }
+#endif
+    }
+}
+
 constexpr size_t MAX_CLIENTS = 4;
 ClientSession s_clients[MAX_CLIENTS];
 std::recursive_mutex s_clientsMutex;
@@ -227,10 +243,7 @@ void broadcastFrameToSubscribers(uint16_t msgType, const ProtoWriter &writer) {
     for (size_t i = 0; i < MAX_CLIENTS; i++) {
         if (s_clients[i].socketFd >= 0 && s_clients[i].subscribedStates) {
             if (!sendFrame(s_clients[i].socketFd, msgType, writer)) {
-                close(s_clients[i].socketFd);
-                s_clients[i].socketFd = -1;
-                s_clients[i].authenticated = false;
-                s_clients[i].subscribedStates = false;
+                closeSession(s_clients[i]);
             }
         }
     }
@@ -269,6 +282,11 @@ void handleConnectRequest(int sock, ProtoReader &reader, ClientSession &session)
     }
 
     session.authenticated = !invalidPassword;
+#if defined(SSD1306_DISPLAY)
+    if (session.authenticated) {
+        wakeDisplay();
+    }
+#endif
 
     ProtoWriter writer;
     writer.writeBoolField(1, invalidPassword); // invalid_password (1)
@@ -689,8 +707,7 @@ void dispatchMessage(ClientSession &session, uint16_t msgType, const uint8_t *pa
         case EspHomeMsg::DISCONNECT_REQUEST: {
             ProtoWriter writer;
             sendFrame(session.socketFd, EspHomeMsg::DISCONNECT_RESPONSE, writer);
-            close(session.socketFd);
-            session.socketFd = -1;
+            closeSession(session);
             break;
         }
 
@@ -741,8 +758,7 @@ void processClientSession(ClientSession &session) {
     if (n <= 0) {
         if (n == 0) {
             // EOF: peer closed
-            close(session.socketFd);
-            session.socketFd = -1;
+            closeSession(session);
         }
         return;
     }
@@ -751,8 +767,7 @@ void processClientSession(ClientSession &session) {
     if (preamble != 0x00) {
         // Not a plaintext frame (or unrecognized preamble)
         Serial.printf("ESPHome: Bad preamble 0x%02x, closing session\n", preamble);
-        close(session.socketFd);
-        session.socketFd = -1;
+        closeSession(session);
         return;
     }
 
@@ -762,16 +777,14 @@ void processClientSession(ClientSession &session) {
     while (true) {
         uint8_t b;
         if (recv(session.socketFd, &b, 1, 0) <= 0) {
-            close(session.socketFd);
-            session.socketFd = -1;
+            closeSession(session);
             return;
         }
         length |= static_cast<uint64_t>(b & 0x7F) << shift;
         if (!(b & 0x80)) break;
         shift += 7;
         if (shift >= 64) {
-            close(session.socketFd);
-            session.socketFd = -1;
+            closeSession(session);
             return;
         }
     }
@@ -782,16 +795,14 @@ void processClientSession(ClientSession &session) {
     while (true) {
         uint8_t b;
         if (recv(session.socketFd, &b, 1, 0) <= 0) {
-            close(session.socketFd);
-            session.socketFd = -1;
+            closeSession(session);
             return;
         }
         rawType |= static_cast<uint64_t>(b & 0x7F) << shift;
         if (!(b & 0x80)) break;
         shift += 7;
         if (shift >= 64) {
-            close(session.socketFd);
-            session.socketFd = -1;
+            closeSession(session);
             return;
         }
     }
@@ -799,8 +810,7 @@ void processClientSession(ClientSession &session) {
     if (length > 16384) {
         // Sanity limit to avoid memory exhaustion
         Serial.printf("ESPHome: Frame length %llu too large\n", length);
-        close(session.socketFd);
-        session.socketFd = -1;
+        closeSession(session);
         return;
     }
 
@@ -810,8 +820,7 @@ void processClientSession(ClientSession &session) {
     while (received < length) {
         ssize_t chunk = recv(session.socketFd, payload.data() + received, length - received, 0);
         if (chunk <= 0) {
-            close(session.socketFd);
-            session.socketFd = -1;
+            closeSession(session);
             return;
         }
         received += chunk;
@@ -908,8 +917,7 @@ void esphomeServerTask(void *param) {
                     // Keepalive check: if no activity for 60s, close
                     if (s_clients[i].socketFd >= 0 && millis() - s_clients[i].lastActivityMs > 90000UL) {
                         Serial.printf("ESPHome: Client %d silent timeout\n", static_cast<int>(i));
-                        close(s_clients[i].socketFd);
-                        s_clients[i].socketFd = -1;
+                        closeSession(s_clients[i]);
                     }
                 }
             }
@@ -920,10 +928,7 @@ void esphomeServerTask(void *param) {
     {
         std::lock_guard<std::recursive_mutex> lock(s_clientsMutex);
         for (size_t i = 0; i < MAX_CLIENTS; i++) {
-            if (s_clients[i].socketFd >= 0) {
-                close(s_clients[i].socketFd);
-                s_clients[i].socketFd = -1;
-            }
+            closeSession(s_clients[i]);
         }
     }
     if (s_serverSocket >= 0) {
@@ -1134,12 +1139,7 @@ void syncEspHomeDevices() {
 
     std::lock_guard<std::recursive_mutex> lock(s_clientsMutex);
     for (size_t i = 0; i < MAX_CLIENTS; i++) {
-        if (s_clients[i].socketFd >= 0) {
-            close(s_clients[i].socketFd);
-            s_clients[i].socketFd = -1;
-            s_clients[i].authenticated = false;
-            s_clients[i].subscribedStates = false;
-        }
+        closeSession(s_clients[i]);
     }
 }
 
