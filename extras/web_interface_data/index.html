@@ -5,20 +5,22 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title data-i18n="page.title">Omni-IO - Device Control</title>
     <link rel="icon" href="img/logo.svg?v=2.0.0" type="image/svg+xml" />
-    <link rel="stylesheet" href="css/style.css?v=2.0.0" />
+    <link rel="stylesheet" href="css/style.css?v=2.0.1" />
   </head>
 
   <body>
     <header>
       <img src="img/logo.svg?v=2.0.0" alt="Omni-IO Logo" class="logo" onclick="showPage('devices')" role="button" tabindex="0" title="Devices" />
       <h1 data-i18n="header.title">Device Control</h1>
-      <div id="mqtt-status-pill" class="mqtt-pill" title="MQTT Status" role="button" tabindex="0">
-        <span id="mqtt-indicator-dot" class="mqtt-dot disabled"></span>
-        <span id="mqtt-status-text" class="mqtt-text">MQTT</span>
-      </div>
-      <div id="esphome-status-pill" class="mqtt-pill" title="ESPHome Status" role="button" tabindex="0">
-        <span id="esphome-indicator-dot" class="mqtt-dot disabled"></span>
-        <span id="esphome-status-text" class="mqtt-text">ESPHome</span>
+      <div class="header-status">
+        <div id="mqtt-status-pill" class="mqtt-pill" title="MQTT Status" role="button" tabindex="0">
+          <span id="mqtt-indicator-dot" class="mqtt-dot disabled"></span>
+          <span id="mqtt-status-text" class="mqtt-text">MQTT</span>
+        </div>
+        <div id="esphome-status-pill" class="mqtt-pill" title="ESPHome Status" role="button" tabindex="0">
+          <span id="esphome-indicator-dot" class="mqtt-dot disabled"></span>
+          <span id="esphome-status-text" class="mqtt-text">ESPHome</span>
+        </div>
       </div>
       <button id="menu-toggle" aria-label="Open menu" aria-expanded="false" type="button">
         <span></span><span></span><span></span>
