@@ -8,7 +8,7 @@
 
   [![Release](https://img.shields.io/github/v/release/NH-Networks/Omni-IO?style=flat-square&color=blue)](https://github.com/NH-Networks/Omni-IO/releases)
   [![PlatformIO](https://img.shields.io/badge/PlatformIO-ESP32-orange?style=flat-square)](https://platformio.org/)
-  [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-MQTT%20Discovery-41BDF5?style=flat-square&logo=home-assistant)](https://www.home-assistant.io/)
+  [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-ESPHome%20%7C%20MQTT-41BDF5?style=flat-square&logo=home-assistant)](https://www.home-assistant.io/)
   [![License](https://img.shields.io/badge/License-CC%20BY--NC--ND%204.0-lightgrey?style=flat-square)](https://creativecommons.org/licenses/by-nc-nd/4.0/)
   [![BuyMeACoffee](https://img.shields.io/badge/Support-Buy%20Me%20A%20Coffee-yellow?style=flat-square&logo=buy-me-a-coffee)](https://buymeacoffee.com/dyna_mite)
 </div>
@@ -38,23 +38,26 @@
   * Fully responsive mobile & desktop web interface served directly from LittleFS.
   * Real-time WebSocket connection for instant feedback and live RF traffic log stream.
   * Multi-language support with instant live switching (**Dutch**, **English**, **German**, and **French**).
+  * Live status pills for both **MQTT** and **ESPHome** in the navbar with one-click settings navigation.
   * Direct device pairing, unpairing, renaming, and travel-time configuration.
   * Physical remote controller map manager.
 * 🚀 **Home Assistant ESPHome Native API (Zero-Broker Integration)**:
   * Direct plug-and-play connection over TCP (port `6053`) without requiring an external MQTT broker.
   * Automatic mDNS discovery (`_esphomelib._tcp.local.`) under **Settings → Devices & Services**.
-  * Native cover entities with smooth position slider and Open/Close/Stop controls.
-  * Number slider entity for live motor travel time adjustments.
-  * Button entities for Pairing, Adding, and Removing devices.
+  * Dynamic entity discovery & re-enumeration: automatically refreshes entities in Home Assistant when devices are added, renamed, or removed.
+  * Native cover entities with smooth position slider and Open/Close/Stop controls (`device_class: shutter`).
+  * Number slider entity for live motor travel time calibration with instant feedback.
+  * Button entities for Pairing, Adding, and Removing devices, plus a gateway soft restart button.
   * Gateway diagnostic sensors (WiFi RSSI, Free Memory, IP address).
 * 🏠 **Home Assistant Auto-Discovery via MQTT**:
   * Automatic discovery for cover entities (blinds, screens, shutters).
   * Smooth percentage-based position control with travel time tracking.
   * Dedicated pairing and maintenance button entities.
   * Real-time state reporting (`OPEN`, `CLOSED`, `OPENING`, `CLOSING`, `STOP`).
-  * Availability tracking with MQTT Last Will and Testament (LWT).
+  * Independent runtime toggle to enable/disable MQTT without clearing configuration.
 * 🖥️ **OLED Display & Advanced Screen Manager**:
-  * Status display showing device name, WiFi signal, IP / mDNS address, MQTT state, and optional CPU temperature.
+  * Real-time status display showing device name, WiFi signal, IP / mDNS address, CPU temperature, and status icons for both MQTT and ESPHome.
+  * Pixel-art ESPHome status icon indicating connected / waiting Home Assistant sessions.
   * Runtime configurable screensaver timeout, screen-off timeout, and 3 dimming levels (Low, Medium, High).
 * 📜 **Syslog & Remote Logging**:
   * Sends log messages directly to remote Syslog servers (RFC3164 / RFC5424 compliant).
