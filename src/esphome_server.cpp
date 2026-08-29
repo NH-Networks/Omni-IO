@@ -10,6 +10,7 @@
 #include <freertos/task.h>
 #include <freertos/semphr.h>
 #include <oled_display.h>
+#include <web_server_handler.h>
 #include <iohcRemote1W.h>
 #include <interact.h>
 #include <log_buffer.h>
@@ -195,11 +196,14 @@ void closeSession(ClientSession &session) {
         bool wasAuth = session.authenticated;
         session.authenticated = false;
         session.subscribedStates = false;
-#if defined(SSD1306_DISPLAY)
         if (wasAuth) {
+#if defined(SSD1306_DISPLAY)
             wakeDisplay();
-        }
 #endif
+#if defined(WEBSERVER)
+            broadcastEspHomeStatus();
+#endif
+        }
     }
 }
 
@@ -282,11 +286,14 @@ void handleConnectRequest(int sock, ProtoReader &reader, ClientSession &session)
     }
 
     session.authenticated = !invalidPassword;
-#if defined(SSD1306_DISPLAY)
     if (session.authenticated) {
+#if defined(SSD1306_DISPLAY)
         wakeDisplay();
-    }
 #endif
+#if defined(WEBSERVER)
+        broadcastEspHomeStatus();
+#endif
+    }
 
     ProtoWriter writer;
     writer.writeBoolField(1, invalidPassword); // invalid_password (1)
@@ -323,7 +330,7 @@ void sendCoverEntityList(int sock, const std::string &hexId, const std::string &
         w.writeBoolField(5, false);           // assumed_state = false
         w.writeBoolField(6, true);            // supports_position = true
         w.writeBoolField(7, false);           // supports_tilt = false
-        w.writeStringField(8, "blind");       // device_class = "blind"
+        w.writeStringField(8, "shutter");     // device_class = "shutter"
         w.writeBoolField(12, true);           // supports_stop = true
 
         sendFrame(sock, EspHomeMsg::LIST_ENTITIES_COVER_RESPONSE, w);
@@ -398,10 +405,15 @@ void sendCoverEntityList(int sock, const std::string &hexId, const std::string &
 void handleListEntitiesRequest(int sock) {
     // 1. Send all configured cover remotes
     const auto &remotes = IOHC::iohcRemote1W::getInstance()->getRemotes();
+    size_t count = 0;
     for (const auto &r : remotes) {
         std::string hexId = bytesToHexString(r.node, sizeof(r.node));
         std::string name = r.name.empty() ? r.description : r.name;
         sendCoverEntityList(sock, hexId, name);
+        count++;
+        if (count % 3 == 0) {
+            vTaskDelay(pdMS_TO_TICKS(2));
+        }
     }
 
     // 2. Gateway Diagnostic Sensors
@@ -458,7 +470,24 @@ void handleListEntitiesRequest(int sock) {
         sendFrame(sock, EspHomeMsg::LIST_ENTITIES_TEXT_SENSOR_RESPONSE, w);
     }
 
-    // 3. Finish list
+    // 3. Gateway Management Buttons
+    // Restart Gateway Button
+    {
+        std::string objId = "omni_restart";
+        uint32_t key = espHomeFnv1a(objId);
+
+        ProtoWriter w;
+        w.writeStringField(1, objId);                // object_id
+        w.writeFixed32Field(2, key);                 // key
+        w.writeStringField(3, "Restart Gateway");    // name
+        w.writeStringField(5, "mdi:restart");        // icon
+        w.writeVarintField(7, 1);                    // entity_category = 1 (config)
+        w.writeStringField(8, "restart");            // device_class = "restart"
+
+        sendFrame(sock, EspHomeMsg::LIST_ENTITIES_BUTTON_RESPONSE, w);
+    }
+
+    // 4. Finish list
     ProtoWriter done;
     sendFrame(sock, EspHomeMsg::LIST_ENTITIES_DONE_RESPONSE, done);
 }
@@ -617,6 +646,22 @@ void handleButtonCommand(ProtoReader &reader) {
     }
 
     if (key == 0) return;
+
+    if (espHomeFnv1a("omni_restart") == key) {
+        addLogMessage("ESPHome: Gateway restart triggered by Home Assistant");
+        xTaskCreate(
+            [](void *) {
+                vTaskDelay(pdMS_TO_TICKS(1000));
+                ESP.restart();
+            },
+            "ha_restart",
+            2048,
+            nullptr,
+            5,
+            nullptr
+        );
+        return;
+    }
 
     const auto &remotes = IOHC::iohcRemote1W::getInstance()->getRemotes();
     for (const auto &r : remotes) {
@@ -871,10 +916,18 @@ void esphomeServerTask(void *param) {
             struct sockaddr_in clientAddr;
             socklen_t clientLen = sizeof(clientAddr);
             int newSock = accept(s_serverSocket, reinterpret_cast<struct sockaddr*>(&clientAddr), &clientLen);
-            if (newSock >= 0) {
-                // Set TCP_NODELAY and socket timeouts (3s) to prevent hanging
+                // Set TCP_NODELAY, keepalive, and socket timeouts (3s) to prevent hanging
                 int flag = 1;
                 setsockopt(newSock, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<char*>(&flag), sizeof(int));
+
+                int keepAlive = 1;
+                setsockopt(newSock, SOL_SOCKET, SO_KEEPALIVE, reinterpret_cast<char*>(&keepAlive), sizeof(int));
+                int keepIdle = 15;
+                setsockopt(newSock, IPPROTO_TCP, TCP_KEEPIDLE, reinterpret_cast<char*>(&keepIdle), sizeof(int));
+                int keepInterval = 5;
+                setsockopt(newSock, IPPROTO_TCP, TCP_KEEPINTVL, reinterpret_cast<char*>(&keepInterval), sizeof(int));
+                int keepCount = 3;
+                setsockopt(newSock, IPPROTO_TCP, TCP_KEEPCNT, reinterpret_cast<char*>(&keepCount), sizeof(int));
 
                 struct timeval tvTimeout;
                 tvTimeout.tv_sec = 3;
@@ -1008,6 +1061,9 @@ void startEspHomeServer() {
     xTaskCreatePinnedToCore(esphomeServerTask, "esphome_api", 4096, nullptr, 2, &s_serverTaskHandle, 1);
     Serial.printf("ESPHome: Native API server listening on port %u\n", esphome_port);
     addLogMessage(String("ESPHome Native API server listening on port ") + String(esphome_port));
+#if defined(WEBSERVER)
+    broadcastEspHomeStatus();
+#endif
 }
 
 void stopEspHomeServer() {
@@ -1023,6 +1079,9 @@ void stopEspHomeServer() {
         vTaskDelay(pdMS_TO_TICKS(10));
         waitMs += 10;
     }
+#if defined(WEBSERVER)
+    broadcastEspHomeStatus();
+#endif
 }
 
 bool isEspHomeServerRunning() {

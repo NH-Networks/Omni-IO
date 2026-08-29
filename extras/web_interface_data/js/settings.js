@@ -99,6 +99,9 @@
                 app.elements.esphomeStatus.textContent = statusText;
                 app.elements.esphomeStatus.className = "status-indicator " + (config.running ? "success" : "idle");
             }
+            if (typeof app.updateEspHomeStatus === "function") {
+                app.updateEspHomeStatus(config);
+            }
         } catch (error) {
             console.error("Error fetching ESPHome config", error);
         }

@@ -239,6 +239,17 @@ Commands transmitted via SX1262 / CC1101 on 868.95 MHz:
 * `POST /api/filesystem`: Multipart OTA LittleFS binary upload (`..._filesystem.bin`).
 * `GET /api/logs`: In-memory rolling circular buffer containing recent system log lines.
 
+### 5.3 WebSocket Events (`/ws`)
+* `esphome_status`: Broadcasts live ESPHome server state (`enabled`, `running`, `clients`, `port`, `connected`, `state`). Controls the `#esphome-status-pill` in the web navbar.
+* `mqtt_status`: Broadcasts live MQTT client state (`connected`, `enabled`, `state`). Controls the `#mqtt-status-pill` in the web navbar.
+* `position`: Real-time position tracking (`{"id": "...", "position": ...}`).
+* `deviceaction`: Radio activity log (`action`, `position`, `target`, `source`).
+* `log`: System trace and debug lines.
+
+### 5.4 Web Navigation Bar Status Pills
+* **MQTT Pill (`#mqtt-status-pill`)**: Shows dot status (green = connected, yellow = connecting, grey = disabled, red = disconnected). Clicking opens Settings → MQTT.
+* **ESPHome Pill (`#esphome-status-pill`)**: Shows dot status (green pulsating = connected with client count, yellow = listening on port, grey = disabled, red = disconnected). Clicking opens Settings → Integration.
+
 ---
 
 ## 6. Home Assistant Integration Guidance

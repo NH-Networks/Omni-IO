@@ -69,10 +69,18 @@ static void notifyWiFiWorker(uint32_t bits) {
 
 static void rssiTimerCb() {
     if (WiFi.status() == WL_CONNECTED) {
-        wifiStatus.rssi = WiFi.RSSI();
-        wifiStatus.signalStrengthPercent = rssiToQuality(wifiStatus.rssi);
+        int newRssi = WiFi.RSSI();
+        wifiStatus.rssi = newRssi;
+        wifiStatus.signalStrengthPercent = rssiToQuality(newRssi);
 #if defined(ESPHOME_API)
-        notifyEspHomeDiagnostics();
+        static uint32_t lastEspHomeDiagMs = 0;
+        static int lastSentRssi = 999;
+        uint32_t now = millis();
+        if (now - lastEspHomeDiagMs >= 30000UL || std::abs(newRssi - lastSentRssi) >= 5) {
+            lastEspHomeDiagMs = now;
+            lastSentRssi = newRssi;
+            notifyEspHomeDiagnostics();
+        }
 #endif
     }
 }

@@ -145,6 +145,22 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     String mqttPayload;
     serializeJson(mqttDoc, mqttPayload);
     client->text(mqttPayload);
+
+#if defined(ESPHOME_API)
+    JsonDocument esphomeDoc;
+    esphomeDoc["type"] = "esphome_status";
+    esphomeDoc["enabled"] = esphome_enabled;
+    esphomeDoc["running"] = isEspHomeServerRunning();
+    uint16_t esphomeClients = getEspHomeConnectedClients();
+    esphomeDoc["clients"] = esphomeClients;
+    esphomeDoc["port"] = esphome_port;
+    esphomeDoc["connected"] = (esphomeClients > 0);
+    esphomeDoc["state"] = !esphome_enabled ? "disabled" :
+                          (esphomeClients > 0 ? "connected" : (isEspHomeServerRunning() ? "connecting" : "disconnected"));
+    String esphomePayload;
+    serializeJson(esphomeDoc, esphomePayload);
+    client->text(esphomePayload);
+#endif
   }
 }
 
@@ -202,6 +218,24 @@ void broadcastMqttStatus(bool connected, bool enabled, const char *state) {
   String payload;
   serializeJson(doc, payload);
   ws.textAll(payload);
+}
+
+void broadcastEspHomeStatus() {
+#if defined(ESPHOME_API)
+  JsonDocument doc;
+  doc["type"] = "esphome_status";
+  doc["enabled"] = esphome_enabled;
+  doc["running"] = isEspHomeServerRunning();
+  uint16_t esphomeClients = getEspHomeConnectedClients();
+  doc["clients"] = esphomeClients;
+  doc["port"] = esphome_port;
+  doc["connected"] = (esphomeClients > 0);
+  doc["state"] = !esphome_enabled ? "disabled" :
+                 (esphomeClients > 0 ? "connected" : (isEspHomeServerRunning() ? "connecting" : "disconnected"));
+  String payload;
+  serializeJson(doc, payload);
+  ws.textAll(payload);
+#endif
 }
 
 void updateTwoWTxStatus(const String &command, const String &result, bool isError) {
