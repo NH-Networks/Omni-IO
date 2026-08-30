@@ -203,11 +203,11 @@ Commands transmitted via SX1262 / CC1101 on 868.95 MHz:
 * `screensaverTimeout`: Default 60 seconds (`NVS_KEY_DISPLAY_SCREENSAVER`).
   * When no radio data or user interaction occurs for 60s, `drawLogo()` enters screensaver mode (dimmed display, floating logo + IP at random screen coordinates).
 * `screenOffTimeout`: Default 3600 seconds. Shuts display panel off completely.
-* `wakeDisplay()`: Triggered on:
-  * Inbound ESPHome client connect / disconnect
-  * Web API command execution
-  * Radio TX / RX frame events
-  * Restores normal contrast and fast refresh rate (`MILLIS_BETWEEN_DISPLAY_UPDATE_FAST = 100ms`).
+* `wakeDisplay()` & Inactivity Timing:
+  * Inactivity timer (`lastDataTime`): Reset on radio TX / RX frame events (`displayCustomMessage()`) and interactive Web API commands (`_jsonPost`, `WS_EVT_CONNECT`, `WS_EVT_DATA`).
+  * Background protection: Automatic browser WebSocket `WS_EVT_PONG` heartbeats, read-only HTTP GET requests, and ESPHome client connects/disconnects do NOT wake the display (they call `updateDisplayStatus()` to refresh icons without resetting sleep timers).
+  * Hardware I2C Contrast: Set via `setDisplayContrast(contrast)` in a single I2C transmission (`0x00`, `0x81`, `contrast`), preventing SSD1306 command decoder aborts caused by split transactions.
+  * Dim levels: Level 0 = `1` (low/dark room), Level 1 = `32` (medium), Level 2 = `80` (high). Active screensavers immediately adapt to runtime dim level changes.
 
 ---
 
