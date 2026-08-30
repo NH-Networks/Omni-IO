@@ -102,7 +102,9 @@ static void broadcastTwoWStatus() {
 static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
                       AwsEventType type, void *arg, uint8_t *data,
                       size_t len) {
-  wakeDisplay();
+  if (type == WS_EVT_CONNECT || type == WS_EVT_DATA) {
+    wakeDisplay();
+  }
   if (type == WS_EVT_CONNECT) {
     IOHC::iohcRemote1W::getInstance()->updatePositions();
 
@@ -294,7 +296,6 @@ template<class T>
 using ArGetRequestHandlerFunction = std::function<void(AsyncWebServerRequest *request, T &root)>;
 ArRequestHandlerFunction _jsonGet(const ArGetRequestHandlerFunction<JsonVariant> handler) {
   return [handler] (AsyncWebServerRequest *request) {
-      wakeDisplay();
       std::unique_ptr<AsyncJsonResponse> response(new AsyncJsonResponse());
       if (!response.get()) {
         request->send(500, "text/plain", "Internal Server Error");

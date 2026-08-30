@@ -68,12 +68,24 @@ static std::atomic<uint16_t> screensaverTimeout{60};    // seconds
 static std::atomic<uint16_t> screenOffTimeout{3600};    // seconds
 static std::atomic<uint8_t>  dimLevel{0};               // 0=low,1=med,2=high
 static std::atomic<bool>     cpuTempEnabled{true};
+static std::atomic<bool>     isDisplayDimmed{false};
+
+// Sends SSD1306_SETCONTRAST (0x81) and contrast in a single I2C transmission.
+// Calling display.ssd1306_command() twice would send an I2C STOP after 0x81,
+// aborting the 2-byte command on SSD1306 controllers.
+static void setDisplayContrast(uint8_t contrast) {
+    Wire.beginTransmission(OLED_ADDRESS);
+    Wire.write(0x00);                // Co = 0, D/C# = 0 (Command mode stream)
+    Wire.write(SSD1306_SETCONTRAST); // 0x81
+    Wire.write(contrast);            // 0x00..0xFF
+    Wire.endTransmission();
+}
 
 // Map dim level to SSD1306 contrast byte
 static uint8_t dimLevelToContrast(uint8_t level) {
     switch (level) {
-        case 2:  return 200;
-        case 1:  return 64;
+        case 2:  return 80;
+        case 1:  return 32;
         default: return 1;
     }
 }
@@ -95,6 +107,9 @@ void setDimLevel(uint8_t level) {
     if (level > 2) level = 2;
     dimLevel = level;
     nvs_write_u16(NVS_KEY_DISPLAY_DIM, level);
+    if (isDisplayDimmed.load()) {
+        setDisplayContrast(dimLevelToContrast(level));
+    }
 }
 
 bool isCpuTempEnabled() { return cpuTempEnabled.load(); }
@@ -266,8 +281,7 @@ bool initDisplay() {
         return false;
     }
 
-    display.ssd1306_command(SSD1306_SETCONTRAST);
-    display.ssd1306_command(1);
+    display.dim(false);
 
     if (xTaskCreatePinnedToCore(displayTask, "DisplayTask", 4096, nullptr, 1,
                                 &displayTaskHandle, tskNO_AFFINITY) != pdPASS) {
@@ -323,6 +337,8 @@ void displayCustomMessage(const char* message, const char* status) {
         return;
     }
 
+    lastDataTime.store(esp_timer_get_time());
+
     xSemaphoreTake(displayBufferMutex, portMAX_DELAY);
     displayBuffer.addLine(message, status ? status : "");
     xSemaphoreGive(displayBufferMutex);
@@ -345,7 +361,6 @@ void updateDisplayStatus() {
         return;
     }
 
-    setTimerSpeed(fast);
     notifyDisplayTask();
 }
 
@@ -487,7 +502,7 @@ void drawLogo() {
 
 void displayTask(void *) {
     bool taskDisplayOn = true;
-    bool isDimmed = true;
+    bool isDimmed = false;
 
     time_t lastDrawnTime = 0;
     int lastRssi = 0;
@@ -545,6 +560,7 @@ void displayTask(void *) {
                 if (isDimmed) {
                     display.dim(false);
                     isDimmed = false;
+                    isDisplayDimmed.store(false);
                 }
                 display.clearDisplay();
                 drawData(currentLines);
@@ -565,9 +581,9 @@ void displayTask(void *) {
             }
             if (!isDimmed) {
                 const uint8_t contrast = dimLevelToContrast(dimLevel.load());
-                display.ssd1306_command(SSD1306_SETCONTRAST);
-                display.ssd1306_command(contrast);
+                setDisplayContrast(contrast);
                 isDimmed = true;
+                isDisplayDimmed.store(true);
             }
             display.clearDisplay();
             drawLogo();

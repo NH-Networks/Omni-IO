@@ -198,7 +198,7 @@ void closeSession(ClientSession &session) {
         session.subscribedStates = false;
         if (wasAuth) {
 #if defined(SSD1306_DISPLAY)
-            wakeDisplay();
+            updateDisplayStatus();
 #endif
 #if defined(WEBSERVER)
             broadcastEspHomeStatus();
@@ -288,7 +288,7 @@ void handleConnectRequest(int sock, ProtoReader &reader, ClientSession &session)
     session.authenticated = !invalidPassword;
     if (session.authenticated) {
 #if defined(SSD1306_DISPLAY)
-        wakeDisplay();
+        updateDisplayStatus();
 #endif
 #if defined(WEBSERVER)
         broadcastEspHomeStatus();
