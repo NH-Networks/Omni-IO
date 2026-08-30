@@ -105,6 +105,8 @@ jobs:
           * 🖥️ **OLED Display Status Subsystem Enhancements**:
             * Custom pixel-art ESPHome / Home Assistant status icon in the header bar with connected (solid house) and waiting (outline house) states.
             * Dynamic multi-protocol status bar balancing CPU temperature, MQTT chain icon, ESPHome house icon, and WiFi signal bars without visual overlap.
+            * Hardware contrast multi-byte I2C transmission fix ensuring display properly dims in screensaver mode.
+            * Inactivity sleep timer protected against background WebSocket pong heartbeats and read-only REST requests.
           * 🌐 **Modern Web UI Refinements & Live Status Pills**:
             * Live connection badges for both **MQTT** and **ESPHome** in the web navigation bar showing real-time client states.
             * One-click navigation from status badges directly to their corresponding settings panels.
