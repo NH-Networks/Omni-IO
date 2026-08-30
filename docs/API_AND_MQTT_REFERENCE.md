@@ -1,3 +1,7 @@
+<!--
+SPDX-FileCopyrightText: 2026 CloudAXS
+SPDX-License-Identifier: LicenseRef-CloudAXS-Proprietary
+-->
 # Omni-IO REST API & MQTT Reference
 
 This document details the REST endpoints, WebSocket event streams, and MQTT topics exposed by the **Omni-IO** firmware.
@@ -160,3 +164,86 @@ Omni-IO exposes a WebSocket server at `ws://<device_ip>/ws` or `ws://omni-io.loc
   "state": "connected"
 }
 ```
+
+---
+
+## 8. MQTT Configuration & Topics
+
+### `GET /api/mqtt`
+Returns the current MQTT configuration.
+```json
+{
+  "enabled": true,
+  "server": "192.168.1.50",
+  "port": 1883,
+  "user": "homeassistant",
+  "password": "...",
+  "clientId": "omni-io",
+  "discovery": "homeassistant",
+  "connected": true
+}
+```
+
+### `POST /api/mqtt`
+Updates MQTT configuration. Pass `"enabled": false` to disable MQTT without clearing broker settings.
+```json
+{
+  "enabled": true,
+  "server": "192.168.1.50",
+  "port": 1883,
+  "user": "homeassistant",
+  "password": "...",
+  "clientId": "omni-io",
+  "discovery": "homeassistant"
+}
+```
+
+### MQTT Topic Hierarchy
+
+| Topic | Direction | Payload / Description |
+| :--- | :--- | :--- |
+| `iown/<id>/set` | Inbound (Command) | `open`, `close`, `stop`, `vent`, `pair` |
+| `iown/<id>/position/set` | Inbound (Command) | `0`–`100` target percentage (`100` = fully open) |
+| `iown/<id>/absolute/set` | Inbound (Command) | `0`–`100` io-homecontrol raw absolute value (`0` = open) |
+| `iown/<id>/travel_time/set` | Inbound (Config) | Travel time in seconds (e.g. `25`) |
+| `iown/<id>/state` | Outbound (State) | `OPEN`, `CLOSED`, `OPENING`, `CLOSING`, `STOP` |
+| `iown/<id>/position` | Outbound (State) | Current estimated percentage (`0`–`100`) |
+| `iown/<id>/travel_time` | Outbound (State) | Current configured travel time in seconds |
+| `iown/status` | Outbound (LWT) | `online` / `offline` |
+
+---
+
+## 9. ESPHome Native API (Direct Home Assistant Integration)
+
+Omni-IO features a native implementation of the **ESPHome API** protocol over TCP (default port `6053`), allowing direct plug-and-play integration with Home Assistant without requiring an external MQTT broker.
+
+### Features
+* **Zero-Config Discovery**: Advertises via mDNS (`_esphomelib._tcp.local.`). Home Assistant detects Omni-IO automatically under **Settings → Devices & Services**.
+* **Direct Cover Entities**: Native `cover` entity for every paired 1-way remote with position slider and Open/Close/Stop controls.
+* **Configuration Controls**: Dedicated `number` slider for travel time adjustment and `button` entities for Pairing, Adding, and Removing devices.
+* **Gateway Diagnostics**: Native `sensor` entities for WiFi RSSI (dBm), Free Memory (Bytes), and an IP Address `text_sensor`.
+
+### `GET /api/esphome`
+Returns the ESPHome Native API status and configuration.
+```json
+{
+  "enabled": true,
+  "port": 6053,
+  "password": "",
+  "name": "omni-io",
+  "running": true,
+  "clients": 1
+}
+```
+
+### `POST /api/esphome`
+Updates ESPHome Native API configuration. Changes apply immediately. (TCP port is fixed to standard `6053`).
+```json
+{
+  "enabled": true,
+  "password": "optional_password",
+  "name": "omni-io"
+}
+```
+
+

@@ -1,4 +1,8 @@
 /*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
+/*
    Copyright (c) 2024. CRIDP https://github.com/cridp
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,12 +36,19 @@ inline const char *wifi_passwd = "";
 
 // Default MQTT configuration. These values can be changed at runtime through
 // the interactive command interface. Leave empty to rely on stored values.
+inline bool mqtt_enabled = true;
 inline std::string mqtt_client_id = "iown";
 inline std::string mqtt_server = "";
 inline std::string mqtt_user = "mosquitto";
 inline std::string mqtt_password = "";
 inline std::string mqtt_discovery_topic = "homeassistant";
 inline uint16_t mqtt_port = 1883;
+
+#define ESPHOME_API                  // Native ESPHome API server for Home Assistant
+inline bool esphome_enabled = true;
+inline constexpr uint16_t esphome_port = 6053; // Fixed standard ESPHome API TCP port
+inline std::string esphome_password = "";
+inline std::string esphome_name = "omni-io";
 
 #define SYSLOG                       // Comment out to disable remote syslog
 #define SYSLOG_SECRET "7a06c4100d82ed8d"  // Shared token — Graylog drops messages without it
@@ -62,3 +73,4 @@ inline std::string syslog_tag = "";    // Optional tag prepended to hostname for
 #endif
 
 #endif
+

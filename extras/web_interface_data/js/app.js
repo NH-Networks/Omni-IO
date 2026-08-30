@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 (function () {
     function createElements() {
         return {
@@ -19,12 +23,18 @@
             helpDeviceButton: document.getElementById("help-device"),
             helpRemoteButton: document.getElementById("help-remote"),
             lastAddrInput: document.getElementById("last-address"),
+            mqttEnabledInput: document.getElementById("mqtt-enabled"),
             mqttDiscoveryInput: document.getElementById("mqtt-discovery"),
             mqttPasswordInput: document.getElementById("mqtt-password"),
             mqttPortInput: document.getElementById("mqtt-port"),
             mqttServerInput: document.getElementById("mqtt-server"),
             mqttUpdateButton: document.getElementById("mqtt-update"),
             mqttUserInput: document.getElementById("mqtt-user"),
+            esphomeEnabledInput: document.getElementById("esphome-enabled"),
+            esphomeNameInput: document.getElementById("esphome-name"),
+            esphomePasswordInput: document.getElementById("esphome-password"),
+            esphomeUpdateButton: document.getElementById("esphome-update"),
+            esphomeStatus: document.getElementById("esphome-status"),
             wifiSsidInput: document.getElementById("wifi-ssid"),
             wifiPasswordInput: document.getElementById("wifi-password"),
             wifiScanButton: document.getElementById("wifi-scan-btn"),
@@ -221,6 +231,32 @@
         }
     }
 
+    function updateEspHomeStatus(app, statusData) {
+        var dot = document.getElementById("esphome-indicator-dot");
+        var pill = document.getElementById("esphome-status-pill");
+        var text = document.getElementById("esphome-status-text");
+        if (!dot || !pill) return;
+
+        var isEnabled = statusData && typeof statusData.enabled !== "undefined" ? !!statusData.enabled : true;
+        var isRunning = statusData && typeof statusData.running !== "undefined" ? !!statusData.running : false;
+        var clients = statusData && typeof statusData.clients !== "undefined" ? Number(statusData.clients) : 0;
+        var isConnected = clients > 0;
+
+        if (!isEnabled) {
+            dot.className = "mqtt-dot disabled";
+            pill.title = "ESPHome: " + app.i18nText("status.esphome_stopped", "Disabled");
+        } else if (isConnected) {
+            dot.className = "mqtt-dot connected";
+            pill.title = "ESPHome: " + app.i18nText("mqtt.connected", "Connected") + " (" + clients + " " + app.i18nText("status.esphome_clients", "connected") + ")";
+        } else if (isRunning) {
+            dot.className = "mqtt-dot connecting";
+            pill.title = "ESPHome: " + app.i18nText("status.esphome_running", "Running on port") + " " + (statusData.port || 6053);
+        } else {
+            dot.className = "mqtt-dot disconnected";
+            pill.title = "ESPHome: " + app.i18nText("mqtt.disconnected", "Disconnected");
+        }
+    }
+
     var _wsPositionRaf = {};
 
     function initWebSocket(app) {
@@ -249,6 +285,8 @@
                     app.fetchAndDisplayDevices();
                 } else if (data.type === "mqtt_status") {
                     updateMqttStatus(app, data);
+                } else if (data.type === "esphome_status") {
+                    updateEspHomeStatus(app, data);
                 } else if (data.type === "lastaddr") {
                     if (app.elements.lastAddrInput) {
                         app.elements.lastAddrInput.value = data.address || "";
@@ -285,6 +323,11 @@
         if (app.elements.mqttUpdateButton) {
             app.elements.mqttUpdateButton.addEventListener("click", function () {
                 if (typeof app.updateMqttConfig === "function") app.updateMqttConfig();
+            });
+        }
+        if (app.elements.esphomeUpdateButton) {
+            app.elements.esphomeUpdateButton.addEventListener("click", function () {
+                if (typeof app.updateEspHomeConfig === "function") app.updateEspHomeConfig();
             });
         }
         if (app.elements.wifiScanButton) {
@@ -416,6 +459,26 @@
             });
         }
 
+        var esphomePill = document.getElementById("esphome-status-pill");
+        if (esphomePill) {
+            esphomePill.addEventListener("click", function () {
+                if (typeof window.showPage === "function") {
+                    window.showPage("settings");
+                }
+                var intTab = document.querySelector('[data-settings-target="integration"]');
+                if (intTab) {
+                    intTab.click();
+                }
+                var esphomeSec = document.getElementById("esphome-settings-section");
+                if (esphomeSec) {
+                    esphomeSec.scrollIntoView({ behavior: "smooth" });
+                }
+            });
+        }
+        app.updateEspHomeStatus = function (data) {
+            updateEspHomeStatus(app, data);
+        };
+
         window.OmniIoApi.requestJson("/api/info").then(function (info) {
             var el = document.getElementById("firmware-version");
             if (el && info.version) {
@@ -430,6 +493,7 @@
 
         app.loadLogBuffer();
         app.loadMqttConfig();
+        if (typeof app.loadEspHomeConfig === "function") app.loadEspHomeConfig();
         app.loadWifiConfig();
         app.loadNetworkConfig();
         app.loadFallbackConfig();
@@ -440,3 +504,4 @@
         app.loadLastAddress();
     });
 })();
+

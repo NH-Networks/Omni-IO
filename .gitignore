@@ -1,3 +1,5 @@
+# Modifications Copyright 2026 CloudAXS.
+# Original upstream portions remain licensed under Apache-2.0.
 # PlatformIO & Build output
 /.pio/
 /build/
@@ -15,3 +17,9 @@ compile_commands.json
 sdkconfig.HeltecESP32
 CMakeLists.txt
 src/CMakeLists.txt
+
+# Scratch & Local OTA Binaries
+scratch/ota_binaries/
+scratch/*.bin
+
+

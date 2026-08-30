@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 let I18N = {};
 let FALLBACK = {};
 let CURRENT_LANG = "en";
@@ -59,3 +63,4 @@ function getLang() {
 window.t = t;
 window.setLang = setLang;
 window.getLang = getLang;
+

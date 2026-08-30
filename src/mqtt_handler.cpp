@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 #include <mqtt_handler.h>
 
 #if defined(MQTT)
@@ -97,6 +101,12 @@ static void stopHeartbeat() {
 }
 
 void initMqtt() {
+    // Load enabled flag from NVS (defaults to true for backwards compatibility)
+    bool en = true;
+    if (nvs_read_bool(NVS_KEY_MQTT_ENABLED, en)) {
+        mqtt_enabled = en;
+    }
+
     if (!nvs_read_string(NVS_KEY_MQTT_SERVER, mqtt_server)) {
         if (mqtt_server.empty()) {
             Serial.println("MQTT server not set");
@@ -408,6 +418,9 @@ static void handleMqttConnectImpl() {
 }
 
 void connectToMqtt() {
+    if (!mqtt_enabled) {
+        return;  // MQTT disabled by user
+    }
     if (mqttClient.connected() || mqttStatus == ConnState::Connecting) {
         return;  // Avoid parallel connection attempts
     }
@@ -807,3 +820,4 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
     mqttFuncHandler(message);
 }
 #endif // MQTT
+

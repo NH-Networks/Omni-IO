@@ -1,3 +1,7 @@
+<!--
+SPDX-FileCopyrightText: 2026 CloudAXS
+SPDX-License-Identifier: LicenseRef-CloudAXS-Proprietary
+-->
 # Omni-IO Troubleshooting Guide
 
 This guide provides solutions to common issues encountered during setup, WiFi connection, RF pairing, or Home Assistant integration.
@@ -54,7 +58,31 @@ This guide provides solutions to common issues encountered during setup, WiFi co
 
 ## 5. Home Assistant MQTT Issues
 
-### Devices are not appearing in Home Assistant
+### Devices are not appearing in Home Assistant (MQTT)
 1. Verify Omni-IO shows **MQTT Connected** on the OLED screen and in the Web UI status bar.
 2. Ensure the **Discovery Prefix** in Omni-IO matches the prefix configured in Home Assistant (default: `homeassistant`).
 3. Check the Home Assistant MQTT integration logs under **Settings → Devices & Services → MQTT**.
+
+---
+
+## 6. Home Assistant ESPHome Native API Issues
+
+### Omni-IO is not automatically discovered by Home Assistant
+* **Cause**: Multicast DNS (mDNS) traffic (`_esphomelib._tcp.local.`) is blocked by your router, WiFi access point (client isolation), or because Home Assistant and Omni-IO reside on different VLANs / subnets.
+* **Solution**:
+  1. In Home Assistant, go to **Settings → Devices & Services → Add Integration**.
+  2. Search for **ESPHome**.
+  3. Enter Omni-IO's IP address (e.g. `10.10.33.15`) and port `6053`.
+  4. Leave encryption key blank (Omni-IO uses plaintext framing) and enter the API password if you configured one in Omni-IO Web Settings.
+
+### Connection Refused on Port 6053
+1. Open the Omni-IO Web UI and go to **Settings → Integration**.
+2. Ensure **Enable ESPHome Native API** is toggled **ON**.
+3. Check the web navbar status pill: **ESPHome** should show a yellow (listening) or green pulsating (client connected) dot.
+4. Verify your local firewall allows inbound TCP traffic on port `6053`.
+
+### Added, renamed, or deleted devices do not update in Home Assistant
+* **Expected Behavior**: When devices are modified in Omni-IO, `syncEspHomeDevices()` gracefully disconnects active ESPHome sessions. Home Assistant's `aioesphomeapi` client detects this and reconnects within 1.0–1.5 seconds, running entity discovery during the handshake.
+* **Troubleshooting**: If Home Assistant does not refresh after 5 seconds, reload the ESPHome integration under **Settings → Devices & Services → ESPHome → Reload**.
+
+

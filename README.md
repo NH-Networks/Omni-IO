@@ -1,3 +1,7 @@
+<!--
+Modifications Copyright 2026 CloudAXS.
+Original upstream portions remain licensed under Apache-2.0.
+-->
 # Omni-IO — Open-Source ESP32 io-homecontrol® Gateway
 
 <div align="center">
@@ -143,6 +147,20 @@ This tool is designed for educational, testing, and smart-home integration purpo
 
 ---
 
-## 📄 License & Attribution
+## 📄 Licensing
 
-* Code, Documentation & Graphic assets licensed under open-source terms.
+This repository contains upstream and derivative components licensed
+under the Apache License 2.0. See `LICENSE`.
+
+Files explicitly marked with:
+`SPDX-License-Identifier: LicenseRef-CloudAXS-Proprietary`
+are proprietary contributions of CloudAXS and are governed by
+`LICENSE-CLOUDAXS`.
+
+The CloudAXS proprietary license applies only to fully original,
+specifically marked CloudAXS files. It does not restrict any rights
+granted for upstream or third-party components under Apache-2.0 or
+their respective licenses.
+
+Third-party components, logos, trademarks, icons, fonts and other
+assets may have separate terms. No trademark permission is implied.

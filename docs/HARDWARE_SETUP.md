@@ -1,3 +1,7 @@
+<!--
+SPDX-FileCopyrightText: 2026 CloudAXS
+SPDX-License-Identifier: LicenseRef-CloudAXS-Proprietary
+-->
 # Omni-IO Hardware Setup & Pinout Guide
 
 This guide covers the supported ESP32 + Semtech LoRa/FSK transceiver boards, pinouts, antenna specifications, and wiring considerations for **Omni-IO**.
@@ -99,3 +103,4 @@ The firmware automatically configures the appropriate SPI and GPIO pins based on
 
 * Provide a clean and stable 5V / 1A power supply via USB-C or Micro-USB.
 * During RF transmission bursts, the radio transceiver can draw peaks up to 120-150mA. A capacitor (100µF–470µF) across 3.3V and GND is beneficial on custom breadboard setups.
+

@@ -1,4 +1,8 @@
 /*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
+/*
    Copyright (c) 2024. CRIDP https://github.com/cridp
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,6 +31,9 @@
 #include <algorithm>
 #if defined(MQTT)
 #include <mqtt_handler.h>
+#endif
+#if defined(ESPHOME_API)
+#include <esphome_server.h>
 #endif
 #if defined(WEBSERVER)
 #include <web_server_handler.h>
@@ -340,6 +347,13 @@ namespace IOHC {
                                 r.lastPublishedPosition = r.positionTracker.getPosition();
                             }
 #endif
+#if defined(ESPHOME_API)
+                            {
+                                std::string id = bytesToHexString(r.node, sizeof(r.node));
+                                notifyEspHomeCoverState(id, "OPENING");
+                                notifyEspHomeCoverPosition(id, r.positionTracker.getPosition());
+                            }
+#endif
                             break;
                         case RemoteButton::Close:
                             packet->payload.packet.msg.p0x00_14.main[0] = 0xc8;
@@ -357,6 +371,13 @@ namespace IOHC {
                                 r.lastPublishedPosition = r.positionTracker.getPosition();
                             }
 #endif
+#if defined(ESPHOME_API)
+                            {
+                                std::string id = bytesToHexString(r.node, sizeof(r.node));
+                                notifyEspHomeCoverState(id, "CLOSING");
+                                notifyEspHomeCoverPosition(id, r.positionTracker.getPosition());
+                            }
+#endif
                             break;
                         case RemoteButton::Stop:
                             packet->payload.packet.msg.p0x00_14.main[0] = 0xd2;
@@ -372,6 +393,13 @@ namespace IOHC {
                                 publishCoverPosition(id, r.positionTracker.getPosition());
                                 r.lastPublishedState = "STOP";
                                 r.lastPublishedPosition = r.positionTracker.getPosition();
+                            }
+#endif
+#if defined(ESPHOME_API)
+                            {
+                                std::string id = bytesToHexString(r.node, sizeof(r.node));
+                                notifyEspHomeCoverState(id, "STOP");
+                                notifyEspHomeCoverPosition(id, r.positionTracker.getPosition());
                             }
 #endif
                             break;
@@ -444,6 +472,13 @@ namespace IOHC {
                                     r.lastPublishedPosition = r.positionTracker.getPosition();
                                 }
 #endif
+#if defined(ESPHOME_API)
+                                {
+                                    std::string id = bytesToHexString(r.node, sizeof(r.node));
+                                    notifyEspHomeCoverState(id, "OPENING");
+                                    notifyEspHomeCoverPosition(id, r.positionTracker.getPosition());
+                                }
+#endif
                             } else if (target < current - 0.5f) {
                                 r.positionTracker.startClosing();
                                 r.movement = remote::Movement::Closing;
@@ -454,6 +489,13 @@ namespace IOHC {
                                     publishCoverPosition(id, r.positionTracker.getPosition());
                                     r.lastPublishedState = "CLOSING";
                                     r.lastPublishedPosition = r.positionTracker.getPosition();
+                                }
+#endif
+#if defined(ESPHOME_API)
+                                {
+                                    std::string id = bytesToHexString(r.node, sizeof(r.node));
+                                    notifyEspHomeCoverState(id, "CLOSING");
+                                    notifyEspHomeCoverPosition(id, r.positionTracker.getPosition());
                                 }
 #endif
                             } else {
@@ -923,6 +965,9 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
         remotes.push_back(r);
         nvs_write_sequence(r.node, r.sequence);
         save();
+#if defined(ESPHOME_API)
+        syncEspHomeDevices();
+#endif
 #if defined(MQTT)
         if (mqttClient.connected()) {
             std::string id = bytesToHexString(r.node, sizeof(r.node));
@@ -1041,6 +1086,9 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
 #endif
         remotes.erase(it);
         save();
+#if defined(ESPHOME_API)
+        syncEspHomeDevices();
+#endif
         return true;
     }
 
@@ -1054,6 +1102,9 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
         }
         it->name = name;
         save();
+#if defined(ESPHOME_API)
+        syncEspHomeDevices();
+#endif
 #if defined(MQTT)
         if (mqttClient.connected()) {
             std::string id = bytesToHexString(it->node, sizeof(it->node));
@@ -1091,6 +1142,13 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
                     r.lastPublishedPosition = r.positionTracker.getPosition();
                 }
 #endif
+#if defined(ESPHOME_API)
+                {
+                    std::string id = bytesToHexString(r.node, sizeof(r.node));
+                    notifyEspHomeCoverState(id, "OPENING");
+                    notifyEspHomeCoverPosition(id, r.positionTracker.getPosition());
+                }
+#endif
                 break;
             case RemoteButton::Close:
                 r.positionTracker.startClosing();
@@ -1106,6 +1164,13 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
                     r.lastPublishedPosition = r.positionTracker.getPosition();
                 }
 #endif
+#if defined(ESPHOME_API)
+                {
+                    std::string id = bytesToHexString(r.node, sizeof(r.node));
+                    notifyEspHomeCoverState(id, "CLOSING");
+                    notifyEspHomeCoverPosition(id, r.positionTracker.getPosition());
+                }
+#endif
                 break;
             case RemoteButton::Stop:
                 r.positionTracker.stop();
@@ -1119,6 +1184,13 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
                     publishCoverPosition(id, r.positionTracker.getPosition());
                     r.lastPublishedState = "STOP";
                     r.lastPublishedPosition = r.positionTracker.getPosition();
+                }
+#endif
+#if defined(ESPHOME_API)
+                {
+                    std::string id = bytesToHexString(r.node, sizeof(r.node));
+                    notifyEspHomeCoverState(id, "STOP");
+                    notifyEspHomeCoverPosition(id, r.positionTracker.getPosition());
                 }
 #endif
                 break;
@@ -1138,6 +1210,10 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
         it->travelTime = travelTime;
         it->positionTracker.setTravelTime(travelTime);
         save();
+#if defined(ESPHOME_API)
+        std::string id = bytesToHexString(it->node, sizeof(it->node));
+        notifyEspHomeTravelTime(id, travelTime);
+#endif
         return true;
     }
 
@@ -1169,20 +1245,26 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
             if (moving) {
                 //Serial.printf("%s position: %.0f%%\n", r.name.c_str(), pos);
                 display1WPosition(r.node, pos, r.name.c_str());
-#if defined(MQTT) || defined(WEBSERVER)
+#if defined(MQTT) || defined(WEBSERVER) || defined(ESPHOME_API)
                 std::string id = bytesToHexString(r.node, sizeof(r.node));
 #endif
-#if defined(MQTT)
                 const char *state = r.movement == remote::Movement::Opening ? "OPENING" : "CLOSING";
+#if defined(MQTT)
                 if (state != r.lastPublishedState) {
                     publishCoverState(id, state);
                     r.lastPublishedState = state;
                 }
 #endif
-#if defined(MQTT) || defined(WEBSERVER)
+#if defined(ESPHOME_API)
+                notifyEspHomeCoverState(id, state);
+#endif
+#if defined(MQTT) || defined(WEBSERVER) || defined(ESPHOME_API)
                 if (fabs(pos - r.lastPublishedPosition) >= 1.0f) {
 #if defined(MQTT)
                     publishCoverPosition(id, pos);
+#endif
+#if defined(ESPHOME_API)
+                    notifyEspHomeCoverPosition(id, pos);
 #endif
 #if defined(WEBSERVER)
                     broadcastDevicePosition(id.c_str(), static_cast<int>(pos));
@@ -1191,7 +1273,7 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
                 r.lastPublishedPosition = pos;
 #endif
             } else {
-#if defined(MQTT) || defined(WEBSERVER)
+#if defined(MQTT) || defined(WEBSERVER) || defined(ESPHOME_API)
                 std::string id = bytesToHexString(r.node, sizeof(r.node));
 #endif
                 const char *state = "STOP";
@@ -1206,6 +1288,9 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
                     r.lastPublishedState = state;
                 }
 #endif
+#if defined(ESPHOME_API)
+                notifyEspHomeCoverState(id, state);
+#endif
 #if defined(WEBSERVER)
                 if (r.movement != remote::Movement::Idle) {
                     broadcastWebDeviceAction(r, state);
@@ -1213,10 +1298,13 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
 #endif
                 if (r.lastPublishedPosition != pos) {
                     display1WPosition(r.node, pos, r.name.c_str());
-#if defined(MQTT) || defined(WEBSERVER)
+#if defined(MQTT) || defined(WEBSERVER) || defined(ESPHOME_API)
                     if (fabs(pos - r.lastPublishedPosition) >= 1.0f) {
 #if defined(MQTT)
                         publishCoverPosition(id, pos);
+#endif
+#if defined(ESPHOME_API)
+                        notifyEspHomeCoverPosition(id, pos);
 #endif
 #if defined(WEBSERVER)
                         broadcastDevicePosition(id.c_str(), static_cast<int>(pos));
@@ -1234,3 +1322,4 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
         }
     }
 }
+

@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 (function () {
     function setSettingsStatus(app, message, isError, timeoutMs) {
         if (typeof window.showToast === "function") {
@@ -36,6 +40,9 @@
     async function loadMqttConfig(app) {
         try {
             const config = await window.OmniIoApi.requestJson("/api/mqtt");
+            if (app.elements.mqttEnabledInput) {
+                app.elements.mqttEnabledInput.checked = config.enabled !== false;
+            }
             app.elements.mqttUserInput.value = config.user || "";
             app.elements.mqttServerInput.value = config.server || "";
             app.elements.mqttPasswordInput.value = config.password || "";
@@ -53,6 +60,7 @@
         );
         try {
             const result = await window.OmniIoApi.postJson("/api/mqtt", {
+                enabled: app.elements.mqttEnabledInput ? app.elements.mqttEnabledInput.checked : true,
                 user: app.elements.mqttUserInput.value,
                 server: app.elements.mqttServerInput.value,
                 password: app.elements.mqttPasswordInput.value,
@@ -68,6 +76,59 @@
             setSettingsStatus(
                 app,
                 app.i18nText("status.mqtt_save_error", "Saving MQTT settings failed"),
+                true
+            );
+        }
+    }
+
+    async function loadEspHomeConfig(app) {
+        try {
+            const config = await window.OmniIoApi.requestJson("/api/esphome");
+            if (app.elements.esphomeEnabledInput) {
+                app.elements.esphomeEnabledInput.checked = !!config.enabled;
+            }
+            if (app.elements.esphomeNameInput) {
+                app.elements.esphomeNameInput.value = config.name || "omni-io";
+            }
+            if (app.elements.esphomePasswordInput) {
+                app.elements.esphomePasswordInput.value = config.password || "";
+            }
+            if (app.elements.esphomeStatus) {
+                const statusText = config.running
+                    ? `${app.i18nText("status.esphome_running", "Running on port")} ${config.port || 6053} (${config.clients || 0} ${app.i18nText("status.esphome_clients", "connected")})`
+                    : app.i18nText("status.esphome_stopped", "Stopped");
+                app.elements.esphomeStatus.textContent = statusText;
+                app.elements.esphomeStatus.className = "status-indicator " + (config.running ? "success" : "idle");
+            }
+            if (typeof app.updateEspHomeStatus === "function") {
+                app.updateEspHomeStatus(config);
+            }
+        } catch (error) {
+            console.error("Error fetching ESPHome config", error);
+        }
+    }
+
+    async function updateEspHomeConfig(app) {
+        setSettingsStatus(
+            app,
+            app.i18nText("status.settings_saving", "Saving settings...")
+        );
+        try {
+            await window.OmniIoApi.postJson("/api/esphome", {
+                enabled: app.elements.esphomeEnabledInput ? app.elements.esphomeEnabledInput.checked : true,
+                name: app.elements.esphomeNameInput ? app.elements.esphomeNameInput.value : "omni-io",
+                password: app.elements.esphomePasswordInput ? app.elements.esphomePasswordInput.value : ""
+            });
+            setSettingsStatus(
+                app,
+                app.i18nText("status.esphome_saved", "ESPHome settings saved")
+            );
+            loadEspHomeConfig(app);
+        } catch (error) {
+            console.error("Error updating ESPHome config", error);
+            setSettingsStatus(
+                app,
+                app.i18nText("status.esphome_save_error", "Saving ESPHome settings failed"),
                 true
             );
         }
@@ -693,6 +754,12 @@
         app.updateMqttConfig = function () {
             return updateMqttConfig(app);
         };
+        app.loadEspHomeConfig = function () {
+            return loadEspHomeConfig(app);
+        };
+        app.updateEspHomeConfig = function () {
+            return updateEspHomeConfig(app);
+        };
         app.loadWifiConfig = function () {
             return loadWifiConfig(app);
         };
@@ -796,3 +863,4 @@
     };
     window.MiOpenSettings = window.OmniIoSettings;
 })();
+

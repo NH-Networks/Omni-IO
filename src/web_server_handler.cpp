@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 #include <web_server_handler.h>
 
 #if defined(WEBSERVER)
@@ -28,6 +32,9 @@ constexpr time_t MIN_VALID_NTP_EPOCH = 1600000000; // ~Sept 2020
 #include <wifi_helper.h>
 #if defined(SYSLOG)
 #include <syslog_helper.h>
+#endif
+#if defined(ESPHOME_API)
+#include <esphome_server.h>
 #endif
 #include <tokens.h>
 
@@ -99,7 +106,9 @@ static void broadcastTwoWStatus() {
 static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
                       AwsEventType type, void *arg, uint8_t *data,
                       size_t len) {
-  wakeDisplay();
+  if (type == WS_EVT_CONNECT || type == WS_EVT_DATA) {
+    wakeDisplay();
+  }
   if (type == WS_EVT_CONNECT) {
     IOHC::iohcRemote1W::getInstance()->updatePositions();
 
@@ -142,6 +151,22 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     String mqttPayload;
     serializeJson(mqttDoc, mqttPayload);
     client->text(mqttPayload);
+
+#if defined(ESPHOME_API)
+    JsonDocument esphomeDoc;
+    esphomeDoc["type"] = "esphome_status";
+    esphomeDoc["enabled"] = esphome_enabled;
+    esphomeDoc["running"] = isEspHomeServerRunning();
+    uint16_t esphomeClients = getEspHomeConnectedClients();
+    esphomeDoc["clients"] = esphomeClients;
+    esphomeDoc["port"] = esphome_port;
+    esphomeDoc["connected"] = (esphomeClients > 0);
+    esphomeDoc["state"] = !esphome_enabled ? "disabled" :
+                          (esphomeClients > 0 ? "connected" : (isEspHomeServerRunning() ? "connecting" : "disconnected"));
+    String esphomePayload;
+    serializeJson(esphomeDoc, esphomePayload);
+    client->text(esphomePayload);
+#endif
   }
 }
 
@@ -201,6 +226,24 @@ void broadcastMqttStatus(bool connected, bool enabled, const char *state) {
   ws.textAll(payload);
 }
 
+void broadcastEspHomeStatus() {
+#if defined(ESPHOME_API)
+  JsonDocument doc;
+  doc["type"] = "esphome_status";
+  doc["enabled"] = esphome_enabled;
+  doc["running"] = isEspHomeServerRunning();
+  uint16_t esphomeClients = getEspHomeConnectedClients();
+  doc["clients"] = esphomeClients;
+  doc["port"] = esphome_port;
+  doc["connected"] = (esphomeClients > 0);
+  doc["state"] = !esphome_enabled ? "disabled" :
+                 (esphomeClients > 0 ? "connected" : (isEspHomeServerRunning() ? "connecting" : "disconnected"));
+  String payload;
+  serializeJson(doc, payload);
+  ws.textAll(payload);
+#endif
+}
+
 void updateTwoWTxStatus(const String &command, const String &result, bool isError) {
   g_twoWStatus.lastTxCommand = command;
   g_twoWStatus.lastTxResult = result;
@@ -257,7 +300,6 @@ template<class T>
 using ArGetRequestHandlerFunction = std::function<void(AsyncWebServerRequest *request, T &root)>;
 ArRequestHandlerFunction _jsonGet(const ArGetRequestHandlerFunction<JsonVariant> handler) {
   return [handler] (AsyncWebServerRequest *request) {
-      wakeDisplay();
       std::unique_ptr<AsyncJsonResponse> response(new AsyncJsonResponse());
       if (!response.get()) {
         request->send(500, "text/plain", "Internal Server Error");
@@ -928,13 +970,27 @@ void handleApiInfo(AsyncWebServerRequest *request, JsonObject &root) {
   root["ip"] = WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : "";
 #if defined(MQTT)
   root["mqttConnected"] = mqttClient.connected();
-  root["mqttEnabled"] = !mqtt_server.empty();
-  root["mqttState"] = mqttStatus == ConnState::Connected ? "connected" :
-                      (mqttStatus == ConnState::Connecting ? "connecting" : "disconnected");
+  root["mqttEnabled"] = mqtt_enabled;
+  root["mqttState"] = !mqtt_enabled ? "disabled" :
+                      (mqttStatus == ConnState::Connected ? "connected" :
+                      (mqttStatus == ConnState::Connecting ? "connecting" : "disconnected"));
 #else
   root["mqttConnected"] = false;
   root["mqttEnabled"] = false;
   root["mqttState"] = "disabled";
+#endif
+#if defined(ESPHOME_API)
+  root["esphomeRunning"] = isEspHomeServerRunning();
+  root["esphomeClients"] = getEspHomeConnectedClients();
+  root["esphomePort"] = esphome_port;
+  root["esphomeEnabled"] = esphome_enabled;
+  root["esphomeName"] = esphome_name.c_str();
+#else
+  root["esphomeRunning"] = false;
+  root["esphomeClients"] = 0;
+  root["esphomePort"] = 0;
+  root["esphomeEnabled"] = false;
+  root["esphomeName"] = "";
 #endif
 }
 
@@ -1166,6 +1222,7 @@ void handleApiSyslogTest(AsyncWebServerRequest *request, JsonObject &doc, JsonOb
 
 #if defined(MQTT)
 void handleApiMqttGet(AsyncWebServerRequest *request, JsonObject &root) {
+  root["enabled"] = mqtt_enabled;
   root["server"] = mqtt_server.c_str();
   root["user"] = mqtt_user.c_str();
   root["password"] = mqtt_password.c_str();
@@ -1192,6 +1249,16 @@ void handleApiMqttSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObjec
 
   bool mqttChanged = false;
   bool discChanged = false;
+  bool enabledChanged = false;
+
+  if (doc["enabled"].is<bool>()) {
+    bool newEnabled = doc["enabled"].as<bool>();
+    if (newEnabled != mqtt_enabled) {
+      mqtt_enabled = newEnabled;
+      nvs_write_bool(NVS_KEY_MQTT_ENABLED, mqtt_enabled);
+      enabledChanged = true;
+    }
+  }
 
   if (!server.isEmpty()) {
     mqtt_server = server.c_str();
@@ -1230,6 +1297,15 @@ void handleApiMqttSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObjec
     mqttClient.setServer(mqtt_server.c_str(), mqtt_port);
     mqttClient.setCredentials(mqtt_user.c_str(), mqtt_password.c_str());
     mqttClient.setClientId(mqtt_client_id.c_str());
+    if (mqtt_enabled && WiFi.status() == WL_CONNECTED) {
+      connectToMqtt();
+    }
+  } else if (enabledChanged) {
+    if (!mqtt_enabled) {
+      mqttClient.disconnect();
+    } else if (WiFi.status() == WL_CONNECTED && !mqtt_server.empty()) {
+      connectToMqtt();
+    }
   }
 
   if (discChanged && mqttStatus == ConnState::Connected) {
@@ -1238,6 +1314,61 @@ void handleApiMqttSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObjec
 
   root["success"] = true;
   root["message"] = "MQTT configuration updated";
+  root["enabled"] = mqtt_enabled;
+}
+#endif
+
+#if defined(ESPHOME_API)
+void handleApiEspHomeGet(AsyncWebServerRequest *request, JsonObject &root) {
+  root["enabled"] = esphome_enabled;
+  root["port"] = esphome_port;
+  root["password"] = esphome_password.c_str();
+  root["name"] = esphome_name.c_str();
+  root["running"] = isEspHomeServerRunning();
+  root["clients"] = getEspHomeConnectedClients();
+}
+
+void handleApiEspHomeSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
+  bool changed = false;
+
+  if (doc["enabled"].is<bool>()) {
+    esphome_enabled = doc["enabled"].as<bool>();
+    nvs_write_bool(NVS_KEY_ESPHOME_EN, esphome_enabled);
+    changed = true;
+  }
+
+  if (doc["password"].is<const char*>()) {
+    esphome_password = doc["password"].as<const char*>();
+    nvs_write_string(NVS_KEY_ESPHOME_PWD, esphome_password);
+    changed = true;
+  }
+
+  if (doc["name"].is<const char*>()) {
+    String n = doc["name"].as<const char*>();
+    n.trim();
+    if (!n.isEmpty()) {
+      esphome_name = n.c_str();
+      nvs_write_string(NVS_KEY_ESPHOME_NAME, esphome_name);
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    if (isEspHomeServerRunning()) {
+      stopEspHomeServer();
+    }
+    if (esphome_enabled && WiFi.status() == WL_CONNECTED) {
+      startEspHomeServer();
+    }
+  }
+
+  root["success"] = true;
+  root["message"] = "ESPHome configuration updated";
+  root["enabled"] = esphome_enabled;
+  root["port"] = esphome_port;
+  root["name"] = esphome_name.c_str();
+  root["running"] = isEspHomeServerRunning();
+  root["clients"] = getEspHomeConnectedClients();
 }
 #endif
 
@@ -1367,6 +1498,9 @@ void setupWebServer() {
 #if defined(MQTT)
   server.on("/api/mqtt", HTTP_GET, jsonGet(handleApiMqttGet));
 #endif
+#if defined(ESPHOME_API)
+  server.on("/api/esphome", HTTP_GET, jsonGet(handleApiEspHomeGet));
+#endif
   server.on("/api/command", HTTP_POST, jsonPost(handleApiCommand));
   server.on("/api/action", HTTP_POST, jsonPost(handleApiAction));
   server.on("/api/wifi", HTTP_POST, jsonPost(handleApiWifiSet));
@@ -1377,6 +1511,9 @@ void setupWebServer() {
 #endif
 #if defined(MQTT)
   server.on("/api/mqtt", HTTP_POST, jsonPost(handleApiMqttSet));
+#endif
+#if defined(ESPHOME_API)
+  server.on("/api/esphome", HTTP_POST, jsonPost(handleApiEspHomeSet));
 #endif
 #if defined(SYSLOG)
   server.on("/api/syslog/test", HTTP_POST, jsonPost(handleApiSyslogTest));
@@ -1425,3 +1562,4 @@ void loopWebServer() {
 }
 
 #endif // defined(WEBSERVER)
+

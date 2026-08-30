@@ -1,3 +1,7 @@
+<!--
+SPDX-FileCopyrightText: 2026 CloudAXS
+SPDX-License-Identifier: LicenseRef-CloudAXS-Proprietary
+-->
 # Omni-IO Device Pairing & Calibration Guide
 
 This guide walks you through pairing your **io-homecontrol®** blinds, roller shutters, screens, and Velux windows with **Omni-IO**, as well as configuring travel times and physical remote mappings.
@@ -91,3 +95,4 @@ If you ever want to remove Omni-IO from a motor:
 1. Put the motor in pairing mode by holding the **PROG** button on your physical remote until the motor jogs.
 2. In the Omni-IO Web UI, click **Edit** on the device and press **Unpair (Ontkoppel)**.
 3. The motor will jog to confirm removal.
+

@@ -1,3 +1,7 @@
+<!--
+Modifications Copyright 2026 CloudAXS.
+Original upstream portions remain licensed under Apache-2.0.
+-->
 <!doctype html>
 <html lang="en">
   <head>
@@ -5,16 +9,22 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title data-i18n="page.title">Omni-IO - Device Control</title>
     <link rel="icon" href="img/logo.svg?v=2.0.0" type="image/svg+xml" />
-    <link rel="stylesheet" href="css/style.css?v=2.0.0" />
+    <link rel="stylesheet" href="css/style.css?v=2.0.1" />
   </head>
 
   <body>
     <header>
       <img src="img/logo.svg?v=2.0.0" alt="Omni-IO Logo" class="logo" onclick="showPage('devices')" role="button" tabindex="0" title="Devices" />
       <h1 data-i18n="header.title">Device Control</h1>
-      <div id="mqtt-status-pill" class="mqtt-pill" title="MQTT Status" role="button" tabindex="0">
-        <span id="mqtt-indicator-dot" class="mqtt-dot disabled"></span>
-        <span id="mqtt-status-text" class="mqtt-text">MQTT</span>
+      <div class="header-status">
+        <div id="mqtt-status-pill" class="mqtt-pill" title="MQTT Status" role="button" tabindex="0">
+          <span id="mqtt-indicator-dot" class="mqtt-dot disabled"></span>
+          <span id="mqtt-status-text" class="mqtt-text">MQTT</span>
+        </div>
+        <div id="esphome-status-pill" class="mqtt-pill" title="ESPHome Status" role="button" tabindex="0">
+          <span id="esphome-indicator-dot" class="mqtt-dot disabled"></span>
+          <span id="esphome-status-text" class="mqtt-text">ESPHome</span>
+        </div>
       </div>
       <button id="menu-toggle" aria-label="Open menu" aria-expanded="false" type="button">
         <span></span><span></span><span></span>
@@ -180,6 +190,16 @@
                 <h2 data-i18n="section.mqtt_settings">MQTT settings</h2>
               </div>
               <div class="card">
+                <label class="setting-toggle" for="mqtt-enabled">
+                  <input
+                    type="checkbox"
+                    id="mqtt-enabled"
+                    checked="checked"
+                  />
+                  <span data-i18n="label.enable_mqtt"
+                    >Enable MQTT</span
+                  >
+                </label>
                 <label for="mqtt-user" data-i18n="label.user">User:</label>
                 <input
                   id="mqtt-user"
@@ -218,6 +238,47 @@
                   placeholder="Discovery Topic"
                 />
                 <button id="mqtt-update" data-i18n="button.update">
+                  Update
+                </button>
+              </div>
+            </section>
+            <section id="esphome-settings-section">
+              <div class="title">
+                <h2 data-i18n="section.esphome_settings">ESPHome (Home Assistant)</h2>
+              </div>
+              <div class="card">
+                <label class="setting-toggle" for="esphome-enabled">
+                  <input
+                    type="checkbox"
+                    id="esphome-enabled"
+                    checked="checked"
+                  />
+                  <span data-i18n="label.enable_esphome"
+                    >Enable ESPHome Native API</span
+                  >
+                </label>
+                <label for="esphome-name" data-i18n="label.esphome_name"
+                  >Device Name:</label
+                >
+                <input
+                  id="esphome-name"
+                  data-i18n-placeholder="placeholder.esphome_name"
+                  placeholder="omni-io"
+                />
+                <label for="esphome-password" data-i18n="label.password"
+                  >Password:</label
+                >
+                <input
+                  type="password"
+                  id="esphome-password"
+                  data-i18n-placeholder="placeholder.esphome_password"
+                  placeholder="Password (optional)"
+                />
+                <p class="settings-note" data-i18n="note.esphome_info">
+                  Home Assistant will automatically discover Omni-IO under Settings &rarr; Devices &amp; Services via mDNS (standard port 6053) without requiring an MQTT broker.
+                </p>
+                <div id="esphome-status" class="status-indicator"></div>
+                <button id="esphome-update" data-i18n="button.update">
                   Update
                 </button>
               </div>
@@ -743,3 +804,4 @@
     <script src="js/menu.js?v=2.0.0"></script>
   </body>
 </html>
+

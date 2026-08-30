@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 #pragma once
 #include <Arduino.h>
 #include <user_config.h>
@@ -67,3 +71,4 @@ inline bool isCpuTempEnabled() { return false; }
 inline void setCpuTempEnabled(bool) {}
 
 #endif
+

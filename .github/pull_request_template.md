@@ -1,3 +1,7 @@
+<!--
+SPDX-FileCopyrightText: 2026 CloudAXS
+SPDX-License-Identifier: LicenseRef-CloudAXS-Proprietary
+-->
 ## Description
 Briefly describe the changes introduced in this pull request and the problem they solve.
 
@@ -19,3 +23,4 @@ Briefly describe the changes introduced in this pull request and the problem the
 - [ ] My code follows the code style of this project.
 - [ ] I have updated the documentation accordingly.
 - [ ] My changes generate no new warnings or compiler errors.
+

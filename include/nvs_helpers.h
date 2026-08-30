@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 #ifndef NVS_HELPERS_H
 #define NVS_HELPERS_H
 
@@ -11,6 +15,7 @@ static constexpr char NVS_KEY_MQTT_PASSWORD[] = "mqtt_password";
 static constexpr char NVS_KEY_MQTT_DISCOVERY[] = "mqtt_disc_topic";
 static constexpr char NVS_KEY_MQTT_CLIENT_ID[] = "mqtt_client_id";
 static constexpr char NVS_KEY_MQTT_PORT[] = "mqtt_port";
+static constexpr char NVS_KEY_MQTT_ENABLED[] = "mqtt_enabled";
 static constexpr char NVS_KEY_SYSLOG_ENABLED[] = "syslog_enabled";
 static constexpr char NVS_KEY_SYSLOG_SERVER[] = "syslog_server";
 static constexpr char NVS_KEY_SYSLOG_PORT[] = "syslog_port";
@@ -33,6 +38,10 @@ static constexpr char NVS_KEY_FB_ENABLED[] = "fb_enabled";
 static constexpr char NVS_KEY_FB_BOOT[] = "fb_boot";
 static constexpr char NVS_KEY_FB_RUN[] = "fb_run";
 static constexpr char NVS_KEY_FB_TIMEOUT[] = "fb_timeout";
+static constexpr char NVS_KEY_ESPHOME_EN[] = "esp_en";
+static constexpr char NVS_KEY_ESPHOME_PORT[] = "esp_port";
+static constexpr char NVS_KEY_ESPHOME_PWD[] = "esp_pwd";
+static constexpr char NVS_KEY_ESPHOME_NAME[] = "esp_name";
 
 
 bool nvs_init();
@@ -47,3 +56,4 @@ bool nvs_read_bool(const char *key, bool &value);
 void nvs_write_bool(const char *key, bool value);
 
 #endif // NVS_HELPERS_H
+

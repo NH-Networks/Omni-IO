@@ -1,0 +1,17 @@
+CloudAXS Proprietary License
+
+Copyright (c) 2026 CloudAXS. All rights reserved.
+
+This license applies solely to files and portions explicitly identified
+as proprietary CloudAXS contributions.
+
+Permission is not granted to use, copy, modify, merge, publish,
+distribute, sublicense, sell, or otherwise exploit those proprietary
+CloudAXS contributions without prior written permission from CloudAXS.
+
+This license does not apply to upstream code, third-party components,
+or portions of files that remain subject to the Apache License 2.0 or
+another applicable license. Nothing in this file restricts rights
+already granted under Apache License 2.0 or another applicable license.
+
+*Note: The identifier `SPDX-License-Identifier: LicenseRef-CloudAXS-Proprietary` used in file headers refers to this license document.*

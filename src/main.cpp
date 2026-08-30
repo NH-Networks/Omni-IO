@@ -1,4 +1,8 @@
 /*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
+/*
    Copyright (c) 2024. CRIDP https://github.com/cridp
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,6 +37,9 @@
 #include <interact.h>
 #if defined(MQTT)
 #include <mqtt_handler.h>
+#endif
+#if defined(ESPHOME_API)
+#include <esphome_server.h>
 #endif
 #include <wifi_helper.h>
 #include <nvs_helpers.h>
@@ -295,6 +302,9 @@ void setup() {
     initWifi();
 #if defined(MQTT)
     initMqtt();
+#endif
+#if defined(ESPHOME_API)
+    initEspHomeServer();
 #endif
     Cmd::kbd_tick.attach_ms(500, Cmd::cmdFuncHandler);
 
@@ -1191,3 +1201,4 @@ void txUserBuffer(Tokens *cmd) {
 void loop() {
     loopWebServer(); // For ESPAsyncWebServer, this is typically not needed.
 }
+

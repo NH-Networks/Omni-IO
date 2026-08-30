@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 #ifndef WEB_SERVER_HANDLER_H
 #define WEB_SERVER_HANDLER_H
 
@@ -15,6 +19,7 @@ void broadcastDevicePosition(const String &id, int position);
 void broadcastDeviceAction(const String &id, const String &action, int position, int target, const String &source = "gateway");
 void broadcastLastAddress(const String &addr);
 void broadcastMqttStatus(bool connected, bool enabled, const char *state = nullptr);
+void broadcastEspHomeStatus();
 void updateTwoWTxStatus(const String &command, const String &result, bool isError = false);
 void updateTwoWRxStatus(const String &packetType, const String &from,
                         const String &to, const String &cmd,
@@ -27,9 +32,11 @@ inline void broadcastDevicePosition(const String &, int) {}
 inline void broadcastDeviceAction(const String &, const String &, int, int, const String & = "gateway") {}
 inline void broadcastLastAddress(const String &) {}
 inline void broadcastMqttStatus(bool, bool, const char * = nullptr) {}
+inline void broadcastEspHomeStatus() {}
 inline void updateTwoWTxStatus(const String &, const String &, bool = false) {}
 inline void updateTwoWRxStatus(const String &, const String &, const String &,
                                const String &, const String &, const String & = "") {}
 #endif
 
 #endif // WEB_SERVER_HANDLER_H
+

@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 *, *::before, *::after {
     box-sizing: border-box;
     margin: 0;
@@ -863,7 +867,13 @@ footer p {
   gap: 8px;
 }
 
-/* MQTT Live Status Pill in Header */
+/* MQTT & ESPHome Live Status Pills in Header */
+.header-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
 .mqtt-pill {
   display: inline-flex;
   align-items: center;
@@ -875,6 +885,9 @@ footer p {
   cursor: pointer;
   user-select: none;
   transition: background-color 0.2s ease, transform 0.15s ease;
+  flex-shrink: 0;
+}
+header > .mqtt-pill:first-of-type {
   margin-left: auto;
 }
 .mqtt-pill:hover {
@@ -1017,5 +1030,26 @@ footer p {
 }
 .dark-mode .device-room-badge {
   background: rgba(255, 255, 255, 0.08);
+}
+
+.settings-note {
+  font-size: 0.85em;
+  opacity: 0.8;
+  margin: 8px 0;
+  line-height: 1.4;
+}
+
+#esphome-status {
+  font-size: 0.88em;
+  margin: 6px 0;
+  font-weight: 500;
+}
+
+#esphome-status.success {
+  color: #22c55e;
+}
+
+#esphome-status.idle {
+  opacity: 0.7;
 }
 

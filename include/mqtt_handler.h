@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 #ifndef MQTT_HANDLER_H
 #define MQTT_HANDLER_H
 #include <user_config.h>
@@ -37,6 +41,19 @@ void publishRadioLogEvent(const IOHC::iohcPacket *packet,
                           const char *direction);
 void removeDiscovery(const std::string &id);
 
+#else
+
+inline void publishCoverState(const std::string &, const char *) {}
+inline void publishCoverPosition(const std::string &, float) {}
+inline void publishDiscovery(const std::string &, const std::string &, const std::string &) {}
+inline void publishTravelTimeDiscovery(const std::string &, const std::string &,
+                                const std::string &, uint32_t) {}
+inline void removeDiscovery(const std::string &) {}
+inline void publishHeartbeat() {}
+inline void initMqtt() {}
+inline void connectToMqtt() {}
+
 #endif // MQTT
 
 #endif // MQTT_HANDLER_H
+

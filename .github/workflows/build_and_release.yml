@@ -1,3 +1,5 @@
+# Modifications Copyright 2026 CloudAXS.
+# Original upstream portions remain licensed under Apache-2.0.
 name: Build and Release
 
 on:
@@ -87,19 +89,34 @@ jobs:
 
           ## ✨ What's New in ${{ github.ref_name }}
 
-          * 🏠 **Device Room Grouping with Master Controls**:
-            * Group devices into customizable rooms and zones with quick sorting.
-            * Master Room Controls allowing one-click Open, Close, Stop, and Vent across all devices in a room.
-            * Visual real-time position sync across room members.
-          * 📡 **Live MQTT Status Indicator & Health Monitoring**:
-            * Header status badge showing real-time MQTT broker connectivity and connection status.
-          * 🎬 **Real-Time Motion Animation & WebSocket Sync**:
-            * Real-time rolling/tilting animations during motor movement.
-            * Motion completion synchronization across connected WebSocket clients with auto-clearing motion state.
-          * ⚡ **Performance & UI Refinements**:
-            * GPU hardware acceleration hints and smooth scrolling for a seamless mobile & desktop experience.
-            * Interactive logo click navigation back to primary Devices view.
-            * Visual polish and hover improvements.
+          * 🚀 **Native ESPHome API Integration (Zero-Broker)**:
+            * Direct, ultra-low-latency Home Assistant integration via embedded ESPHome Native API server (TCP port \`6053\`).
+            * Standardized static TCP port \`6053\` with streamlined Web UI settings and zero risk of misconfiguration.
+            * Zero-broker requirement: no external Mosquitto MQTT broker needed.
+            * Automatic mDNS discovery (\`_esphomelib._tcp.local.\`) under **Settings → Devices & Services** in Home Assistant.
+            * Native \`cover\` entities with position slider, open, close, and stop controls (\`device_class: shutter\`).
+            * Interactive \`number\` slider entity for live motor travel time calibration.
+            * Button entities for motor Pairing (\`0x2E\`), Adding (\`0x30\`), and Removing (\`0x39\`), plus a dedicated gateway soft restart button.
+            * Diagnostic sensors for WiFi RSSI (dBm), Free Heap Memory (Bytes), and IP address.
+          * 🔄 **Dynamic Entity Discovery & Re-enumeration**:
+            * Instant synchronization: adding, editing, or deleting a device in Omni-IO automatically refreshes Home Assistant entities within 1.5 seconds without restarting Home Assistant or reloading integrations.
+            * Zero-latency travel time broadcast updates directly synchronized to active Home Assistant sessions.
+          * ⚡ **Independent Protocol Toggles & Multi-Protocol Coexistence**:
+            * Independent runtime enable/disable toggles for both **MQTT** and **ESPHome** in the Web UI and REST API.
+            * Persistent NVS storage for all protocol configurations.
+            * Clean migration path from MQTT to ESPHome with zero duplicate or orphan entities.
+          * 🖥️ **OLED Display Status Subsystem Enhancements**:
+            * Custom pixel-art ESPHome / Home Assistant status icon in the header bar with connected (solid house) and waiting (outline house) states.
+            * Dynamic multi-protocol status bar balancing CPU temperature, MQTT chain icon, ESPHome house icon, and WiFi signal bars without visual overlap.
+            * Hardware contrast multi-byte I2C transmission fix ensuring display properly dims in screensaver mode.
+            * Inactivity sleep timer protected against background WebSocket pong heartbeats and read-only REST requests.
+          * 🌐 **Modern Web UI Refinements & Live Status Pills**:
+            * Live connection badges for both **MQTT** and **ESPHome** in the web navigation bar showing real-time client states.
+            * One-click navigation from status badges directly to their corresponding settings panels.
+            * Streamlined responsive status grouping.
+          * 🛠️ **Developer Tools & Architecture Documentation**:
+            * Comprehensive architectural knowledge base in \`knowledge.md\` covering protocol specifications, protobuf framing, NVS keys, and board pinouts.
+            * Standalone CLI test utility \`tools/test_esphome_api.py\` for automated validation of the ESPHome API protocol.
 
           ---
 
@@ -182,3 +199,4 @@ jobs:
             LilyGoTBeamV12ESP32_firmware.bin
             LilyGoTBeamV12ESP32_filesystem.bin
             changelog.md
+
