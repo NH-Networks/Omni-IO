@@ -145,5 +145,4 @@ This tool is designed for educational, testing, and smart-home integration purpo
 
 ## 📄 License & Attribution
 
-* Code licensed under open-source terms.
-* Documentation & Graphic assets © 2025–2026 by [djbenbe](https://creativecommons.org) and contributors, licensed under [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/).
+* Code, Documentation & Graphic assets licensed under open-source terms.
