@@ -42,7 +42,7 @@ inline uint16_t mqtt_port = 1883;
 
 #define ESPHOME_API                  // Native ESPHome API server for Home Assistant
 inline bool esphome_enabled = true;
-inline uint16_t esphome_port = 6053;
+inline constexpr uint16_t esphome_port = 6053; // Fixed standard ESPHome API TCP port
 inline std::string esphome_password = "";
 inline std::string esphome_name = "omni-io";
 

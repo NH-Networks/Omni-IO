@@ -261,13 +261,6 @@
                   data-i18n-placeholder="placeholder.esphome_name"
                   placeholder="omni-io"
                 />
-                <label for="esphome-port" data-i18n="label.port">Port:</label>
-                <input
-                  type="number"
-                  id="esphome-port"
-                  data-i18n-placeholder="placeholder.esphome_port"
-                  placeholder="6053"
-                />
                 <label for="esphome-password" data-i18n="label.password"
                   >Password:</label
                 >
@@ -278,7 +271,7 @@
                   placeholder="Password (optional)"
                 />
                 <p class="settings-note" data-i18n="note.esphome_info">
-                  Home Assistant will automatically discover Omni-IO under Settings &rarr; Devices &amp; Services via mDNS without requiring an MQTT broker.
+                  Home Assistant will automatically discover Omni-IO under Settings &rarr; Devices &amp; Services via mDNS (standard port 6053) without requiring an MQTT broker.
                 </p>
                 <div id="esphome-status" class="status-indicator"></div>
                 <button id="esphome-update" data-i18n="button.update">

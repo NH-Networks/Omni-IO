@@ -89,6 +89,7 @@ jobs:
 
           * 🚀 **Native ESPHome API Integration (Zero-Broker)**:
             * Direct, ultra-low-latency Home Assistant integration via embedded ESPHome Native API server (TCP port \`6053\`).
+            * Standardized static TCP port \`6053\` with streamlined Web UI settings and zero risk of misconfiguration.
             * Zero-broker requirement: no external Mosquitto MQTT broker needed.
             * Automatic mDNS discovery (\`_esphomelib._tcp.local.\`) under **Settings → Devices & Services** in Home Assistant.
             * Native \`cover\` entities with position slider, open, close, and stop controls (\`device_class: shutter\`).

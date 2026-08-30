@@ -223,7 +223,6 @@ Commands transmitted via SX1262 / CC1101 on 868.95 MHz:
 | `mqtt_pwd` | string | `""` | MQTT Password |
 | `mqtt_topic` | string | `"homeassistant"` | MQTT Auto-Discovery prefix topic |
 | `esphome_en` | bool | `true` | Enable / disable ESPHome native API server |
-| `esphome_port` | u16 | `6053` | ESPHome TCP listening port |
 | `esphome_pwd` | string | `""` | Optional API password |
 | `disp_en` | bool | `true` | Enable / disable OLED display task |
 | `disp_ss` | u16 | `60` | Screensaver timeout (seconds) |
@@ -234,7 +233,7 @@ Commands transmitted via SX1262 / CC1101 on 868.95 MHz:
 * `GET /api/info`: Comprehensive device metadata, heap, WiFi RSSI, MQTT status, ESPHome status.
 * `GET /api/devices`: List all configured 1W remotes, travel times, and sequence counters.
 * `POST /api/mqtt`: Update MQTT config (`{"enabled": bool, "server": "...", "port": ...}`).
-* `POST /api/esphome`: Update ESPHome config (`{"enabled": bool, "port": 6053, "password": "..."}`).
+* `POST /api/esphome`: Update ESPHome config (`{"enabled": bool, "password": "...", "name": "..."}`).
 * `POST /api/firmware`: Multipart OTA firmware binary upload (`..._firmware.bin`).
 * `POST /api/filesystem`: Multipart OTA LittleFS binary upload (`..._filesystem.bin`).
 * `GET /api/logs`: In-memory rolling circular buffer containing recent system log lines.

@@ -73,7 +73,7 @@ This guide provides solutions to common issues encountered during setup, WiFi co
 
 ### Connection Refused on Port 6053
 1. Open the Omni-IO Web UI and go to **Settings → Integration**.
-2. Ensure **Enable ESPHome Native API** is toggled **ON** and port is set to `6053`.
+2. Ensure **Enable ESPHome Native API** is toggled **ON**.
 3. Check the web navbar status pill: **ESPHome** should show a yellow (listening) or green pulsating (client connected) dot.
 4. Verify your local firewall allows inbound TCP traffic on port `6053`.
 

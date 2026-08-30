@@ -233,11 +233,10 @@ Returns the ESPHome Native API status and configuration.
 ```
 
 ### `POST /api/esphome`
-Updates ESPHome Native API configuration. Changes apply immediately.
+Updates ESPHome Native API configuration. Changes apply immediately. (TCP port is fixed to standard `6053`).
 ```json
 {
   "enabled": true,
-  "port": 6053,
   "password": "optional_password",
   "name": "omni-io"
 }

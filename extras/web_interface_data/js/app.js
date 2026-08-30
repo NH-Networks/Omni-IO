@@ -28,7 +28,6 @@
             mqttUserInput: document.getElementById("mqtt-user"),
             esphomeEnabledInput: document.getElementById("esphome-enabled"),
             esphomeNameInput: document.getElementById("esphome-name"),
-            esphomePortInput: document.getElementById("esphome-port"),
             esphomePasswordInput: document.getElementById("esphome-password"),
             esphomeUpdateButton: document.getElementById("esphome-update"),
             esphomeStatus: document.getElementById("esphome-status"),

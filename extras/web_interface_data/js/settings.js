@@ -86,15 +86,12 @@
             if (app.elements.esphomeNameInput) {
                 app.elements.esphomeNameInput.value = config.name || "omni-io";
             }
-            if (app.elements.esphomePortInput) {
-                app.elements.esphomePortInput.value = config.port || 6053;
-            }
             if (app.elements.esphomePasswordInput) {
                 app.elements.esphomePasswordInput.value = config.password || "";
             }
             if (app.elements.esphomeStatus) {
                 const statusText = config.running
-                    ? `${app.i18nText("status.esphome_running", "Running on port")} ${config.port} (${config.clients || 0} ${app.i18nText("status.esphome_clients", "connected")})`
+                    ? `${app.i18nText("status.esphome_running", "Running on port")} ${config.port || 6053} (${config.clients || 0} ${app.i18nText("status.esphome_clients", "connected")})`
                     : app.i18nText("status.esphome_stopped", "Stopped");
                 app.elements.esphomeStatus.textContent = statusText;
                 app.elements.esphomeStatus.className = "status-indicator " + (config.running ? "success" : "idle");
@@ -116,7 +113,6 @@
             await window.OmniIoApi.postJson("/api/esphome", {
                 enabled: app.elements.esphomeEnabledInput ? app.elements.esphomeEnabledInput.checked : true,
                 name: app.elements.esphomeNameInput ? app.elements.esphomeNameInput.value : "omni-io",
-                port: app.elements.esphomePortInput ? parseInt(app.elements.esphomePortInput.value, 10) : 6053,
                 password: app.elements.esphomePasswordInput ? app.elements.esphomePasswordInput.value : ""
             });
             setSettingsStatus(

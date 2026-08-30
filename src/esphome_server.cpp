@@ -1003,10 +1003,6 @@ void initEspHomeServer() {
     if (nvs_read_bool(NVS_KEY_ESPHOME_EN, en)) {
         esphome_enabled = en;
     }
-    uint16_t port = 6053;
-    if (nvs_read_u16(NVS_KEY_ESPHOME_PORT, port)) {
-        esphome_port = port;
-    }
     std::string pwd;
     if (nvs_read_string(NVS_KEY_ESPHOME_PWD, pwd)) {
         esphome_password = pwd;

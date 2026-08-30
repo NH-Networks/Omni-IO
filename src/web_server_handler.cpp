@@ -1333,21 +1333,6 @@ void handleApiEspHomeSet(AsyncWebServerRequest *request, JsonObject &doc, JsonOb
     changed = true;
   }
 
-  if (doc["port"].is<JsonVariant>()) {
-    JsonVariant portVariant = doc["port"];
-    int portVal = -1;
-    if (portVariant.is<uint16_t>() || portVariant.is<int>() || portVariant.is<long>()) {
-      portVal = portVariant.as<int>();
-    } else if (portVariant.is<const char*>()) {
-      portVal = atoi(portVariant.as<const char*>());
-    }
-    if (portVal > 0 && portVal <= 65535) {
-      esphome_port = static_cast<uint16_t>(portVal);
-      nvs_write_u16(NVS_KEY_ESPHOME_PORT, esphome_port);
-      changed = true;
-    }
-  }
-
   if (doc["password"].is<const char*>()) {
     esphome_password = doc["password"].as<const char*>();
     nvs_write_string(NVS_KEY_ESPHOME_PWD, esphome_password);
