@@ -1,3 +1,7 @@
+<!--
+Modifications Copyright 2026 CloudAXS.
+Original upstream portions remain licensed under Apache-2.0.
+-->
 # Omni-IO — Open-Source ESP32 io-homecontrol® Gateway
 
 <div align="center">
