@@ -162,5 +162,8 @@ specifically marked CloudAXS files. It does not restrict any rights
 granted for upstream or third-party components under Apache-2.0 or
 their respective licenses.
 
-Third-party components, logos, trademarks, icons, fonts and other
-assets may have separate terms. No trademark permission is implied.
+### 🛡️ Trademark & Logo Protection
+The **Omni-IO logo** (`extras/web_interface_data/img/logo.svg`) and associated branding are exclusive, proprietary assets of CloudAXS. 
+They are **NOT** licensed under the open-source Apache License 2.0. You may not use, copy, or distribute the logo or product names in derivative works or forks without prior written permission from CloudAXS.
+
+Third-party components, icons, fonts and other assets may have separate terms. No trademark permission is implied.
