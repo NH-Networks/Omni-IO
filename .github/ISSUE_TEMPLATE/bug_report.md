@@ -1,3 +1,7 @@
+<!--
+SPDX-FileCopyrightText: 2026 CloudAXS
+SPDX-License-Identifier: LicenseRef-CloudAXS-Proprietary
+-->
 ---
 name: Bug Report
 about: Create a report to help us improve Omni-IO
@@ -30,3 +34,4 @@ If applicable, add screenshots or serial monitor output / web console logs to he
 
 **Additional Context**
 Add any other context about the problem here.
+

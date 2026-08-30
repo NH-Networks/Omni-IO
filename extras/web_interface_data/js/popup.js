@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 (function () {
     let currentPopupOptions = null;
 
@@ -215,3 +219,4 @@
     };
     window.MiOpenPopup = window.OmniIoPopup;
 })();
+

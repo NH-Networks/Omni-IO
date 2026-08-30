@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 *, *::before, *::after {
     box-sizing: border-box;
     margin: 0;
@@ -1048,3 +1052,4 @@ header > .mqtt-pill:first-of-type {
 #esphome-status.idle {
   opacity: 0.7;
 }
+

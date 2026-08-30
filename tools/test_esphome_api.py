@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 CloudAXS
+# SPDX-License-Identifier: LicenseRef-CloudAXS-Proprietary
 import asyncio
 import sys
 from aioesphomeapi.client import APIClient
@@ -40,3 +42,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+

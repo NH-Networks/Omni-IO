@@ -1,3 +1,7 @@
+<!--
+SPDX-FileCopyrightText: 2026 CloudAXS
+SPDX-License-Identifier: LicenseRef-CloudAXS-Proprietary
+-->
 # Omni-IO Troubleshooting Guide
 
 This guide provides solutions to common issues encountered during setup, WiFi connection, RF pairing, or Home Assistant integration.
@@ -80,4 +84,5 @@ This guide provides solutions to common issues encountered during setup, WiFi co
 ### Added, renamed, or deleted devices do not update in Home Assistant
 * **Expected Behavior**: When devices are modified in Omni-IO, `syncEspHomeDevices()` gracefully disconnects active ESPHome sessions. Home Assistant's `aioesphomeapi` client detects this and reconnects within 1.0–1.5 seconds, running entity discovery during the handshake.
 * **Troubleshooting**: If Home Assistant does not refresh after 5 seconds, reload the ESPHome integration under **Settings → Devices & Services → ESPHome → Reload**.
+
 

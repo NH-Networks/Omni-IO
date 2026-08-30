@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 (function () {
     function findLinkedDeviceNames(app, remote) {
         if (!remote.devices || !remote.devices.length) {
@@ -186,3 +190,4 @@
     };
     window.MiOpenRemotes = window.OmniIoRemotes;
 })();
+

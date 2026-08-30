@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 CloudAXS
+# SPDX-License-Identifier: LicenseRef-CloudAXS-Proprietary
 import os
 import sys
 import time
@@ -103,3 +105,4 @@ if __name__ == "__main__":
             print("ESPHome API status:", json.dumps(esp_info, indent=2))
     except Exception as e:
         print("Failed to query /api/esphome:", e)
+

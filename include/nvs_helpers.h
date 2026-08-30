@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 #ifndef NVS_HELPERS_H
 #define NVS_HELPERS_H
 
@@ -52,3 +56,4 @@ bool nvs_read_bool(const char *key, bool &value);
 void nvs_write_bool(const char *key, bool value);
 
 #endif // NVS_HELPERS_H
+

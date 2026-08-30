@@ -1,3 +1,7 @@
+<!--
+SPDX-FileCopyrightText: 2026 CloudAXS
+SPDX-License-Identifier: LicenseRef-CloudAXS-Proprietary
+-->
 # Omni-IO REST API & MQTT Reference
 
 This document details the REST endpoints, WebSocket event streams, and MQTT topics exposed by the **Omni-IO** firmware.
@@ -241,4 +245,5 @@ Updates ESPHome Native API configuration. Changes apply immediately. (TCP port i
   "name": "omni-io"
 }
 ```
+
 

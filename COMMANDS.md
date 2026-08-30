@@ -1,3 +1,7 @@
+<!--
+Modifications Copyright 2026 CloudAXS.
+Original upstream portions remain licensed under Apache-2.0.
+-->
 # Omni-IO Command Reference
 
 This document provides a comprehensive list of all serial console and web interface terminal commands supported by the **Omni-IO** firmware.
@@ -75,3 +79,4 @@ This document provides a comprehensive list of all serial console and web interf
 | `mqttUser` | `<username>` | Configure MQTT username |
 | `mqttPass` | `<password>` | Configure MQTT password |
 | `mqttDiscovery` | `<topic>` | Configure Home Assistant discovery prefix |
+

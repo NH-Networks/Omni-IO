@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 (function () {
     // RAF throttle map: deviceId -> pending RAF id
     var _rafPending = {};
@@ -583,3 +587,4 @@
     };
     window.MiOpenDevices = window.OmniIoDevices;
 })();
+

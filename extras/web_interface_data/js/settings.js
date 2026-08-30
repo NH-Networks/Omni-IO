@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 (function () {
     function setSettingsStatus(app, message, isError, timeoutMs) {
         if (typeof window.showToast === "function") {
@@ -859,3 +863,4 @@
     };
     window.MiOpenSettings = window.OmniIoSettings;
 })();
+

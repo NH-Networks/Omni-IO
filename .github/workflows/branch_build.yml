@@ -1,3 +1,5 @@
+# Modifications Copyright 2026 CloudAXS.
+# Original upstream portions remain licensed under Apache-2.0.
 name: Branch Build
 
 on:
@@ -124,3 +126,4 @@ jobs:
           replacesArtifacts: true
           artifactErrorsFailBuild: true
           prerelease: ${{ github.ref_name != 'master' }}
+

@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 #include "syslog_helper.h"
 #include <user_config.h> // provides SYSLOG, syslog_server, syslog_port
 
@@ -194,3 +198,4 @@ void sendSyslog(const String &) {}
 void sendSyslog(const String &, int) {}
 
 #endif // SYSLOG
+

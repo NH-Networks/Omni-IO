@@ -1,3 +1,7 @@
+<!--
+SPDX-FileCopyrightText: 2026 CloudAXS
+SPDX-License-Identifier: LicenseRef-CloudAXS-Proprietary
+-->
 ---
 name: Feature Request
 about: Suggest an idea or new capability for Omni-IO
@@ -20,3 +24,4 @@ Does this apply to 1W, 2W, Home Assistant MQTT, Web UI, OLED, or a specific boar
 
 **Additional Context**
 Add any other context or screenshots about the feature request here.
+

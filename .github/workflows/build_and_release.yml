@@ -1,3 +1,5 @@
+# Modifications Copyright 2026 CloudAXS.
+# Original upstream portions remain licensed under Apache-2.0.
 name: Build and Release
 
 on:
@@ -197,3 +199,4 @@ jobs:
             LilyGoTBeamV12ESP32_firmware.bin
             LilyGoTBeamV12ESP32_filesystem.bin
             changelog.md
+

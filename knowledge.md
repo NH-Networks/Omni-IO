@@ -1,3 +1,7 @@
+<!--
+SPDX-FileCopyrightText: 2026 CloudAXS
+SPDX-License-Identifier: LicenseRef-CloudAXS-Proprietary
+-->
 # Omni-IO — Architecture, Development & Operational Knowledge Base
 
 This document captures the comprehensive architectural decisions, protocol implementations, hardware quirks, and operational knowledge accumulated during the development and stabilization of the **Omni-IO** project, with special emphasis on the **ESPHome Native API**, **MQTT Integration**, **OLED Display Subsystem**, and **io-homecontrol Radio Protocol**.
@@ -296,3 +300,4 @@ Upload sequence:
 1. Upload firmware to `POST /api/firmware` $\rightarrow$ wait for device reboot (~7s).
 2. Upload filesystem to `POST /api/filesystem` $\rightarrow$ wait for device reboot (~7s).
 3. Query `GET /api/info` to verify clean version reporting and client reconnection.
+

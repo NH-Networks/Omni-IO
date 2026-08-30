@@ -1,3 +1,7 @@
+<!--
+SPDX-FileCopyrightText: 2026 CloudAXS
+SPDX-License-Identifier: LicenseRef-CloudAXS-Proprietary
+-->
 # Home Assistant Integration Guide
 
 Omni-IO provides two seamless integration paths into **Home Assistant**:
@@ -157,3 +161,4 @@ action:
     target:
       entity_id: cover.living_room_shutter
 ```
+

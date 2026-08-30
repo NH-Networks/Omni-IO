@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 #ifndef MQTT_HANDLER_H
 #define MQTT_HANDLER_H
 #include <user_config.h>
@@ -52,3 +56,4 @@ inline void connectToMqtt() {}
 #endif // MQTT
 
 #endif // MQTT_HANDLER_H
+

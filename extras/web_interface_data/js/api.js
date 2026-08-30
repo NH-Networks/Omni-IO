@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 (function () {
     function ensureJson(response) {
         return response.json().catch(function () {
@@ -68,3 +72,4 @@
     };
     window.MiOpenApi = window.OmniIoApi;
 })();
+

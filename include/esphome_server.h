@@ -1,3 +1,7 @@
+/*
+ * SPDX-FileCopyrightText: 2026 CloudAXS
+ * SPDX-License-Identifier: LicenseRef-CloudAXS-Proprietary
+ */
 #ifndef ESPHOME_SERVER_H
 #define ESPHOME_SERVER_H
 
@@ -85,3 +89,4 @@ inline void syncEspHomeDevices() {}
 #endif // ESPHOME_API
 
 #endif // ESPHOME_SERVER_H
+

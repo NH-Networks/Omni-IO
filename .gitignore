@@ -1,3 +1,5 @@
+# Modifications Copyright 2026 CloudAXS.
+# Original upstream portions remain licensed under Apache-2.0.
 # PlatformIO & Build output
 /.pio/
 /build/
@@ -19,4 +21,5 @@ src/CMakeLists.txt
 # Scratch & Local OTA Binaries
 scratch/ota_binaries/
 scratch/*.bin
+
 

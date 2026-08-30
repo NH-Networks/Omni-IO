@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 #include <mqtt_handler.h>
 
 #if defined(MQTT)
@@ -816,3 +820,4 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
     mqttFuncHandler(message);
 }
 #endif // MQTT
+

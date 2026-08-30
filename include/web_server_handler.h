@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 #ifndef WEB_SERVER_HANDLER_H
 #define WEB_SERVER_HANDLER_H
 
@@ -35,3 +39,4 @@ inline void updateTwoWRxStatus(const String &, const String &, const String &,
 #endif
 
 #endif // WEB_SERVER_HANDLER_H
+

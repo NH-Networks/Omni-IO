@@ -1,3 +1,7 @@
+/*
+ * SPDX-FileCopyrightText: 2026 CloudAXS
+ * SPDX-License-Identifier: LicenseRef-CloudAXS-Proprietary
+ */
 #include <esphome_server.h>
 
 #if defined(ESPHOME_API)
@@ -1200,3 +1204,4 @@ void syncEspHomeDevices() {
 }
 
 #endif // ESPHOME_API
+

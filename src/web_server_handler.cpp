@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 #include <web_server_handler.h>
 
 #if defined(WEBSERVER)
@@ -1558,3 +1562,4 @@ void loopWebServer() {
 }
 
 #endif // defined(WEBSERVER)
+
