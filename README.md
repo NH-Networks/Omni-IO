@@ -1,14 +1,14 @@
 # Omni-IO — Open-Source ESP32 io-homecontrol® Gateway
 
 <div align="center">
-  <img src="extras/web_interface_data/img/logo.png" alt="Omni-IO Logo" width="100"/>
+  <img src="extras/web_interface_data/img/logo.svg" alt="Omni-IO Logo" width="256"/>
   <br/>
   <strong>Next-Generation Open-Source 868MHz Gateway for io-homecontrol® Devices</strong>
   <br/><br/>
 
   [![Release](https://img.shields.io/github/v/release/NH-Networks/Omni-IO?style=flat-square&color=blue)](https://github.com/NH-Networks/Omni-IO/releases)
   [![PlatformIO](https://img.shields.io/badge/PlatformIO-ESP32-orange?style=flat-square)](https://platformio.org/)
-  [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-MQTT%20Discovery-41BDF5?style=flat-square&logo=home-assistant)](https://www.home-assistant.io/)
+  [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-ESPHome%20%7C%20MQTT-41BDF5?style=flat-square&logo=home-assistant)](https://www.home-assistant.io/)
   [![License](https://img.shields.io/badge/License-CC%20BY--NC--ND%204.0-lightgrey?style=flat-square)](https://creativecommons.org/licenses/by-nc-nd/4.0/)
   [![BuyMeACoffee](https://img.shields.io/badge/Support-Buy%20Me%20A%20Coffee-yellow?style=flat-square&logo=buy-me-a-coffee)](https://buymeacoffee.com/dyna_mite)
 </div>
@@ -38,16 +38,26 @@
   * Fully responsive mobile & desktop web interface served directly from LittleFS.
   * Real-time WebSocket connection for instant feedback and live RF traffic log stream.
   * Multi-language support with instant live switching (**Dutch**, **English**, **German**, and **French**).
+  * Live status pills for both **MQTT** and **ESPHome** in the navbar with one-click settings navigation.
   * Direct device pairing, unpairing, renaming, and travel-time configuration.
   * Physical remote controller map manager.
+* 🚀 **Home Assistant ESPHome Native API (Zero-Broker Integration)**:
+  * Direct plug-and-play connection over TCP (port `6053`) without requiring an external MQTT broker.
+  * Automatic mDNS discovery (`_esphomelib._tcp.local.`) under **Settings → Devices & Services**.
+  * Dynamic entity discovery & re-enumeration: automatically refreshes entities in Home Assistant when devices are added, renamed, or removed.
+  * Native cover entities with smooth position slider and Open/Close/Stop controls (`device_class: shutter`).
+  * Number slider entity for live motor travel time calibration with instant feedback.
+  * Button entities for Pairing, Adding, and Removing devices, plus a gateway soft restart button.
+  * Gateway diagnostic sensors (WiFi RSSI, Free Memory, IP address).
 * 🏠 **Home Assistant Auto-Discovery via MQTT**:
   * Automatic discovery for cover entities (blinds, screens, shutters).
   * Smooth percentage-based position control with travel time tracking.
   * Dedicated pairing and maintenance button entities.
   * Real-time state reporting (`OPEN`, `CLOSED`, `OPENING`, `CLOSING`, `STOP`).
-  * Availability tracking with MQTT Last Will and Testament (LWT).
+  * Independent runtime toggle to enable/disable MQTT without clearing configuration.
 * 🖥️ **OLED Display & Advanced Screen Manager**:
-  * Status display showing device name, WiFi signal, IP / mDNS address, MQTT state, and optional CPU temperature.
+  * Real-time status display showing device name, WiFi signal, IP / mDNS address, CPU temperature, and status icons for both MQTT and ESPHome.
+  * Pixel-art ESPHome status icon indicating connected / waiting Home Assistant sessions.
   * Runtime configurable screensaver timeout, screen-off timeout, and 3 dimming levels (Low, Medium, High).
 * 📜 **Syslog & Remote Logging**:
   * Sends log messages directly to remote Syslog servers (RFC3164 / RFC5424 compliant).
@@ -90,14 +100,22 @@ Once connected to your network, open your web browser and navigate to:
 
 ## 🏠 Home Assistant Integration
 
-When MQTT is enabled, Omni-IO automatically exposes your blinds and covers to Home Assistant via MQTT Discovery:
+Omni-IO provides two seamless integration paths into Home Assistant:
 
+### Option A: ESPHome Native API (Recommended — No Broker Needed)
+1. Ensure Omni-IO and your Home Assistant server are on the same local network.
+2. In Home Assistant, go to **Settings → Devices & Services**.
+3. Omni-IO will appear automatically as a discovered **ESPHome** device! Click **Configure** and **Submit**.
+4. That's it! All configured covers, travel-time configuration sliders, pairing buttons, and diagnostic sensors appear immediately with sub-millisecond local response.
+
+### Option B: MQTT Discovery
+When MQTT is enabled, Omni-IO can also publish standard Home Assistant MQTT discovery topics:
 1. In the Web UI, go to **Settings → MQTT**.
-2. Enter your MQTT Broker IP, port, username, and password.
+2. Enable MQTT, enter your MQTT Broker IP, port, username, and password.
 3. Click **Save Settings**.
-4. Home Assistant will immediately discover the covers and their control buttons!
+4. Home Assistant will discover the covers via MQTT!
 
-### MQTT Topics Structure
+#### MQTT Topics Structure
 * **Command Topic**: `iown/<ID>/set` (`OPEN`, `CLOSE`, `STOP`)
 * **Position Set Topic**: `iown/<ID>/position/set` (`0` to `100`)
 * **State Topic**: `iown/<ID>/state` (`OPEN`, `CLOSED`, `OPENING`, `CLOSING`, `STOP`)
