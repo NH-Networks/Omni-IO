@@ -1,7 +1,7 @@
 # Omni-IO — Open-Source ESP32 io-homecontrol® Gateway
 
 <div align="center">
-  <img src="extras/web_interface_data/img/logo.png" alt="Omni-IO Logo" width="100"/>
+  <img src="extras/web_interface_data/img/logo.svg" alt="Omni-IO Logo" width="256"/>
   <br/>
   <strong>Next-Generation Open-Source 868MHz Gateway for io-homecontrol® Devices</strong>
   <br/><br/>
