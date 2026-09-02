@@ -17,10 +17,16 @@
 #ifndef IOHC_BOARD_H
 #define IOHC_BOARD_H
 
-#define RADIO_SX127X
+// M5Stack C6L uses SX1262; all other boards default to SX127X
+#if defined(M5STACK_C6L)
+  #define RADIO_SX126X
+#else
+  #define RADIO_SX127X
+#endif
+
 #define Regulatory_Domain_EU_868
-//#define RADIO_SX126X
 #define BOARD_MODEL BOARD_HELTEC32_V3
+
 /*
  * Board pins definitions
  */
@@ -66,6 +72,36 @@
 #define RADIO_DIO1_PIN      35 //HELTEC
 #define RADIO_DIO2_PIN      34 //HELTEC
 #define RADIO_BUSY_PIN      32
+#elif defined(M5STACK_C6L)
+// -----------------------------------------------------------------------
+// M5Stack C6L Unit — ESP32-C6 (RISC-V single-core) + SX1262 868MHz
+// Schematic: SCH_Unit_C6L_SCH_B0.4.1_20250827
+// SPI bus shared between SX1262 and OLED (select via CS pins)
+// SX_NRST / SX_ANT_SW / SX_LNA_EN routed via PI4IOE5V6408 I2C expander
+// -----------------------------------------------------------------------
+#define RADIO_SCLK_PIN      20   // SX1262 SCK  (shared SPI)
+#define RADIO_MISO_PIN      22   // SX1262 MISO (shared SPI)
+#define RADIO_MOSI_PIN      21   // SX1262 MOSI (shared SPI)
+#define RADIO_CS_PIN        23   // SX1262 NSS
+#define RADIO_BUSY_PIN      19   // SX1262 BUSY
+#define RADIO_DIO1_PIN       7   // SX1262 DIO1 (IRQ)
+// RST is controlled via PI4IOE5V6408 I2C GPIO expander (E0.P7)
+// Use I2C_EXPANDER_SDA/SCL below to drive it before radio init
+#define RADIO_RST_PIN       -1   // Not directly on GPIO; use expander
+#define BOARD_LED_PIN        2   // RGB LED (WS2812 on G2)
+// PI4IOE5V6408 I2C GPIO expander for SX_NRST (P7), ANT_SW (P6), LNA_EN (P5)
+#define I2C_EXPANDER_SCL     8
+#define I2C_EXPANDER_SDA    10
+#define I2C_EXPANDER_ADDR 0x43   // PI4IOE5V6408 default address
+// OLED SSD1306 64x48 — SPI mode, shares bus with SX1262
+#define OLED_CS_PIN          6   // OLED chip select
+#define OLED_DC_PIN         18   // OLED data/command
+#define OLED_RST_PIN        15   // OLED reset
+#define DISPLAY_WIDTH       64
+#define DISPLAY_HEIGHT      48
+// Grove PORT.A (external)
+#define GROVE_PIN_A          5
+#define GROVE_PIN_B          4
 #else
 #define RADIO_SCLK_PIN       5
 #define RADIO_MISO_PIN      19
@@ -74,6 +110,12 @@
 #define RADIO_DIO0_PIN      26
 #define RADIO_RST_PIN       14
 #define BOARD_LED_PIN       25
+#endif
+
+// Default display dimensions for all non-C6L boards
+#if !defined(DISPLAY_WIDTH)
+#define DISPLAY_WIDTH  128
+#define DISPLAY_HEIGHT  64
 #endif
 
 // I2C pin definitions for OLED or peripherals
@@ -93,6 +135,12 @@
 #define I2C_SDA_PIN 4
 #define I2C_SCL_PIN 15
 #define DISPLAY_OLED_RST_PIN 16
+#elif defined(M5STACK_C6L)
+// OLED on SPI (see OLED_CS_PIN / OLED_DC_PIN / OLED_RST_PIN above)
+// I2C bus is used exclusively for PI4IOE5V6408 expander
+#define I2C_SDA_PIN I2C_EXPANDER_SDA
+#define I2C_SCL_PIN I2C_EXPANDER_SCL
+#define DISPLAY_OLED_RST_PIN OLED_RST_PIN
 #else
 #define I2C_SDA_PIN 21
 #define I2C_SCL_PIN 22
