@@ -498,7 +498,6 @@ namespace Radio {
 
     void dump() {}
     void dumpReal() {}
-    int dump_fsk_registers(const uint8_t *regs) { return 0; }
     uint16_t readWord(uint8_t regAddr) { return 0; }
     void writeWord(uint8_t regAddr, uint16_t value) {}
 }
