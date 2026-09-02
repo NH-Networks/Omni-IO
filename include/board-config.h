@@ -1,4 +1,8 @@
 /*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
+/*
    Copyright (c) 2024. CRIDP https://github.com/cridp
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -158,6 +162,11 @@
 #if defined(RADIO_SX127X)
 #define RADIO_RESET        RADIO_RST_PIN  //                 12
 #define RADIO_NSS          RADIO_CS_PIN   //                 25
+#elif defined(RADIO_SX126X)
+#define RADIO_RESET        RADIO_RST_PIN
+#define RADIO_NSS          RADIO_CS_PIN
+#define RADIO_BUSY         RADIO_BUSY_PIN
+#define RADIO_DIO_1        RADIO_DIO1_PIN
 #endif
 #if defined(RADIO_SX127X)
 //#define RADIO_DIO_0                             5   // NodeMCU D1

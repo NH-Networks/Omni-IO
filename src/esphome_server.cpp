@@ -1059,7 +1059,7 @@ void startEspHomeServer() {
     }
 
     s_serverRunning = true;
-    xTaskCreatePinnedToCore(esphomeServerTask, "esphome_api", 4096, nullptr, 2, &s_serverTaskHandle, 1);
+    xTaskCreatePinnedToCore(esphomeServerTask, "esphome_api", 4096, nullptr, 2, &s_serverTaskHandle, (portNUM_PROCESSORS > 1 ? 1 : 0));
     Serial.printf("ESPHome: Native API server listening on port %u\n", esphome_port);
     addLogMessage(String("ESPHome Native API server listening on port ") + String(esphome_port));
 #if defined(WEBSERVER)

@@ -22,6 +22,7 @@ jobs:
           - LilyGoTBeamV12ESP32
           - LilyGoLoraESP32
           - LilyGoT3S3
+          - M5StackC6L
 
     steps:
       - name: Checkout repository
@@ -68,6 +69,9 @@ jobs:
             FS_OFFSET="0x670000"
           elif [ "${{ matrix.env }}" = "LilyGoT3S3" ]; then
             CHIP="esp32s3"
+            BOOT_OFFSET="0x0"
+          elif [ "${{ matrix.env }}" = "M5StackC6L" ]; then
+            CHIP="esp32c6"
             BOOT_OFFSET="0x0"
           fi
           esptool --chip "$CHIP" merge-bin -o "artifacts/${{ matrix.env }}_${SAFE_BRANCH}_${COMMIT_TIME}.bin" --flash-size "$FLASH_SIZE" "$BOOT_OFFSET" .pio/build/${{ matrix.env }}/bootloader.bin 0x8000 .pio/build/${{ matrix.env }}/partitions.bin 0x10000 .pio/build/${{ matrix.env }}/firmware.bin "$FS_OFFSET" .pio/build/${{ matrix.env }}/littlefs.bin

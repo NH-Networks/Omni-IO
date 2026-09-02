@@ -511,7 +511,7 @@ void initWifi() {
     WiFi.setAutoReconnect(true);
     WiFi.setSleep(false);
 
-    xTaskCreatePinnedToCore(wifiWorker, "WiFi_Worker", 8192, NULL, 3, &wifiWorkerTaskHandle, 1);
+    xTaskCreatePinnedToCore(wifiWorker, "WiFi_Worker", 8192, NULL, 3, &wifiWorkerTaskHandle, (portNUM_PROCESSORS > 1 ? 1 : 0));
 
     Serial.printf("WiFi MAC: %s\n", WiFi.macAddress().c_str());
 }

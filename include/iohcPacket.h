@@ -1,4 +1,8 @@
 /*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
+/*
    Copyright (c) 2024. CRIDP https://github.com/cridp
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,6 +29,8 @@
 
 #if defined(RADIO_SX127X)
 #include <SX1276Helpers.h>
+#elif defined(RADIO_SX126X)
+#include <SX126xHelpers.h>
 #endif
 
 #define RESET_AFTER_LAST_MSG_US         15000
