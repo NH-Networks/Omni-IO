@@ -284,8 +284,19 @@ When switching a running device from MQTT to ESPHome:
 | `LilyGoTBeamV12ESP32` | `ttgo-t-beam` | ESP32-D0WDQ6 | SX1262 / SX1276 | SPI (SCK: 5, MISO: 19, MOSI: 27, CS: 18) |
 | `LilyGoLoraESP32` | `ttgo-lora32-v21`| ESP32-PICO-D4 | SX1276 | SPI (SCK: 5, MISO: 19, MOSI: 27, CS: 18) |
 | `HeltecLoraV2ESP32` | `heltec_wifi_lora_32_V2` | ESP32-D0WDQ6 | SX1276 | Integrated 0.96" OLED on I2C `0x3C` |
+| `M5StackC6L` | `esp32-c6-devkitc-1` | ESP32-C6 (RISC-V single-core) | SX1262 | SPI (SCK: G20, MISO: G22, MOSI: G21, CS: G23) |
 
-### 7.1 OTA Firmware Update Script Pattern
+### 7.1 M5Stack C6L Unit — Hardware Notes
+* **Schematic reference**: `SCH_Unit_C6L_SCH_B0.4.1_20250827`
+* **SX1262 pin mapping** (all internal, not on Grove connector):
+  * SCK: G20, MISO: G22, MOSI: G21, CS: G23, BUSY: G19, DIO1/IRQ: G7
+  * `SX_NRST` (P7), `SX_ANT_SW` (P6), `SX_LNA_EN` (P5) — all via **PI4IOE5V6408 I2C GPIO expander** (SCL: G8, SDA: G10, I2C addr: `0x43`). These must be driven before radio initialisation.
+* **OLED**: SSD1306 64×48 in **SPI mode** (CS: G6, DC: G18, RST: G15), shares the SPI bus with SX1262.
+* **Single-core RISC-V**: Do **not** use `xTaskCreatePinnedToCore(..., 1)` — the `DCONFIG_ESP_WIFI_TASK_PINNED_TO_CORE_1` flag is explicitly unset in `[env:M5StackC6L]` and replaced with `CORE_0`.
+* **Grove PORT.A** (only external GPIO): G5 (yellow), G4 (white).
+* **Other HMI**: RGB LED on G2 (WS2812), Buzzer on G11, Button via PI4IOE5V6408 P0.
+
+### 7.2 OTA Firmware Update Script Pattern
 Always dynamically discover the newest binary via `glob` to avoid uploading stale cached builds:
 ```python
 import glob, urllib.request
@@ -300,4 +311,3 @@ Upload sequence:
 1. Upload firmware to `POST /api/firmware` $\rightarrow$ wait for device reboot (~7s).
 2. Upload filesystem to `POST /api/filesystem` $\rightarrow$ wait for device reboot (~7s).
 3. Query `GET /api/info` to verify clean version reporting and client reconnection.
-
