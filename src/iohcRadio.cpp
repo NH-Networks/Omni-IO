@@ -163,7 +163,13 @@ namespace IOHC {
             return;
         }
 
+#if defined(RADIO_SX127X)
         const bool syncActive = digitalRead(RADIO_PREAMBLE_DETECTED);
+#elif defined(RADIO_SX126X)
+        const bool syncActive = digitalRead(RADIO_DIO1_PIN);
+#else
+        const bool syncActive = false;
+#endif
         if (syncActive) {
             twoWSyncIrqCount++;
             iohcRadio::setRadioState(iohcRadio::RadioState::PREAMBLE);
@@ -891,9 +897,9 @@ bool queueCallback(IohcPacketDelegate* callback, iohcPacket* packet) {
         uint32_t lastPop = millis();
 #endif
 
-#if defined(RADIO_SX127X)
-
         bool rxOverflow = false;
+
+#if defined(RADIO_SX127X)
         uint16_t fifoCount = 0;
         uint32_t emptySinceUs = 0;
         const uint32_t readStartedUs = micros();
@@ -1119,9 +1125,13 @@ bool queueCallback(IohcPacketDelegate* callback, iohcPacket* packet) {
     void IRAM_ATTR iohcRadio::i_preamble() {
 #if defined(RADIO_SX127X)
         bool preamble = digitalRead(RADIO_PREAMBLE_DETECTED);
+#elif defined(RADIO_SX126X)
+        bool preamble = digitalRead(RADIO_DIO1_PIN);
 #elif defined(CC1101)
         __g_preamble = true;
         bool preamble = __g_preamble;
+#else
+        bool preamble = false;
 #endif
         iohcRadio::setRadioState(preamble ? iohcRadio::RadioState::PREAMBLE : iohcRadio::RadioState::RX);
     }
@@ -1133,6 +1143,9 @@ bool queueCallback(IohcPacketDelegate* callback, iohcPacket* packet) {
     void IRAM_ATTR iohcRadio::i_payload() {
 #if defined(RADIO_SX127X)
         bool payload = digitalRead(RADIO_PACKET_AVAIL);
+        iohcRadio::setRadioState(payload ? iohcRadio::RadioState::PAYLOAD : iohcRadio::RadioState::RX);
+#elif defined(RADIO_SX126X)
+        bool payload = digitalRead(RADIO_DIO1_PIN);
         iohcRadio::setRadioState(payload ? iohcRadio::RadioState::PAYLOAD : iohcRadio::RadioState::RX);
 #endif
     }

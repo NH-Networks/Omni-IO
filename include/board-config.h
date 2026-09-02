@@ -22,10 +22,12 @@
 #define IOHC_BOARD_H
 
 // M5Stack C6L uses SX1262; all other boards default to SX127X
-#if defined(M5STACK_C6L)
-  #define RADIO_SX126X
-#else
-  #define RADIO_SX127X
+#if !defined(RADIO_SX126X) && !defined(RADIO_SX127X)
+  #if defined(M5STACK_C6L)
+    #define RADIO_SX126X
+  #else
+    #define RADIO_SX127X
+  #endif
 #endif
 
 #define Regulatory_Domain_EU_868
