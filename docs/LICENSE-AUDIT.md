@@ -9,6 +9,9 @@ This document classifies all files in this repository based on their origin, ide
 These files were fully created by CloudAXS. They do not contain upstream code and are exclusively licensed under `LICENSE-CLOUDAXS`.
 * `src/esphome_server.cpp`
 * `include/esphome_server.h`
+* `src/SX126xHelpers.cpp`
+* `include/SX126xHelpers.h`
+* `include/sx126xRegs.h`
 * `docs/API_AND_MQTT_REFERENCE.md`
 * `docs/HARDWARE_SETUP.md`
 * `docs/HOME_ASSISTANT.md`
