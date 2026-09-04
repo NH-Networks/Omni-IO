@@ -29,7 +29,7 @@
 #ifdef FIRMWARE_VERSION
 #define ESPHOME_FIRMWARE_VERSION FIRMWARE_VERSION
 #else
-#define ESPHOME_FIRMWARE_VERSION "3.0.1"
+#define ESPHOME_FIRMWARE_VERSION "3.0.2"
 #endif
 
 // FNV-1a 32-bit hash for stable entity keys across reboots
@@ -191,7 +191,6 @@ struct ClientSession {
     bool authenticated = false;
     bool subscribedStates = false;
     uint32_t lastActivityMs = 0;
-    uint32_t lastPingSentMs = 0;
     char ip[INET_ADDRSTRLEN] = {};
 };
 
@@ -246,6 +245,15 @@ bool sendFrame(int sock, uint16_t msgType, const uint8_t *payload, size_t payloa
         if (res <= 0) return false;
         sent += res;
     }
+
+    // Refresh client's activity timestamp since frame was successfully transmitted
+    for (size_t i = 0; i < MAX_CLIENTS; i++) {
+        if (s_clients[i].socketFd == sock) {
+            s_clients[i].lastActivityMs = millis();
+            break;
+        }
+    }
+
     return true;
 }
 
@@ -955,7 +963,7 @@ void esphomeServerTask(void *param) {
                 setsockopt(newSock, IPPROTO_TCP, TCP_KEEPCNT, reinterpret_cast<char*>(&keepCount), sizeof(int));
 
                 struct timeval tvTimeout;
-                tvTimeout.tv_sec = 3;
+                tvTimeout.tv_sec = 5;
                 tvTimeout.tv_usec = 0;
                 setsockopt(newSock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<char*>(&tvTimeout), sizeof(tvTimeout));
                 setsockopt(newSock, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<char*>(&tvTimeout), sizeof(tvTimeout));
@@ -968,7 +976,6 @@ void esphomeServerTask(void *param) {
                         s_clients[i].authenticated = false;
                         s_clients[i].subscribedStates = false;
                         s_clients[i].lastActivityMs = millis();
-                        s_clients[i].lastPingSentMs = millis();
                         char ipStr[INET_ADDRSTRLEN];
                         inet_ntop(AF_INET, &(clientAddr.sin_addr), ipStr, INET_ADDRSTRLEN);
                         strncpy(s_clients[i].ip, ipStr, sizeof(s_clients[i].ip) - 1);
@@ -998,21 +1005,16 @@ void esphomeServerTask(void *param) {
 
                     if (s_clients[i].socketFd < 0) continue;
 
-                    // Active keepalive heartbeat (ESPHome Native API protocol):
-                    // Periodically send PingRequest (type 7) to keep the connection alive.
-                    // The client (Home Assistant) responds with PingResponse (type 8),
-                    // which updates lastActivityMs and keeps the session active.
-                    if (s_clients[i].authenticated && (now - s_clients[i].lastPingSentMs >= 20000UL)) {
-                        s_clients[i].lastPingSentMs = now;
-                        ProtoWriter pingWriter;
-                        if (!sendFrame(s_clients[i].socketFd, EspHomeMsg::PING_REQUEST, pingWriter)) {
-                            closeSession(s_clients[i], "disconnected (ping send error)");
-                            continue;
-                        }
+                    // Handshake timeout: disconnect clients that fail to authenticate within 60s
+                    if (!s_clients[i].authenticated && (now - s_clients[i].lastActivityMs > 60000UL)) {
+                        closeSession(s_clients[i], "disconnected (handshake timeout)");
+                        continue;
                     }
 
-                    // Keepalive check: if no activity received for 90s, close unresponsive client
-                    if (now - s_clients[i].lastActivityMs > 90000UL) {
+                    // Keepalive silent timeout:
+                    // If neither incoming traffic (pings/commands) nor outgoing broadcasts (diagnostics/states)
+                    // have occurred for 150s, disconnect stale connection (matches official ESPHome KEEPALIVE_DISCONNECT_TIMEOUT).
+                    if (now - s_clients[i].lastActivityMs > 150000UL) {
                         Serial.printf("ESPHome: Client %s (slot %d) silent timeout\n", s_clients[i].ip, static_cast<int>(i));
                         closeSession(s_clients[i], "disconnected (keepalive timeout)");
                     }
