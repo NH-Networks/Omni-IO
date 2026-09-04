@@ -29,7 +29,7 @@
 #ifdef FIRMWARE_VERSION
 #define ESPHOME_FIRMWARE_VERSION FIRMWARE_VERSION
 #else
-#define ESPHOME_FIRMWARE_VERSION "3.0.2"
+#define ESPHOME_FIRMWARE_VERSION "3.0.3"
 #endif
 
 // FNV-1a 32-bit hash for stable entity keys across reboots
@@ -1005,8 +1005,10 @@ void esphomeServerTask(void *param) {
 
                     if (s_clients[i].socketFd < 0) continue;
 
+                    uint32_t currentMs = millis();
+
                     // Handshake timeout: disconnect clients that fail to authenticate within 60s
-                    if (!s_clients[i].authenticated && (now - s_clients[i].lastActivityMs > 60000UL)) {
+                    if (!s_clients[i].authenticated && currentMs >= s_clients[i].lastActivityMs && (currentMs - s_clients[i].lastActivityMs > 60000UL)) {
                         closeSession(s_clients[i], "disconnected (handshake timeout)");
                         continue;
                     }
@@ -1014,7 +1016,7 @@ void esphomeServerTask(void *param) {
                     // Keepalive silent timeout:
                     // If neither incoming traffic (pings/commands) nor outgoing broadcasts (diagnostics/states)
                     // have occurred for 150s, disconnect stale connection (matches official ESPHome KEEPALIVE_DISCONNECT_TIMEOUT).
-                    if (now - s_clients[i].lastActivityMs > 150000UL) {
+                    if (s_clients[i].authenticated && currentMs >= s_clients[i].lastActivityMs && (currentMs - s_clients[i].lastActivityMs > 150000UL)) {
                         Serial.printf("ESPHome: Client %s (slot %d) silent timeout\n", s_clients[i].ip, static_cast<int>(i));
                         closeSession(s_clients[i], "disconnected (keepalive timeout)");
                     }
