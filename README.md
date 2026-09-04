@@ -27,7 +27,6 @@ Original upstream portions remain licensed under Apache-2.0.
 * **[cridp](https://github.com/cridp)** — Author of [cridp/iown-homecontrol-esp32sx1276](https://github.com/cridp/iown-homecontrol-esp32sx1276): Hardware adaptation and timing optimizations for the ESP32 and Semtech SX1276 radio transceiver.
 * **[djbenbe](https://github.com/djbenbe)** — Author of [djbenbe/miopen.io](https://github.com/djbenbe/miopen.io/tree/Beta): Core firmware development, UI concept, graphics, and initial integration.
 * **[rspaargaren](https://github.com/rspaargaren)** — Community documentation, troubleshooting guides, and [io-homecontrol Wiki](https://github.com/rspaargaren/iohomecontrol/wiki).
-* **[CloudAXS](https://github.com/CloudAXS)** — Web interface architecture, modern responsive design, and multi-language engine.
 
 *All respective trademarks and copyrights belong to their respective owners.*
 
