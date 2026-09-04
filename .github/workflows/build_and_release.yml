@@ -83,11 +83,23 @@ jobs:
           cat > changelog.md <<EOF
           # 🎉 Omni-IO Release ${{ github.ref_name }}
 
-          Welcome to the **${{ github.ref_name }}** release of **Omni-IO**, the next-generation open-source ESP32 gateway and controller for **io-homecontrol®** (868.95 MHz) devices (Somfy, Velux, and compatible HVAC/blinds systems).
+          Welcome to the **${{ github.ref_name }}** maintenance release of **Omni-IO**, the open-source ESP32 gateway and controller for **io-homecontrol®** (868.95 MHz) devices (Somfy, Velux, and compatible HVAC/blinds systems).
 
           ---
 
-          ## ✨ What's New in ${{ github.ref_name }}
+          ## 🚀 What's New in v3.0.1
+
+          * 💓 **ESPHome Native API Keepalive Heartbeat & Stability Fix**:
+            * Implemented active server-side keepalive pinging (\`EspHomeMsg::PING_REQUEST = 7\`) every 20 seconds, fully compliant with the official ESPHome Native API standard (\`api_connection.cpp\`).
+            * Added native handling for client \`PING_RESPONSE = 8\`, refreshing session activity timestamps and keeping Home Assistant connections alive indefinitely.
+            * Permanently resolved the 90-second silent timeout disconnect/reconnect cycle (~40 reconnects per hour) that flooded device logs.
+            * Added proactive socket write error handling during ping transmission to clean up stalled or severed TCP sockets immediately.
+            * Enhanced session disconnect diagnostics in serial and web logs (\`keepalive timeout\`, \`socket write error\`, \`ping send error\`, \`requested by client\`).
+            * Removed log rate-limiting filters in favor of clean, transparent logging without suppressing legitimate connection events.
+
+          ---
+
+          ## ✨ Previous v3.0.0 Highlights
 
           * 🚀 **Native ESPHome API Integration (Zero-Broker)**:
             * Direct, ultra-low-latency Home Assistant integration via embedded ESPHome Native API server (TCP port \`6053\`).

@@ -191,15 +191,22 @@ struct ClientSession {
     bool authenticated = false;
     bool subscribedStates = false;
     uint32_t lastActivityMs = 0;
+    uint32_t lastPingSentMs = 0;
+    char ip[INET_ADDRSTRLEN] = {};
 };
 
-void closeSession(ClientSession &session) {
+void closeSession(ClientSession &session, const char *reason = nullptr) {
     if (session.socketFd >= 0) {
         close(session.socketFd);
         session.socketFd = -1;
         bool wasAuth = session.authenticated;
         session.authenticated = false;
         session.subscribedStates = false;
+        if (reason != nullptr && session.ip[0] != '\0') {
+            Serial.printf("ESPHome: Client %s %s\n", session.ip, reason);
+            addLogMessage(String("ESPHome: Client ") + session.ip + " " + reason);
+        }
+        session.ip[0] = '\0';
         if (wasAuth) {
 #if defined(SSD1306_DISPLAY)
             updateDisplayStatus();
@@ -251,7 +258,7 @@ void broadcastFrameToSubscribers(uint16_t msgType, const ProtoWriter &writer) {
     for (size_t i = 0; i < MAX_CLIENTS; i++) {
         if (s_clients[i].socketFd >= 0 && s_clients[i].subscribedStates) {
             if (!sendFrame(s_clients[i].socketFd, msgType, writer)) {
-                closeSession(s_clients[i]);
+                closeSession(s_clients[i], "disconnected (socket write error)");
             }
         }
     }
@@ -287,6 +294,7 @@ void handleConnectRequest(int sock, ProtoReader &reader, ClientSession &session)
     bool invalidPassword = false;
     if (!esphome_password.empty() && password != esphome_password) {
         invalidPassword = true;
+        addLogMessage(String("ESPHome: Client ") + session.ip + " authentication failed (invalid password)");
     }
 
     session.authenticated = !invalidPassword;
@@ -753,10 +761,14 @@ void dispatchMessage(ClientSession &session, uint16_t msgType, const uint8_t *pa
             break;
         }
 
+        case EspHomeMsg::PING_RESPONSE:
+            // Heartbeat response from client; lastActivityMs was refreshed at start of dispatchMessage
+            break;
+
         case EspHomeMsg::DISCONNECT_REQUEST: {
             ProtoWriter writer;
             sendFrame(session.socketFd, EspHomeMsg::DISCONNECT_RESPONSE, writer);
-            closeSession(session);
+            closeSession(session, "disconnected (requested by client)");
             break;
         }
 
@@ -807,16 +819,22 @@ void processClientSession(ClientSession &session) {
     if (n <= 0) {
         if (n == 0) {
             // EOF: peer closed
-            closeSession(session);
+            closeSession(session, "disconnected (closed by client)");
+        } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            closeSession(session, "disconnected (socket read error)");
         }
         return;
     }
 
     uint8_t preamble = headerBuf[0];
     if (preamble != 0x00) {
-        // Not a plaintext frame (or unrecognized preamble)
-        Serial.printf("ESPHome: Bad preamble 0x%02x, closing session\n", preamble);
-        closeSession(session);
+        if (preamble == 0x01) {
+            closeSession(session, "rejected (Noise encryption not supported; remove encryption key in Home Assistant)");
+        } else {
+            char buf[64];
+            snprintf(buf, sizeof(buf), "rejected (unsupported protocol preamble 0x%02x)", preamble);
+            closeSession(session, buf);
+        }
         return;
     }
 
@@ -825,15 +843,16 @@ void processClientSession(ClientSession &session) {
     uint32_t shift = 0;
     while (true) {
         uint8_t b;
-        if (recv(session.socketFd, &b, 1, 0) <= 0) {
-            closeSession(session);
+        ssize_t res = recv(session.socketFd, &b, 1, 0);
+        if (res <= 0) {
+            closeSession(session, res == 0 ? "disconnected (closed by client)" : "disconnected (socket read error)");
             return;
         }
         length |= static_cast<uint64_t>(b & 0x7F) << shift;
         if (!(b & 0x80)) break;
         shift += 7;
         if (shift >= 64) {
-            closeSession(session);
+            closeSession(session, "disconnected (invalid length varint)");
             return;
         }
     }
@@ -843,15 +862,16 @@ void processClientSession(ClientSession &session) {
     shift = 0;
     while (true) {
         uint8_t b;
-        if (recv(session.socketFd, &b, 1, 0) <= 0) {
-            closeSession(session);
+        ssize_t res = recv(session.socketFd, &b, 1, 0);
+        if (res <= 0) {
+            closeSession(session, res == 0 ? "disconnected (closed by client)" : "disconnected (socket read error)");
             return;
         }
         rawType |= static_cast<uint64_t>(b & 0x7F) << shift;
         if (!(b & 0x80)) break;
         shift += 7;
         if (shift >= 64) {
-            closeSession(session);
+            closeSession(session, "disconnected (invalid type varint)");
             return;
         }
     }
@@ -859,7 +879,7 @@ void processClientSession(ClientSession &session) {
     if (length > 16384) {
         // Sanity limit to avoid memory exhaustion
         Serial.printf("ESPHome: Frame length %llu too large\n", length);
-        closeSession(session);
+        closeSession(session, "disconnected (frame length exceeds 16KB)");
         return;
     }
 
@@ -869,7 +889,7 @@ void processClientSession(ClientSession &session) {
     while (received < length) {
         ssize_t chunk = recv(session.socketFd, payload.data() + received, length - received, 0);
         if (chunk <= 0) {
-            closeSession(session);
+            closeSession(session, chunk == 0 ? "disconnected (closed by client)" : "disconnected (socket read error)");
             return;
         }
         received += chunk;
@@ -948,11 +968,14 @@ void esphomeServerTask(void *param) {
                         s_clients[i].authenticated = false;
                         s_clients[i].subscribedStates = false;
                         s_clients[i].lastActivityMs = millis();
-                        slotFound = true;
+                        s_clients[i].lastPingSentMs = millis();
                         char ipStr[INET_ADDRSTRLEN];
                         inet_ntop(AF_INET, &(clientAddr.sin_addr), ipStr, INET_ADDRSTRLEN);
-                        Serial.printf("ESPHome: Client connected from %s (slot %d)\n", ipStr, static_cast<int>(i));
-                        addLogMessage(String("ESPHome client connected: ") + ipStr);
+                        strncpy(s_clients[i].ip, ipStr, sizeof(s_clients[i].ip) - 1);
+                        s_clients[i].ip[sizeof(s_clients[i].ip) - 1] = '\0';
+                        slotFound = true;
+                        Serial.printf("ESPHome: Client connected from %s (slot %d)\n", s_clients[i].ip, static_cast<int>(i));
+                        addLogMessage(String("ESPHome client connected: ") + s_clients[i].ip);
                         break;
                     }
                 }
@@ -966,16 +989,32 @@ void esphomeServerTask(void *param) {
         // Process data from active clients
         {
             std::lock_guard<std::recursive_mutex> lock(s_clientsMutex);
+            uint32_t now = millis();
             for (size_t i = 0; i < MAX_CLIENTS; i++) {
                 if (s_clients[i].socketFd >= 0) {
                     if (FD_ISSET(s_clients[i].socketFd, &readFds)) {
                         processClientSession(s_clients[i]);
                     }
 
-                    // Keepalive check: if no activity for 60s, close
-                    if (s_clients[i].socketFd >= 0 && millis() - s_clients[i].lastActivityMs > 90000UL) {
-                        Serial.printf("ESPHome: Client %d silent timeout\n", static_cast<int>(i));
-                        closeSession(s_clients[i]);
+                    if (s_clients[i].socketFd < 0) continue;
+
+                    // Active keepalive heartbeat (ESPHome Native API protocol):
+                    // Periodically send PingRequest (type 7) to keep the connection alive.
+                    // The client (Home Assistant) responds with PingResponse (type 8),
+                    // which updates lastActivityMs and keeps the session active.
+                    if (s_clients[i].authenticated && (now - s_clients[i].lastPingSentMs >= 20000UL)) {
+                        s_clients[i].lastPingSentMs = now;
+                        ProtoWriter pingWriter;
+                        if (!sendFrame(s_clients[i].socketFd, EspHomeMsg::PING_REQUEST, pingWriter)) {
+                            closeSession(s_clients[i], "disconnected (ping send error)");
+                            continue;
+                        }
+                    }
+
+                    // Keepalive check: if no activity received for 90s, close unresponsive client
+                    if (now - s_clients[i].lastActivityMs > 90000UL) {
+                        Serial.printf("ESPHome: Client %s (slot %d) silent timeout\n", s_clients[i].ip, static_cast<int>(i));
+                        closeSession(s_clients[i], "disconnected (keepalive timeout)");
                     }
                 }
             }
@@ -1019,6 +1058,7 @@ void initEspHomeServer() {
     std::lock_guard<std::recursive_mutex> lock(s_clientsMutex);
     for (size_t i = 0; i < MAX_CLIENTS; i++) {
         s_clients[i].socketFd = -1;
+        s_clients[i].ip[0] = '\0';
     }
 }
 
@@ -1199,7 +1239,7 @@ void syncEspHomeDevices() {
 
     std::lock_guard<std::recursive_mutex> lock(s_clientsMutex);
     for (size_t i = 0; i < MAX_CLIENTS; i++) {
-        closeSession(s_clients[i]);
+        closeSession(s_clients[i], "disconnected (device list sync)");
     }
 }
 
