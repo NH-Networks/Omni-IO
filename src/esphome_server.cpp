@@ -29,7 +29,7 @@
 #ifdef FIRMWARE_VERSION
 #define ESPHOME_FIRMWARE_VERSION FIRMWARE_VERSION
 #else
-#define ESPHOME_FIRMWARE_VERSION "3.0.3"
+#define ESPHOME_FIRMWARE_VERSION "3.0.2"
 #endif
 
 // FNV-1a 32-bit hash for stable entity keys across reboots

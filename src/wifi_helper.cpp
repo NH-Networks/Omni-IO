@@ -159,7 +159,7 @@ static void handleWifiConnected() {
             MDNS.addServiceTxt("esphomelib", "tcp", "network", "wifi");
             MDNS.addServiceTxt("esphomelib", "tcp", "friendly_name", esphome_name.empty() ? "Omni-IO Gateway" : esphome_name.c_str());
             MDNS.addServiceTxt("esphomelib", "tcp", "project_name", "NH-Networks.Omni-IO");
-            MDNS.addServiceTxt("esphomelib", "tcp", "project_version", "3.0.3");
+            MDNS.addServiceTxt("esphomelib", "tcp", "project_version", "3.0.2");
         }
         startEspHomeServer();
 #endif
