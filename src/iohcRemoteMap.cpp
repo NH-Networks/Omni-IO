@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 #include <iohcRemoteMap.h>
 #include <ArduinoJson.h>
 #include <LittleFS.h>
@@ -46,13 +50,34 @@ namespace IOHC {
             return false;
         }
         for (JsonPair kv : doc.as<JsonObject>()) {
+            const std::string key = kv.key().c_str();
+            // Skip metadata or comment keys like _copyright
+            if (key.rfind("_", 0) == 0) {
+                continue;
+            }
+            if (!kv.value().is<JsonObject>()) {
+                continue;
+            }
+            if (key.length() != sizeof(address) * 2) {
+                Serial.printf("Skipping remote map entry '%s': invalid node length\n", key.c_str());
+                continue;
+            }
             entry e{};
-            hexStringToBytes(kv.key().c_str(), e.node);
+            if (hexStringToBytes(key, e.node) != sizeof(e.node)) {
+                Serial.printf("Skipping remote map entry '%s': invalid hex node id\n", key.c_str());
+                continue;
+            }
             JsonObject obj = kv.value().as<JsonObject>();
-            e.name = obj["name"].as<std::string>();
+            if (obj["name"].is<const char*>()) {
+                e.name = obj["name"].as<std::string>();
+            }
             JsonArray jarr = obj["devices"].as<JsonArray>();
-            for (auto v : jarr) {
-                e.devices.push_back(resolveDevice(v.as<std::string>()));
+            if (!jarr.isNull()) {
+                for (auto v : jarr) {
+                    if (v.is<const char*>()) {
+                        e.devices.push_back(resolveDevice(v.as<std::string>()));
+                    }
+                }
             }
             _entries.push_back(e);
         }

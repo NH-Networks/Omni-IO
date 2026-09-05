@@ -304,5 +304,10 @@
   "section.quick_help": "Aide rapide et appairage",
   "log.live_connected": "Connecté en direct",
   "log.disconnected": "Déconnecté",
-  "log.messages_count": "{count} messages"
+  "log.messages_count": "{count} messages",
+  "label.no_signal_yet": "Aucun signal reçu pour le moment",
+  "label.received_just_now": "Reçu: À l'instant",
+  "label.received_ago_sec": "Reçu: il y a {sec}s",
+  "label.received_ago_min": "Reçu: il y a {min}m",
+  "label.received_ago_hours": "Reçu: il y a plus d'une heure"
 }

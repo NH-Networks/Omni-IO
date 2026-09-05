@@ -86,7 +86,11 @@
             copyLogButton: document.getElementById("copy-log-button"),
             copyAddressButton: document.getElementById("copy-address-button"),
             useAddressRemoteButton: document.getElementById("use-address-remote-button"),
+            clearAddressButton: document.getElementById("clear-address-button"),
             lastAddressBadge: document.getElementById("last-address-badge"),
+            lastAddressProto: document.getElementById("last-address-proto"),
+            lastAddressAction: document.getElementById("last-address-action"),
+            lastAddressTime: document.getElementById("last-address-time"),
             logStatusDot: document.getElementById("log-status-dot"),
             logStatusText: document.getElementById("log-status-text"),
             logCount: document.getElementById("log-count")
@@ -130,13 +134,94 @@
         }
     }
 
-    function updateLastAddressBadge(app, address) {
-        var addr = (address || "").trim().toUpperCase();
-        if (app.elements.lastAddrInput) {
-            app.elements.lastAddrInput.value = addr;
+    function renderLastAddressTime(app) {
+        if (!app.elements.lastAddressTime) return;
+        var receivedAt = app.state.lastAddressReceivedAt;
+        if (!receivedAt) {
+            app.elements.lastAddressTime.textContent = i18nText("label.no_signal_yet", "No signal received yet");
+            app.elements.lastAddressTime.classList.remove("time-live");
+            return;
         }
+
+        var diffSec = Math.max(0, Math.floor((Date.now() - receivedAt) / 1000));
+        var date = new Date(receivedAt);
+        var timeStr = date.toTimeString().split(" ")[0];
+
+        var label = "";
+        if (diffSec < 5) {
+            label = i18nText("label.received_just_now", "Received: Just now") + " (" + timeStr + ")";
+            app.elements.lastAddressTime.classList.add("time-live");
+        } else if (diffSec < 60) {
+            label = i18nText("label.received_ago_sec", "Received: {sec}s ago").replace("{sec}", diffSec) + " (" + timeStr + ")";
+            app.elements.lastAddressTime.classList.add("time-live");
+        } else if (diffSec < 3600) {
+            var min = Math.floor(diffSec / 60);
+            label = i18nText("label.received_ago_min", "Received: {min}m ago").replace("{min}", min) + " (" + timeStr + ")";
+            app.elements.lastAddressTime.classList.remove("time-live");
+        } else {
+            var hours = Math.floor(diffSec / 3600);
+            label = i18nText("label.received_ago_hours", "Received: > 1 hour ago") + " (" + timeStr + ")";
+            app.elements.lastAddressTime.classList.remove("time-live");
+        }
+        app.elements.lastAddressTime.textContent = label;
+    }
+
+    function updateLastAddressBadge(app, address, action, protocol, secondsAgo, isLive) {
+        var addr = (address || "").trim().toUpperCase();
+        var isBlank = !addr || addr === "------" || addr === "000000";
+
+        if (app.elements.lastAddrInput) {
+            app.elements.lastAddrInput.value = isBlank ? "" : addr;
+        }
+
         if (app.elements.lastAddressBadge) {
-            app.elements.lastAddressBadge.textContent = addr || "------";
+            app.elements.lastAddressBadge.textContent = isBlank ? "------" : addr;
+            if (isLive && !isBlank) {
+                app.elements.lastAddressBadge.classList.remove("badge-pulse");
+                void app.elements.lastAddressBadge.offsetWidth;
+                app.elements.lastAddressBadge.classList.add("badge-pulse");
+            }
+        }
+
+        if (isBlank) {
+            app.state.lastAddressReceivedAt = null;
+            if (app.elements.lastAddressProto) app.elements.lastAddressProto.style.display = "none";
+            if (app.elements.lastAddressAction) app.elements.lastAddressAction.style.display = "none";
+            renderLastAddressTime(app);
+            return;
+        }
+
+        if (app.elements.lastAddressProto) {
+            if (protocol) {
+                app.elements.lastAddressProto.textContent = protocol;
+                app.elements.lastAddressProto.style.display = "";
+            } else if (!app.elements.lastAddressProto.textContent) {
+                app.elements.lastAddressProto.style.display = "none";
+            }
+        }
+
+        if (app.elements.lastAddressAction) {
+            if (action && action !== "-" && action !== "unknown") {
+                app.elements.lastAddressAction.textContent = action;
+                app.elements.lastAddressAction.className = "rf-action-badge action-" + action.toLowerCase();
+                app.elements.lastAddressAction.style.display = "";
+            } else if (!isLive && !action) {
+                app.elements.lastAddressAction.style.display = "none";
+            }
+        }
+
+        if (isLive) {
+            app.state.lastAddressReceivedAt = Date.now();
+        } else if (typeof secondsAgo !== "undefined" && secondsAgo !== null && secondsAgo >= 0) {
+            app.state.lastAddressReceivedAt = Date.now() - (secondsAgo * 1000);
+        }
+
+        renderLastAddressTime(app);
+
+        if (!app.state.lastAddressTimer) {
+            app.state.lastAddressTimer = setInterval(function () {
+                renderLastAddressTime(app);
+            }, 5000);
         }
     }
 
@@ -354,7 +439,7 @@
                 } else if (data.type === "esphome_status") {
                     updateEspHomeStatus(app, data);
                 } else if (data.type === "lastaddr") {
-                    updateLastAddressBadge(app, data.address);
+                    updateLastAddressBadge(app, data.address, data.action, data.protocol, 0, true);
                 } else if (data.type === "twowstatus") {
                     // twowstatus has no UI in this branch — silently ignored
                 }
@@ -430,6 +515,14 @@
                 if (app.elements.remotePopupButton) {
                     app.elements.remotePopupButton.click();
                 }
+            });
+        }
+        if (app.elements.clearAddressButton) {
+            app.elements.clearAddressButton.addEventListener("click", async function () {
+                try {
+                    await window.OmniIoApi.postJson("/api/lastaddr/clear", {});
+                } catch (e) {}
+                updateLastAddressBadge(app, "------");
             });
         }
         if (app.elements.sendCommandButton) {
@@ -595,8 +688,8 @@
         app.updateEspHomeStatus = function (data) {
             updateEspHomeStatus(app, data);
         };
-        app.updateLastAddressBadge = function (addr) {
-            updateLastAddressBadge(app, addr);
+        app.updateLastAddressBadge = function (addr, action, protocol, secondsAgo, isLive) {
+            updateLastAddressBadge(app, addr, action, protocol, secondsAgo, isLive);
         };
 
         window.OmniIoApi.requestJson("/api/info").then(function (info) {

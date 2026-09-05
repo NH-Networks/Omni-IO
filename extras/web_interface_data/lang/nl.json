@@ -304,5 +304,10 @@
   "section.quick_help": "Snelle Handleiding & Koppelen",
   "log.live_connected": "Live verbonden",
   "log.disconnected": "Niet verbonden",
-  "log.messages_count": "{count} berichten"
+  "log.messages_count": "{count} berichten",
+  "label.no_signal_yet": "Nog geen signaal ontvangen",
+  "label.received_just_now": "Ontvangen: Zojuist",
+  "label.received_ago_sec": "Ontvangen: {sec}s geleden",
+  "label.received_ago_min": "Ontvangen: {min}m geleden",
+  "label.received_ago_hours": "Ontvangen: > 1 uur geleden"
 }

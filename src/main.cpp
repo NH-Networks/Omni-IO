@@ -271,7 +271,7 @@ void setup() {
     // Mount LittleFS filesystem
 #if defined(ESP32)
     // LittleFS.begin(); // Original call, replaced by new init below
-    if(!LittleFS.begin()){
+    if(!LittleFS.begin(true)){
         Serial.println("An Error has occurred while mounting LittleFS");
         // Handle error appropriately, maybe by halting or indicating failure
         return;
@@ -380,7 +380,8 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
     memcpy(lastFrom.b, iohc->payload.packet.header.source, sizeof(lastFrom.b));
     IOHC::lastFromAddress.store(lastFrom);
 #if defined(WEBSERVER)
-    broadcastLastAddress(bytesToHexString(lastFrom.b, sizeof(lastFrom.b)).c_str());
+    const char *protoStr = (iohc->payload.packet.header.CtrlByte1.asStruct.Protocol == 1) ? "1W" : "2W";
+    broadcastLastAddress(bytesToHexString(lastFrom.b, sizeof(lastFrom.b)).c_str(), "", protoStr);
     if (iohc->payload.packet.header.CtrlByte1.asStruct.Protocol == 0) {
         const uint8_t twoWExpectedLength = iohc->payload.packet.header.CtrlByte1.asStruct.MsgLen + 1;
         if (iohc->buffer_length < sizeof(_header) ||
@@ -848,6 +849,9 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
                 }
                 doc["action"] = action;
                 display1WAction(iohc->payload.packet.header.source, action, "RX");
+#if defined(WEBSERVER)
+                broadcastLastAddress(bytesToHexString(iohc->payload.packet.header.source, 3).c_str(), action, "1W");
+#endif
                 if (const auto *map = remoteMap->find(iohc->payload.packet.header.source)) {
                     IOHC::RemoteButton btn;
                     bool recognized = true;

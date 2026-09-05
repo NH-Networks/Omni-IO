@@ -32,7 +32,7 @@
         try {
             const data = await window.OmniIoApi.requestJson("/api/lastaddr");
             if (typeof app.updateLastAddressBadge === "function") {
-                app.updateLastAddressBadge(data.address);
+                app.updateLastAddressBadge(data.address, data.action, data.protocol, data.seconds_ago, false);
             } else if (app.elements.lastAddrInput) {
                 app.elements.lastAddrInput.value = data.address || "";
             }

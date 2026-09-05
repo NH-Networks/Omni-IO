@@ -134,12 +134,19 @@ Original upstream portions remain licensed under Apache-2.0.
                   <span class="rf-badge-label" data-i18n="label.last_address">Last Address:</span>
                   <div class="rf-badge-box">
                     <span id="last-address-badge" class="rf-hex-badge">------</span>
+                    <span id="last-address-proto" class="rf-proto-badge" style="display: none;">1W</span>
+                    <span id="last-address-action" class="rf-action-badge" style="display: none;"></span>
                     <input id="last-address" readonly="readonly" style="display: none;" />
                   </div>
+                </div>
+                <div class="rf-time-row">
+                  <span class="rf-time-icon">⏱</span>
+                  <span id="last-address-time" class="rf-time-text" data-i18n="label.no_signal_yet">No signal received yet</span>
                 </div>
                 <div class="rf-actions">
                   <button id="copy-address-button" type="button" data-i18n="button.copy" title="Copy Address">Copy</button>
                   <button id="use-address-remote-button" type="button" data-i18n="button.create_remote" title="Create Remote with this ID">Use as Remote</button>
+                  <button id="clear-address-button" type="button" class="btn-clear-address" data-i18n="button.clear" title="Clear Address">Clear</button>
                 </div>
               </div>
             </div>

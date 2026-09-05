@@ -304,5 +304,10 @@
   "section.quick_help": "Kurzanleitung & Anlernen",
   "log.live_connected": "Live verbunden",
   "log.disconnected": "Getrennt",
-  "log.messages_count": "{count} Nachrichten"
+  "log.messages_count": "{count} Nachrichten",
+  "label.no_signal_yet": "Noch kein Signal empfangen",
+  "label.received_just_now": "Empfangen: Gerade eben",
+  "label.received_ago_sec": "Empfangen: vor {sec}s",
+  "label.received_ago_min": "Empfangen: vor {min}m",
+  "label.received_ago_hours": "Empfangen: vor > 1 Stunde"
 }

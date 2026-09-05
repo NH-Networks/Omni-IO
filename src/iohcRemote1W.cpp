@@ -727,9 +727,19 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
         bool updateFile = false;
         std::vector<remote> loadedRemotes;
         for (JsonPair kv: doc.as<JsonObject>()) {
+            const std::string entryId = kv.key().c_str();
+            if (entryId.rfind("_", 0) == 0) {
+                continue;
+            }
+            if (!kv.value().is<JsonObject>()) {
+                continue;
+            }
+            if (entryId.length() != sizeof(address) * 2) {
+                Serial.printf("Skipping 1W remote '%s': invalid id length\n", entryId.c_str());
+                continue;
+            }
             remote r;
             auto jobj = kv.value().as<JsonObject>();
-            const std::string entryId = kv.key().c_str();
 
             if (hexStringToBytes(entryId, r.node) != sizeof(r.node)) {
                 Serial.printf("Skipping 1W remote '%s': invalid id\n", entryId.c_str());

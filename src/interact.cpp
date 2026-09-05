@@ -475,6 +475,12 @@ void createCommands() {
         const auto _a = IOHC::lastFromAddress.load();
         Serial.println(bytesToHexString(_a.b, sizeof(_a.b)).c_str());
     });
+    Cmd::addHandler((char *) "clearLastAddr", (char *) "Clear last received address", [](Tokens *cmd)-> void {
+        IOHC::Address3 zero{};
+        IOHC::lastFromAddress.store(zero);
+        broadcastLastAddress("------", "", "");
+        Serial.println("Last address cleared");
+    });
 #if defined(MQTT)
     Cmd::addHandler((char *) "mqttIp", (char *) "Set MQTT server IP", [](Tokens *cmd)-> void {
         if (cmd->size() < 2) {
