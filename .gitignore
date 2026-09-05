@@ -19,8 +19,7 @@ CMakeLists.txt
 src/CMakeLists.txt
 
 # Scratch & Local OTA Binaries
-scratch/ota_binaries/
-scratch/*.bin
+scratch/
 *.bin
 
 # Agent instructions & internal knowledge base (local only)

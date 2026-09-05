@@ -1,4 +1,8 @@
 /*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
+/*
    Copyright (c) 2024. CRIDP https://github.com/cridp
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,16 +23,25 @@
 /*
     Helper function to convert a string containing hex numbers to a bytes sequence; one byte every two characters
 */
-uint8_t hexStringToBytes(const std::string hexString, uint8_t *byteString) {
-size_t i;
-
-    if (hexString.length() % 2 != 0)
+uint8_t hexStringToBytes(const std::string &hexString, uint8_t *byteString, size_t maxLen) {
+    if (hexString.empty() || hexString.length() % 2 != 0 || !byteString)
         return 0;
 
-    for (i = 0; i < hexString.length(); i += 2)
-        byteString[i/2] = (char) strtol(hexString.substr(i, 2).c_str(), nullptr, 16);
+    for (char c : hexString) {
+        if (!isxdigit(static_cast<unsigned char>(c))) {
+            return 0;
+        }
+    }
 
-    return i/2;
+    size_t targetLen = hexString.length() / 2;
+    if (maxLen > 0 && targetLen > maxLen) {
+        return 0;
+    }
+
+    for (size_t i = 0; i < hexString.length(); i += 2)
+        byteString[i/2] = static_cast<uint8_t>(strtol(hexString.substr(i, 2).c_str(), nullptr, 16));
+
+    return static_cast<uint8_t>(targetLen);
 }
 
 /**

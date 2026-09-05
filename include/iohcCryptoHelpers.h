@@ -1,4 +1,8 @@
 /*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
+/*
    Copyright (c) 2024. CRIDP https://github.com/cridp
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,7 +36,7 @@
 
 #define CRC_POLYNOMIAL_CCITT    0x8408
 
-uint8_t hexStringToBytes(std::string hexString, uint8_t *byteString);
+uint8_t hexStringToBytes(const std::string &hexString, uint8_t *byteString, size_t maxLen = 0);
 std::string bytesToHexString(const uint8_t *byteString, uint8_t len);
 
 namespace iohcCrypto {

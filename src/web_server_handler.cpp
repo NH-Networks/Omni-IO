@@ -202,10 +202,27 @@ void broadcastDeviceAction(const String &id, const String &action, int position,
   ws.textAll(payload);
 }
 
-void broadcastLastAddress(const String &addr) {
+static uint32_t s_lastFromTimestamp = 0;
+static String s_lastFromAction = "";
+static String s_lastFromProtocol = "";
+
+void broadcastLastAddress(const String &addr, const String &action, const String &protocol) {
+  if (addr != "------" && addr != "000000" && !addr.isEmpty()) {
+    s_lastFromTimestamp = millis();
+    if (!action.isEmpty()) {
+      s_lastFromAction = action;
+    }
+    if (!protocol.isEmpty()) {
+      s_lastFromProtocol = protocol;
+    }
+  }
+
   JsonDocument doc;
   doc["type"] = "lastaddr";
   doc["address"] = addr;
+  doc["action"] = s_lastFromAction;
+  doc["protocol"] = s_lastFromProtocol;
+  doc["timestamp"] = s_lastFromTimestamp;
   String payload;
   serializeJson(doc, payload);
   ws.textAll(payload);
@@ -960,7 +977,7 @@ void handleApiInfo(AsyncWebServerRequest *request, JsonObject &root) {
   root["environment"] = "unknown";
 #endif
 #else
-  root["version"] = "3.3.0";
+  root["version"] = "3.1.0";
 #endif
   root["uptimeMs"] = millis();
   root["freeHeap"] = ESP.getFreeHeap();
@@ -1003,7 +1020,27 @@ void handleApiLogs(AsyncWebServerRequest *request, JsonArray &root) {
 
 void handleApiLastAddr(AsyncWebServerRequest *request, JsonObject &root) {
   const auto _a = IOHC::lastFromAddress.load();
-  root["address"] = bytesToHexString(_a.b, sizeof(_a.b)).c_str();
+  String addr = bytesToHexString(_a.b, sizeof(_a.b)).c_str();
+  root["address"] = addr;
+  root["action"] = s_lastFromAction;
+  root["protocol"] = s_lastFromProtocol;
+  if (s_lastFromTimestamp > 0 && addr != "000000" && !addr.isEmpty()) {
+    uint32_t now = millis();
+    root["seconds_ago"] = (now >= s_lastFromTimestamp) ? (now - s_lastFromTimestamp) / 1000 : 0;
+  } else {
+    root["seconds_ago"] = -1;
+  }
+}
+
+void handleApiClearLastAddr(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
+  IOHC::Address3 zero{};
+  IOHC::lastFromAddress.store(zero);
+  s_lastFromTimestamp = 0;
+  s_lastFromAction = "";
+  s_lastFromProtocol = "";
+  broadcastLastAddress("------", "", "");
+  root["success"] = true;
+  root["message"] = "Last address cleared";
 }
 
 static bool jsonToBool(JsonVariant variant, bool &value) {
@@ -1484,6 +1521,7 @@ void setupWebServer() {
   server.on("/api/remotes", HTTP_GET, jsonGet(handleApiRemotes));
   server.on("/api/logs", HTTP_GET, jsonGet(handleApiLogs));
   server.on("/api/lastaddr", HTTP_GET, jsonGet(handleApiLastAddr));
+  server.on("/api/lastaddr/clear", HTTP_POST, jsonPost(handleApiClearLastAddr));
   server.on("/api/wifi-scan", HTTP_GET, jsonGet(handleApiWifiScan));
   server.on("/api/wifi/scan", HTTP_GET, jsonGet(handleApiWifiScan));
   server.on("/api/wifi", HTTP_GET, jsonGet(handleApiWifiGet));

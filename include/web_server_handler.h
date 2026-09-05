@@ -17,7 +17,7 @@ void loopWebServer();
 void broadcastLog(const String &msg);
 void broadcastDevicePosition(const String &id, int position);
 void broadcastDeviceAction(const String &id, const String &action, int position, int target, const String &source = "gateway");
-void broadcastLastAddress(const String &addr);
+void broadcastLastAddress(const String &addr, const String &action = "", const String &protocol = "");
 void broadcastMqttStatus(bool connected, bool enabled, const char *state = nullptr);
 void broadcastEspHomeStatus();
 void updateTwoWTxStatus(const String &command, const String &result, bool isError = false);
@@ -30,7 +30,7 @@ inline void loopWebServer() {}
 inline void broadcastLog(const String &) {}
 inline void broadcastDevicePosition(const String &, int) {}
 inline void broadcastDeviceAction(const String &, const String &, int, int, const String & = "gateway") {}
-inline void broadcastLastAddress(const String &) {}
+inline void broadcastLastAddress(const String &, const String & = "", const String & = "") {}
 inline void broadcastMqttStatus(bool, bool, const char * = nullptr) {}
 inline void broadcastEspHomeStatus() {}
 inline void updateTwoWTxStatus(const String &, const String &, bool = false) {}

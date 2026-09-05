@@ -80,7 +80,20 @@
             sendCommandButton: document.getElementById("send-command-button"),
             statusMessages: document.getElementById("status-messages"),
             suggestions: document.getElementById("suggestions"),
-            themeToggle: document.getElementById("toggle-theme")
+            themeToggle: document.getElementById("toggle-theme"),
+            selectLog: document.getElementById("select-log"),
+            clearLogButton: document.getElementById("clear-log-button"),
+            copyLogButton: document.getElementById("copy-log-button"),
+            copyAddressButton: document.getElementById("copy-address-button"),
+            useAddressRemoteButton: document.getElementById("use-address-remote-button"),
+            clearAddressButton: document.getElementById("clear-address-button"),
+            lastAddressBadge: document.getElementById("last-address-badge"),
+            lastAddressProto: document.getElementById("last-address-proto"),
+            lastAddressAction: document.getElementById("last-address-action"),
+            lastAddressTime: document.getElementById("last-address-time"),
+            logStatusDot: document.getElementById("log-status-dot"),
+            logStatusText: document.getElementById("log-status-text"),
+            logCount: document.getElementById("log-count")
         };
     }
 
@@ -94,6 +107,124 @@
         return fallback || key;
     }
 
+    function updateLogCount(app) {
+        if (app.elements.logCount && app.elements.statusMessages) {
+            var count = app.elements.statusMessages.children.length;
+            var tmpl = i18nText("log.messages_count", "{count} messages");
+            app.elements.logCount.textContent = tmpl.replace("{count}", count);
+        }
+    }
+
+    function applyLogFilter(app) {
+        if (!app.elements.statusMessages || !app.elements.selectLog) return;
+        var filter = app.elements.selectLog.value;
+        var children = app.elements.statusMessages.children;
+        for (var i = 0; i < children.length; i++) {
+            var p = children[i];
+            var lvl = p.dataset.level || "info";
+            if (filter === "all") {
+                p.style.display = "";
+            } else if (filter === "error") {
+                p.style.display = lvl === "error" ? "" : "none";
+            } else if (filter === "warning") {
+                p.style.display = (lvl === "error" || lvl === "warning") ? "" : "none";
+            } else if (filter === "info") {
+                p.style.display = "";
+            }
+        }
+    }
+
+    function renderLastAddressTime(app) {
+        if (!app.elements.lastAddressTime) return;
+        var receivedAt = app.state.lastAddressReceivedAt;
+        if (!receivedAt) {
+            app.elements.lastAddressTime.textContent = i18nText("label.no_signal_yet", "No signal received yet");
+            app.elements.lastAddressTime.classList.remove("time-live");
+            return;
+        }
+
+        var diffSec = Math.max(0, Math.floor((Date.now() - receivedAt) / 1000));
+        var date = new Date(receivedAt);
+        var timeStr = date.toTimeString().split(" ")[0];
+
+        var label = "";
+        if (diffSec < 5) {
+            label = i18nText("label.received_just_now", "Received: Just now") + " (" + timeStr + ")";
+            app.elements.lastAddressTime.classList.add("time-live");
+        } else if (diffSec < 60) {
+            label = i18nText("label.received_ago_sec", "Received: {sec}s ago").replace("{sec}", diffSec) + " (" + timeStr + ")";
+            app.elements.lastAddressTime.classList.add("time-live");
+        } else if (diffSec < 3600) {
+            var min = Math.floor(diffSec / 60);
+            label = i18nText("label.received_ago_min", "Received: {min}m ago").replace("{min}", min) + " (" + timeStr + ")";
+            app.elements.lastAddressTime.classList.remove("time-live");
+        } else {
+            var hours = Math.floor(diffSec / 3600);
+            label = i18nText("label.received_ago_hours", "Received: > 1 hour ago") + " (" + timeStr + ")";
+            app.elements.lastAddressTime.classList.remove("time-live");
+        }
+        app.elements.lastAddressTime.textContent = label;
+    }
+
+    function updateLastAddressBadge(app, address, action, protocol, secondsAgo, isLive) {
+        var addr = (address || "").trim().toUpperCase();
+        var isBlank = !addr || addr === "------" || addr === "000000";
+
+        if (app.elements.lastAddrInput) {
+            app.elements.lastAddrInput.value = isBlank ? "" : addr;
+        }
+
+        if (app.elements.lastAddressBadge) {
+            app.elements.lastAddressBadge.textContent = isBlank ? "------" : addr;
+            if (isLive && !isBlank) {
+                app.elements.lastAddressBadge.classList.remove("badge-pulse");
+                void app.elements.lastAddressBadge.offsetWidth;
+                app.elements.lastAddressBadge.classList.add("badge-pulse");
+            }
+        }
+
+        if (isBlank) {
+            app.state.lastAddressReceivedAt = null;
+            if (app.elements.lastAddressProto) app.elements.lastAddressProto.style.display = "none";
+            if (app.elements.lastAddressAction) app.elements.lastAddressAction.style.display = "none";
+            renderLastAddressTime(app);
+            return;
+        }
+
+        if (app.elements.lastAddressProto) {
+            if (protocol) {
+                app.elements.lastAddressProto.textContent = protocol;
+                app.elements.lastAddressProto.style.display = "";
+            } else if (!app.elements.lastAddressProto.textContent) {
+                app.elements.lastAddressProto.style.display = "none";
+            }
+        }
+
+        if (app.elements.lastAddressAction) {
+            if (action && action !== "-" && action !== "unknown") {
+                app.elements.lastAddressAction.textContent = action;
+                app.elements.lastAddressAction.className = "rf-action-badge action-" + action.toLowerCase();
+                app.elements.lastAddressAction.style.display = "";
+            } else if (!isLive && !action) {
+                app.elements.lastAddressAction.style.display = "none";
+            }
+        }
+
+        if (isLive) {
+            app.state.lastAddressReceivedAt = Date.now();
+        } else if (typeof secondsAgo !== "undefined" && secondsAgo !== null && secondsAgo >= 0) {
+            app.state.lastAddressReceivedAt = Date.now() - (secondsAgo * 1000);
+        }
+
+        renderLastAddressTime(app);
+
+        if (!app.state.lastAddressTimer) {
+            app.state.lastAddressTimer = setInterval(function () {
+                renderLastAddressTime(app);
+            }, 5000);
+        }
+    }
+
     function logStatus(app, message, isError) {
         if (!app.elements.statusMessages || !message) {
             return;
@@ -101,8 +232,26 @@
 
         var logEntry = document.createElement("p");
         logEntry.textContent = message;
-        if (isError) {
-            logEntry.style.color = "red";
+
+        var lowerMsg = message.toLowerCase();
+        var level = "info";
+        if (isError || lowerMsg.indexOf("[e]") !== -1 || lowerMsg.indexOf("error") !== -1 || lowerMsg.indexOf("failed") !== -1) {
+            level = "error";
+            logEntry.classList.add("log-error");
+        } else if (lowerMsg.indexOf("[w]") !== -1 || lowerMsg.indexOf("warning") !== -1 || lowerMsg.indexOf("rejected") !== -1) {
+            level = "warning";
+            logEntry.classList.add("log-warning");
+        } else if (lowerMsg.indexOf("[i]") !== -1 || lowerMsg.indexOf("info") !== -1) {
+            level = "info";
+            logEntry.classList.add("log-info");
+        }
+        logEntry.dataset.level = level;
+
+        var currentFilter = app.elements.selectLog ? app.elements.selectLog.value : "all";
+        if (currentFilter === "error" && level !== "error") {
+            logEntry.style.display = "none";
+        } else if (currentFilter === "warning" && level !== "error" && level !== "warning") {
+            logEntry.style.display = "none";
         }
 
         app.elements.statusMessages.appendChild(logEntry);
@@ -110,6 +259,7 @@
         while (app.elements.statusMessages.children.length > 300) {
             app.elements.statusMessages.removeChild(app.elements.statusMessages.firstChild);
         }
+        updateLogCount(app);
 
         if (typeof app.onLogMessage === "function") {
             try {
@@ -130,6 +280,7 @@
                     logStatus(app, message);
                 });
             }
+            updateLogCount(app);
         } catch (error) {
             logStatus(app, "Could not load log buffer", true);
         }
@@ -288,9 +439,7 @@
                 } else if (data.type === "esphome_status") {
                     updateEspHomeStatus(app, data);
                 } else if (data.type === "lastaddr") {
-                    if (app.elements.lastAddrInput) {
-                        app.elements.lastAddrInput.value = data.address || "";
-                    }
+                    updateLastAddressBadge(app, data.address, data.action, data.protocol, 0, true);
                 } else if (data.type === "twowstatus") {
                     // twowstatus has no UI in this branch — silently ignored
                 }
@@ -301,10 +450,14 @@
 
         ws.onopen = function () {
             app.state.wsConnected = true;
+            if (app.elements.logStatusDot) app.elements.logStatusDot.className = "log-dot live";
+            if (app.elements.logStatusText) app.elements.logStatusText.textContent = i18nText("log.live_connected", "Live");
         };
 
         ws.onclose = function () {
             app.state.wsConnected = false;
+            if (app.elements.logStatusDot) app.elements.logStatusDot.className = "log-dot offline";
+            if (app.elements.logStatusText) app.elements.logStatusText.textContent = i18nText("log.disconnected", "Disconnected");
             if (!app.state.wsReconnectTimer) {
                 app.state.wsReconnectTimer = setTimeout(function () {
                     app.state.wsReconnectTimer = null;
@@ -315,6 +468,63 @@
     }
 
     function bindEvents(app) {
+        if (app.elements.selectLog) {
+            app.elements.selectLog.addEventListener("change", function () {
+                applyLogFilter(app);
+            });
+        }
+        if (app.elements.clearLogButton) {
+            app.elements.clearLogButton.addEventListener("click", function () {
+                if (app.elements.statusMessages) {
+                    app.elements.statusMessages.textContent = "";
+                    updateLogCount(app);
+                }
+            });
+        }
+        if (app.elements.copyLogButton) {
+            app.elements.copyLogButton.addEventListener("click", function () {
+                if (!app.elements.statusMessages) return;
+                var text = app.elements.statusMessages.innerText || "";
+                if (!text) return;
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(function () {
+                        var orig = app.elements.copyLogButton.textContent;
+                        app.elements.copyLogButton.textContent = i18nText("log.copied", "Copied!");
+                        setTimeout(function () { app.elements.copyLogButton.textContent = orig; }, 2000);
+                    });
+                }
+            });
+        }
+        if (app.elements.copyAddressButton) {
+            app.elements.copyAddressButton.addEventListener("click", function () {
+                var addr = (app.elements.lastAddrInput && app.elements.lastAddrInput.value) || "";
+                if (addr && addr !== "------" && navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(addr).then(function () {
+                        var orig = app.elements.copyAddressButton.textContent;
+                        app.elements.copyAddressButton.textContent = i18nText("log.copied", "Copied!");
+                        setTimeout(function () { app.elements.copyAddressButton.textContent = orig; }, 2000);
+                    });
+                }
+            });
+        }
+        if (app.elements.useAddressRemoteButton) {
+            app.elements.useAddressRemoteButton.addEventListener("click", function () {
+                if (typeof window.showPage === "function") {
+                    window.showPage("devices");
+                }
+                if (app.elements.remotePopupButton) {
+                    app.elements.remotePopupButton.click();
+                }
+            });
+        }
+        if (app.elements.clearAddressButton) {
+            app.elements.clearAddressButton.addEventListener("click", async function () {
+                try {
+                    await window.OmniIoApi.postJson("/api/lastaddr/clear", {});
+                } catch (e) {}
+                updateLastAddressBadge(app, "------");
+            });
+        }
         if (app.elements.sendCommandButton) {
             app.elements.sendCommandButton.addEventListener("click", function () {
                 if (typeof app.sendCommand === "function") app.sendCommand();
@@ -477,6 +687,9 @@
         }
         app.updateEspHomeStatus = function (data) {
             updateEspHomeStatus(app, data);
+        };
+        app.updateLastAddressBadge = function (addr, action, protocol, secondsAgo, isLive) {
+            updateLastAddressBadge(app, addr, action, protocol, secondsAgo, isLive);
         };
 
         window.OmniIoApi.requestJson("/api/info").then(function (info) {

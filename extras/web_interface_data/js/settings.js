@@ -31,7 +31,11 @@
     async function loadLastAddress(app) {
         try {
             const data = await window.OmniIoApi.requestJson("/api/lastaddr");
-            app.elements.lastAddrInput.value = data.address || "";
+            if (typeof app.updateLastAddressBadge === "function") {
+                app.updateLastAddressBadge(data.address, data.action, data.protocol, data.seconds_ago, false);
+            } else if (app.elements.lastAddrInput) {
+                app.elements.lastAddrInput.value = data.address || "";
+            }
         } catch (error) {
             console.error("Error fetching last address", error);
         }
@@ -41,7 +45,7 @@
         try {
             const config = await window.OmniIoApi.requestJson("/api/mqtt");
             if (app.elements.mqttEnabledInput) {
-                app.elements.mqttEnabledInput.checked = config.enabled !== false;
+                app.elements.mqttEnabledInput.checked = Boolean(config.enabled);
             }
             app.elements.mqttUserInput.value = config.user || "";
             app.elements.mqttServerInput.value = config.server || "";

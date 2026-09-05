@@ -88,11 +88,43 @@ jobs:
           cat > changelog.md <<EOF
           # 🎉 Omni-IO Release ${{ github.ref_name }}
 
-          Welcome to the **${{ github.ref_name }}** release of **Omni-IO**, the next-generation open-source ESP32 gateway and controller for **io-homecontrol®** (868.95 MHz) devices (Somfy, Velux, and compatible HVAC/blinds systems).
+          Welcome to the **${{ github.ref_name }}** maintenance release of **Omni-IO**, the open-source ESP32 gateway and controller for **io-homecontrol®** (868.95 MHz) devices (Somfy, Velux, and compatible HVAC/blinds systems).
 
           ---
 
-          ## ✨ What's New in ${{ github.ref_name }}
+          ## 🚀 What's New in v3.1.0 (Production Ready Release)
+
+          * ⚡ **MQTT Disabled by Default on Clean Devices**:
+            * Out of the box, Omni-IO now defaults to the Native ESPHome API (Zero-Broker) for seamless, instant Home Assistant auto-discovery.
+            * Eliminates unnecessary background connection attempts to unconfigured MQTT brokers on fresh devices.
+            * MQTT remains fully supported and can be enabled with a single click in **Settings → Integrations**; existing device configurations in NVS are preserved.
+          * 🛠️ **Clean Flash Bootloop & Heap Corruption Fix**:
+            * Resolved hardware abort / heap panic on clean devices caused by buffer overflow when loading dictionary data files (\`RemoteMap.json\`, \`1W.json\`).
+            * Hardened hex string parsers with explicit bounds-checking, non-hex validation (\`isxdigit\`), and metadata key filtering (\`_\`).
+            * Added \`LittleFS.begin(true)\` auto-format fallback so devices with empty/unformatted partitions initialize safely without halting.
+          * 📡 **Interactive Live RF Sniffer**:
+            * Added real-time "Last Address" live sniffer with color-coded flash/glow feedback (green for 1W, cyan for 2W).
+            * Live timestamp and action decoding (Open, Close, Stop, etc.) with dedicated protocol badges.
+            * Interactive Web UI controls to pause/resume the feed and clear history, fully localized in NL, EN, DE, and FR.
+          * 📦 **M5Stack C6L Unit Support (ESP32-C6 + SX1262)**:
+            * Complete board support for M5Stack Unit C6L (ESP32-C6 single-core RISC-V + SX1262 transceiver).
+            * Hardware SPI routing with shared OLED and PI4IOE5V6408 I2C expander management for antenna switching and resets.
+
+          ---
+
+          ## 💓 v3.0.1 & v3.0.2 Highlights (ESPHome Keepalive & Connection Stability)
+
+          * 💓 **ESPHome Native API Keepalive Heartbeat**:
+            * Implemented active server-side keepalive pinging (\`EspHomeMsg::PING_REQUEST = 7\`) every 20 seconds, fully compliant with the official ESPHome Native API standard (\`api_connection.cpp\`).
+            * Added native handling for client \`PING_RESPONSE = 8\`, refreshing session activity timestamps and keeping Home Assistant connections alive indefinitely.
+            * Permanently resolved the 90-second silent timeout disconnect/reconnect cycle (~40 reconnects per hour) that flooded device logs.
+            * Added proactive socket write error handling during ping transmission to clean up stalled or severed TCP sockets immediately.
+            * Enhanced session disconnect diagnostics in serial and web logs (\`keepalive timeout\`, \`socket write error\`, \`ping send error\`, \`requested by client\`).
+            * Removed log rate-limiting filters in favor of clean, transparent logging without suppressing legitimate connection events.
+
+          ---
+
+          ## ✨ Previous v3.0.0 Highlights
 
           * 🚀 **Native ESPHome API Integration (Zero-Broker)**:
             * Direct, ultra-low-latency Home Assistant integration via embedded ESPHome Native API server (TCP port \`6053\`).

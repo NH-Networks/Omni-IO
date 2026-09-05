@@ -1,4 +1,8 @@
 /*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
+/*
    Copyright (c) 2024. CRIDP https://github.com/cridp
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -301,13 +305,19 @@ namespace IOHC {
 
         // Iterate through the JSON object
         for (JsonPair kv: doc.as<JsonObject>()) {
+            const std::string key = kv.key().c_str();
+            if (key.rfind("_", 0) == 0 || !kv.value().is<JsonObject>() || key.length() != sizeof(address) * 2) {
+                continue;
+            }
             device d;
-            hexStringToBytes(kv.key().c_str(), d._node);
+            if (hexStringToBytes(key, d._node) != sizeof(d._node)) {
+                continue;
+            }
             auto jobj = kv.value().as<JsonObject>();
-            d._type = jobj["type"].as<std::string>();
-            d._description = jobj["description"].as<std::string>();
+            if (jobj["type"].is<const char*>()) d._type = jobj["type"].as<std::string>();
+            if (jobj["description"].is<const char*>()) d._description = jobj["description"].as<std::string>();
             //     hexStringToBytes(jobj["key"].as<const char*>(), _key);
-            hexStringToBytes(jobj["dst"].as<const char *>(), d._dst);
+            if (jobj["dst"].is<const char*>()) hexStringToBytes(jobj["dst"].as<const char *>(), d._dst);
             //     uint8_t btmp[2];
             //     hexStringToBytes(jobj["sequence"].as<const char*>(), btmp);
             //            /*hexStringToBytes*/(jobj["type"].as<const char*>(), _type);

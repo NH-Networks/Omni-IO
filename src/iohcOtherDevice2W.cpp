@@ -545,10 +545,16 @@ namespace IOHC {
 
         // Iterate through the JSON object
         for (JsonPair kv: doc.as<JsonObject>()) {
-            hexStringToBytes(kv.key().c_str(), _node);
+            const std::string key = kv.key().c_str();
+            if (key.rfind("_", 0) == 0 || !kv.value().is<JsonObject>() || key.length() != sizeof(address) * 2) {
+                continue;
+            }
+            if (hexStringToBytes(key, _node) != sizeof(_node)) {
+                continue;
+            }
             auto jobj = kv.value().as<JsonObject>();
             //     hexStringToBytes(jobj["key"].as<const char*>(), _key);
-            hexStringToBytes(jobj["dst"].as<const char *>(), _dst);
+            if (jobj["dst"].is<const char*>()) hexStringToBytes(jobj["dst"].as<const char *>(), _dst);
             //     uint8_t btmp[2];
             //     hexStringToBytes(jobj["sequence"].as<const char*>(), btmp);
 

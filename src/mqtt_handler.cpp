@@ -60,7 +60,7 @@ static void handleMqttConnectImpl();
 #ifdef FIRMWARE_VERSION
 #define IOHC_SW_VERSION FIRMWARE_VERSION
 #else
-#define IOHC_SW_VERSION "3.3.0"
+#define IOHC_SW_VERSION "3.1.0"
 #endif
 
 static void populateGatewayDevice(JsonVariant variant) {
@@ -101,10 +101,12 @@ static void stopHeartbeat() {
 }
 
 void initMqtt() {
-    // Load enabled flag from NVS (defaults to true for backwards compatibility)
-    bool en = true;
+    // Load enabled flag from NVS (defaults to false for new devices)
+    bool en = false;
     if (nvs_read_bool(NVS_KEY_MQTT_ENABLED, en)) {
         mqtt_enabled = en;
+    } else {
+        mqtt_enabled = false;
     }
 
     if (!nvs_read_string(NVS_KEY_MQTT_SERVER, mqtt_server)) {
