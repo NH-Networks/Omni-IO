@@ -23,7 +23,8 @@ Standard JSON does not support comments. When adding these notices to a `.json` 
 
 ## 4. Release & Deployment Rules
 - **Branch builds with GitHub Actions**: Pushing commits to active branches (`master`, `Beta`, `dev-main`, `feature/**`) to trigger automated CI/CD branch builds via `.github/workflows/branch_build.yml` is encouraged during development.
-- **NO version releases or release notes**: DO NOT create or push release tags (`v*`) or publish release notes unless the user explicitly gives permission.
+- **NO version releases without approval**: DO NOT create or push release tags (`v*`) or publish release notes unless the user explicitly gives permission.
+- **Proactively suggest releases**: When a build or milestone is mature, verified, and production-ready, proactively propose a version release to the user for consideration and approval.
 - **Mandatory Self-Testing on Target Gateway**:
   - Always upload and verify changes directly on the local test device at `10.10.33.15` before considering a task completed.
   - Use `scratch/upload_ota.py` (run via `uv run python scratch/upload_ota.py`) to flash firmware and filesystem over OTA and verify `/api/info`.

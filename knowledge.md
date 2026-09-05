@@ -307,7 +307,9 @@ Upload sequence:
 
 ### 8.1 Branch Builds vs. Version Releases
 * **Automated Branch Builds Permitted**: Commits and pushes to active branches (`master`, `Beta`, `dev-main`, `feature/**`) are encouraged to trigger automated branch builds via GitHub Actions (`.github/workflows/branch_build.yml`).
-* **NO Version Releases or Release Notes**: DO NOT create or push version release tags (`v*`) or generate release notes unless the user explicitly gives permission. Production release workflows (`.github/workflows/build_and_release.yml`) are strictly reserved for approved milestones.
+* **NO Version Releases Without User Approval**: DO NOT create or push version release tags (`v*`) or generate release notes unless the user explicitly gives permission. Production release workflows (`.github/workflows/build_and_release.yml`) are strictly reserved for approved milestones.
+* **Proactive Release Proposals**: The agent should proactively evaluate whether a set of tested and verified features or fixes is suitable for a formal release and suggest it to the user.
+
 
 
 ### 8.2 Hardware Verification on Test Gateway (10.10.33.15)
