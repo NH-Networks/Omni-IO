@@ -45,7 +45,7 @@
         try {
             const config = await window.OmniIoApi.requestJson("/api/mqtt");
             if (app.elements.mqttEnabledInput) {
-                app.elements.mqttEnabledInput.checked = config.enabled !== false;
+                app.elements.mqttEnabledInput.checked = Boolean(config.enabled);
             }
             app.elements.mqttUserInput.value = config.user || "";
             app.elements.mqttServerInput.value = config.server || "";
