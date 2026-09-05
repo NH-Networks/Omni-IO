@@ -87,15 +87,19 @@ jobs:
 
           ---
 
-          ## 🚀 What's New in v3.0.1
+          ## 🚀 What's New in v3.0.2
 
-          * 💓 **ESPHome Native API Keepalive Heartbeat & Stability Fix**:
-            * Implemented active server-side keepalive pinging (\`EspHomeMsg::PING_REQUEST = 7\`) every 20 seconds, fully compliant with the official ESPHome Native API standard (\`api_connection.cpp\`).
-            * Added native handling for client \`PING_RESPONSE = 8\`, refreshing session activity timestamps and keeping Home Assistant connections alive indefinitely.
-            * Permanently resolved the 90-second silent timeout disconnect/reconnect cycle (~40 reconnects per hour) that flooded device logs.
-            * Added proactive socket write error handling during ping transmission to clean up stalled or severed TCP sockets immediately.
-            * Enhanced session disconnect diagnostics in serial and web logs (\`keepalive timeout\`, \`socket write error\`, \`ping send error\`, \`requested by client\`).
-            * Removed log rate-limiting filters in favor of clean, transparent logging without suppressing legitimate connection events.
+          * 🛠️ **Clean Flash Bootloop & Heap Corruption Fix**:
+            * Resolved hardware abort / heap panic on clean devices caused by buffer overflow when loading dictionary data files (\`RemoteMap.json\`, \`1W.json\`).
+            * Hardened hex string parsers with explicit bounds-checking, non-hex validation (\`isxdigit\`), and metadata key filtering (\`_\`).
+            * Added \`LittleFS.begin(true)\` auto-format fallback so devices with empty/unformatted partitions initialize safely without halting.
+          * 📡 **Interactive Live RF Sniffer**:
+            * Added real-time "Last Address" live sniffer with color-coded flash/glow feedback (green for 1W, cyan for 2W).
+            * Live timestamp and action decoding (Open, Close, Stop, etc.) with dedicated protocol badges.
+            * Interactive Web UI controls to pause/resume the feed and clear history, fully localized in NL, EN, DE, and FR.
+          * 💓 **ESPHome Native API Keepalive Heartbeat & Stability**:
+            * Active server-side keepalive pinging (\`PING_REQUEST = 7\`) every 20 seconds, resolving connection drops and silent timeouts in Home Assistant.
+            * Proactive socket write error detection and clean socket disconnection handling.
 
           ---
 
