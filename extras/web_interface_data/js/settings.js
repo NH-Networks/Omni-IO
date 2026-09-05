@@ -31,7 +31,11 @@
     async function loadLastAddress(app) {
         try {
             const data = await window.OmniIoApi.requestJson("/api/lastaddr");
-            app.elements.lastAddrInput.value = data.address || "";
+            if (typeof app.updateLastAddressBadge === "function") {
+                app.updateLastAddressBadge(data.address);
+            } else if (app.elements.lastAddrInput) {
+                app.elements.lastAddrInput.value = data.address || "";
+            }
         } catch (error) {
             console.error("Error fetching last address", error);
         }

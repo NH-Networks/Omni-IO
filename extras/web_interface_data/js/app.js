@@ -80,7 +80,16 @@
             sendCommandButton: document.getElementById("send-command-button"),
             statusMessages: document.getElementById("status-messages"),
             suggestions: document.getElementById("suggestions"),
-            themeToggle: document.getElementById("toggle-theme")
+            themeToggle: document.getElementById("toggle-theme"),
+            selectLog: document.getElementById("select-log"),
+            clearLogButton: document.getElementById("clear-log-button"),
+            copyLogButton: document.getElementById("copy-log-button"),
+            copyAddressButton: document.getElementById("copy-address-button"),
+            useAddressRemoteButton: document.getElementById("use-address-remote-button"),
+            lastAddressBadge: document.getElementById("last-address-badge"),
+            logStatusDot: document.getElementById("log-status-dot"),
+            logStatusText: document.getElementById("log-status-text"),
+            logCount: document.getElementById("log-count")
         };
     }
 
@@ -94,6 +103,43 @@
         return fallback || key;
     }
 
+    function updateLogCount(app) {
+        if (app.elements.logCount && app.elements.statusMessages) {
+            var count = app.elements.statusMessages.children.length;
+            var tmpl = i18nText("log.messages_count", "{count} messages");
+            app.elements.logCount.textContent = tmpl.replace("{count}", count);
+        }
+    }
+
+    function applyLogFilter(app) {
+        if (!app.elements.statusMessages || !app.elements.selectLog) return;
+        var filter = app.elements.selectLog.value;
+        var children = app.elements.statusMessages.children;
+        for (var i = 0; i < children.length; i++) {
+            var p = children[i];
+            var lvl = p.dataset.level || "info";
+            if (filter === "all") {
+                p.style.display = "";
+            } else if (filter === "error") {
+                p.style.display = lvl === "error" ? "" : "none";
+            } else if (filter === "warning") {
+                p.style.display = (lvl === "error" || lvl === "warning") ? "" : "none";
+            } else if (filter === "info") {
+                p.style.display = "";
+            }
+        }
+    }
+
+    function updateLastAddressBadge(app, address) {
+        var addr = (address || "").trim().toUpperCase();
+        if (app.elements.lastAddrInput) {
+            app.elements.lastAddrInput.value = addr;
+        }
+        if (app.elements.lastAddressBadge) {
+            app.elements.lastAddressBadge.textContent = addr || "------";
+        }
+    }
+
     function logStatus(app, message, isError) {
         if (!app.elements.statusMessages || !message) {
             return;
@@ -101,8 +147,26 @@
 
         var logEntry = document.createElement("p");
         logEntry.textContent = message;
-        if (isError) {
-            logEntry.style.color = "red";
+
+        var lowerMsg = message.toLowerCase();
+        var level = "info";
+        if (isError || lowerMsg.indexOf("[e]") !== -1 || lowerMsg.indexOf("error") !== -1 || lowerMsg.indexOf("failed") !== -1) {
+            level = "error";
+            logEntry.classList.add("log-error");
+        } else if (lowerMsg.indexOf("[w]") !== -1 || lowerMsg.indexOf("warning") !== -1 || lowerMsg.indexOf("rejected") !== -1) {
+            level = "warning";
+            logEntry.classList.add("log-warning");
+        } else if (lowerMsg.indexOf("[i]") !== -1 || lowerMsg.indexOf("info") !== -1) {
+            level = "info";
+            logEntry.classList.add("log-info");
+        }
+        logEntry.dataset.level = level;
+
+        var currentFilter = app.elements.selectLog ? app.elements.selectLog.value : "all";
+        if (currentFilter === "error" && level !== "error") {
+            logEntry.style.display = "none";
+        } else if (currentFilter === "warning" && level !== "error" && level !== "warning") {
+            logEntry.style.display = "none";
         }
 
         app.elements.statusMessages.appendChild(logEntry);
@@ -110,6 +174,7 @@
         while (app.elements.statusMessages.children.length > 300) {
             app.elements.statusMessages.removeChild(app.elements.statusMessages.firstChild);
         }
+        updateLogCount(app);
 
         if (typeof app.onLogMessage === "function") {
             try {
@@ -130,6 +195,7 @@
                     logStatus(app, message);
                 });
             }
+            updateLogCount(app);
         } catch (error) {
             logStatus(app, "Could not load log buffer", true);
         }
@@ -288,9 +354,7 @@
                 } else if (data.type === "esphome_status") {
                     updateEspHomeStatus(app, data);
                 } else if (data.type === "lastaddr") {
-                    if (app.elements.lastAddrInput) {
-                        app.elements.lastAddrInput.value = data.address || "";
-                    }
+                    updateLastAddressBadge(app, data.address);
                 } else if (data.type === "twowstatus") {
                     // twowstatus has no UI in this branch — silently ignored
                 }
@@ -301,10 +365,14 @@
 
         ws.onopen = function () {
             app.state.wsConnected = true;
+            if (app.elements.logStatusDot) app.elements.logStatusDot.className = "log-dot live";
+            if (app.elements.logStatusText) app.elements.logStatusText.textContent = i18nText("log.live_connected", "Live");
         };
 
         ws.onclose = function () {
             app.state.wsConnected = false;
+            if (app.elements.logStatusDot) app.elements.logStatusDot.className = "log-dot offline";
+            if (app.elements.logStatusText) app.elements.logStatusText.textContent = i18nText("log.disconnected", "Disconnected");
             if (!app.state.wsReconnectTimer) {
                 app.state.wsReconnectTimer = setTimeout(function () {
                     app.state.wsReconnectTimer = null;
@@ -315,6 +383,55 @@
     }
 
     function bindEvents(app) {
+        if (app.elements.selectLog) {
+            app.elements.selectLog.addEventListener("change", function () {
+                applyLogFilter(app);
+            });
+        }
+        if (app.elements.clearLogButton) {
+            app.elements.clearLogButton.addEventListener("click", function () {
+                if (app.elements.statusMessages) {
+                    app.elements.statusMessages.textContent = "";
+                    updateLogCount(app);
+                }
+            });
+        }
+        if (app.elements.copyLogButton) {
+            app.elements.copyLogButton.addEventListener("click", function () {
+                if (!app.elements.statusMessages) return;
+                var text = app.elements.statusMessages.innerText || "";
+                if (!text) return;
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(function () {
+                        var orig = app.elements.copyLogButton.textContent;
+                        app.elements.copyLogButton.textContent = i18nText("log.copied", "Copied!");
+                        setTimeout(function () { app.elements.copyLogButton.textContent = orig; }, 2000);
+                    });
+                }
+            });
+        }
+        if (app.elements.copyAddressButton) {
+            app.elements.copyAddressButton.addEventListener("click", function () {
+                var addr = (app.elements.lastAddrInput && app.elements.lastAddrInput.value) || "";
+                if (addr && addr !== "------" && navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(addr).then(function () {
+                        var orig = app.elements.copyAddressButton.textContent;
+                        app.elements.copyAddressButton.textContent = i18nText("log.copied", "Copied!");
+                        setTimeout(function () { app.elements.copyAddressButton.textContent = orig; }, 2000);
+                    });
+                }
+            });
+        }
+        if (app.elements.useAddressRemoteButton) {
+            app.elements.useAddressRemoteButton.addEventListener("click", function () {
+                if (typeof window.showPage === "function") {
+                    window.showPage("devices");
+                }
+                if (app.elements.remotePopupButton) {
+                    app.elements.remotePopupButton.click();
+                }
+            });
+        }
         if (app.elements.sendCommandButton) {
             app.elements.sendCommandButton.addEventListener("click", function () {
                 if (typeof app.sendCommand === "function") app.sendCommand();
@@ -477,6 +594,9 @@
         }
         app.updateEspHomeStatus = function (data) {
             updateEspHomeStatus(app, data);
+        };
+        app.updateLastAddressBadge = function (addr) {
+            updateLastAddressBadge(app, addr);
         };
 
         window.OmniIoApi.requestJson("/api/info").then(function (info) {

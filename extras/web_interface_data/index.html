@@ -39,8 +39,8 @@ Original upstream portions remain licensed under Apache-2.0.
             <span data-i18n="nav.devices">Devices</span>
         </a>
         <a onclick="showPage('help')" class="items nav-link">
-            <img class="nav-icon" src="img/help.svg" alt="" />
-            <span data-i18n="nav.help">Log</span>
+            <img class="nav-icon" src="img/system.svg" alt="" />
+            <span data-i18n="nav.status">Status / Logs</span>
         </a>
         <a onclick="showPage('settings')" class="items nav-link">
           <img class="nav-icon" src="img/settings.svg" alt="" />
@@ -94,44 +94,106 @@ Original upstream portions remain licensed under Apache-2.0.
           </section>
         </div>
       </div>
-      <div id="help-page" style="display: none">
+      <div id="help-page" class="grid" style="display: none">
         <div class="left">
           <section id="status-section">
             <div class="title">
               <h2 data-i18n="section.status_logs">Status / Log</h2>
-              <select id="select-log">
-                <option value="all" data-i18n="filter.all">All</option>
-                <option value="info" data-i18n="filter.info">Info</option>
-                <option value="warning" data-i18n="filter.warning">
-                  Warning
-                </option>
-                <option value="error" data-i18n="filter.error">Error</option>
-              </select>
-            </div>
-            <div class="card">
-              <div class="device-selection">
-                <label for="device-select" data-i18n="label.select_device">
-                  Select Device:
-                </label>
-                <select id="device-select"></select>
-                <label for="last-address" data-i18n="label.last_address">
-                  Last Address:
-                </label>
-                <input id="last-address" readonly="readonly" />
+              <div class="log-actions">
+                <select id="select-log" title="Filter log">
+                  <option value="all" data-i18n="filter.all">All</option>
+                  <option value="info" data-i18n="filter.info">Info</option>
+                  <option value="warning" data-i18n="filter.warning">Warning</option>
+                  <option value="error" data-i18n="filter.error">Error</option>
+                </select>
+                <button id="clear-log-button" type="button" class="btn-log-action" data-i18n="button.clear_log" title="Clear log">Clear</button>
+                <button id="copy-log-button" type="button" class="btn-log-action" data-i18n="button.copy_log" title="Copy log">Copy</button>
               </div>
-              <div id="status-messages"></div>
+            </div>
+            <div class="card log-card">
+              <div class="log-status-bar">
+                <span class="log-indicator"><span id="log-status-dot" class="log-dot live"></span> <span id="log-status-text" data-i18n="log.live_connected">Live</span></span>
+                <span id="log-count" class="log-count">0 messages</span>
+              </div>
+              <div id="status-messages" role="log" aria-live="polite"></div>
+            </div>
+          </section>
+        </div>
+        <div class="right">
+          <!-- Card 1: RF Signal Sniffer (Last Received) -->
+          <section id="rf-sniffer-section">
+            <div class="title">
+              <h2 data-i18n="section.rf_sniffer">RF Sniffer (Last Received)</h2>
+            </div>
+            <div class="card rf-sniffer-card">
+              <p class="section-desc" data-i18n="note.rf_sniffer">
+                Omni-IO intercepts radio signals over the air. Press any button on a physical remote to reveal its hardware address.
+              </p>
+              <div class="rf-badge-container">
+                <div class="rf-badge-row">
+                  <span class="rf-badge-label" data-i18n="label.last_address">Last Address:</span>
+                  <div class="rf-badge-box">
+                    <span id="last-address-badge" class="rf-hex-badge">------</span>
+                    <input id="last-address" readonly="readonly" style="display: none;" />
+                  </div>
+                </div>
+                <div class="rf-actions">
+                  <button id="copy-address-button" type="button" data-i18n="button.copy" title="Copy Address">Copy</button>
+                  <button id="use-address-remote-button" type="button" data-i18n="button.create_remote" title="Create Remote with this ID">Use as Remote</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Card 2: Manual Diagnostic CLI Console -->
+          <section id="diagnostics-section" style="margin-top: 14px;">
+            <div class="title">
+              <h2 data-i18n="section.test_console">Test & Diagnostics Console</h2>
+            </div>
+            <div class="card diagnostics-card">
+              <p class="section-desc" data-i18n="note.test_console">
+                Send low-level commands directly to firmware or a selected device.
+              </p>
+              <div class="device-selection-wrap">
+                <label for="device-select" data-i18n="label.select_device">Target Device:</label>
+                <select id="device-select"></select>
+              </div>
               <div class="send-messages">
                 <input
                   id="command-input"
                   data-i18n-placeholder="placeholder.type_here"
-                  placeholder="Typ hier..."
+                  placeholder="Type here..."
                   autocomplete="off"
                 />
                 <select id="suggestions"></select>
-                <button id="send-command-button" data-i18n="button.send">
-                  Send
-                </button>
+                <button id="send-command-button" data-i18n="button.send">Send</button>
               </div>
+            </div>
+          </section>
+
+          <!-- Card 3: Quick Pairing Instructions (Help) -->
+          <section id="quick-help-section" style="margin-top: 14px;">
+            <div class="title">
+              <h2 data-i18n="section.quick_help">Quick Help & Pairing</h2>
+            </div>
+            <div class="card quick-help-card">
+              <details class="help-accordion" open>
+                <summary><strong data-i18n="popup.help_device">Pairing a screen (1W)</strong></summary>
+                <ol class="help-steps">
+                  <li><strong>Devices → (+)</strong>: Create a new screen.</li>
+                  <li><strong>Edit</strong>: Open that screen's settings.</li>
+                  <li><strong>Physical remote</strong>: Hold PROG until screen jogs.</li>
+                  <li><strong>Pair</strong>: Click "Pair" in the web UI. The screen jogs again.</li>
+                </ol>
+              </details>
+              <details class="help-accordion">
+                <summary><strong data-i18n="popup.help_remote">Linking a remote</strong></summary>
+                <ol class="help-steps">
+                  <li>Press any button on the physical remote; see <em>Last Address</em> above.</li>
+                  <li><strong>Remotes → (+)</strong>: Add remote (ID is auto-filled).</li>
+                  <li><strong>Edit</strong>: Link the desired screen to this remote.</li>
+                </ol>
+              </details>
             </div>
           </section>
         </div>

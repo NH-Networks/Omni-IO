@@ -301,3 +301,21 @@ Upload sequence:
 2. Upload filesystem to `POST /api/filesystem` $\rightarrow$ wait for device reboot (~7s).
 3. Query `GET /api/info` to verify clean version reporting and client reconnection.
 
+---
+
+## 8. Release Policy & Mandatory Hardware Verification
+
+### 8.1 Branch Builds vs. Version Releases
+* **Automated Branch Builds Permitted**: Commits and pushes to active branches (`master`, `Beta`, `dev-main`, `feature/**`) are encouraged to trigger automated branch builds via GitHub Actions (`.github/workflows/branch_build.yml`).
+* **NO Version Releases or Release Notes**: DO NOT create or push version release tags (`v*`) or generate release notes unless the user explicitly gives permission. Production release workflows (`.github/workflows/build_and_release.yml`) are strictly reserved for approved milestones.
+
+
+### 8.2 Hardware Verification on Test Gateway (10.10.33.15)
+* Target Test Device: `http://10.10.33.15` (LilyGo T3S3 hardware).
+* All web interface, firmware, or protocol modifications must be uploaded and self-tested on this live device prior to closing out tasks.
+* **Testing procedure**:
+  1. Build filesystem / firmware (`uv tool run platformio run -e LilyGoT3S3` / `buildfs`).
+  2. Upload via `scratch/upload_ota.py` (`uv run python scratch/upload_ota.py`).
+  3. Validate endpoints (`GET /api/info`, `GET /api/devices`, `/ws`, web UI pages) on `http://10.10.33.15`.
+
+
