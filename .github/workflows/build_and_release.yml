@@ -87,7 +87,24 @@ jobs:
 
           ---
 
-          ## 🚀 What's New in v3.1.0 (Production Ready Release)
+          ## 🚀 What's New in v3.1.1 (Stability & Radio Pipeline Hardening)
+
+          * 🛡️ **FreeRTOS Callback Task & Queue Hardening**:
+            * Doubled \`CallbackTask\` stack allocation from 4 KB to **8 KB** (\`8192 bytes\`), providing safe headroom for complex JSON serialization, dynamic string operations, and nested callbacks.
+            * Added defensive null-pointer checks in \`callbackTaskLoop\` and queue ingress validation in \`queueCallback()\` to prevent task execution panics.
+          * 📦 **RF Frame Buffer Bounds Checking**:
+            * Implemented strict \`buffer_length\` validation across incoming radio frame handlers (\`0x2B\`, \`0x38\`, \`0x3C\`, \`0x51\`, \`0xFE\`, \`0x30\`, \`0x39\`, and \`0x00\`) in both \`msgRcvd()\` and \`publishMsg()\`.
+            * Eliminates out-of-bounds reads and memory corruption from truncated, malformed, or noisy RF signals.
+          * ⚡ **Background WebSocket Optimization**:
+            * Added active client checks (\`ws.count() == 0\`) across all websocket broadcast routines (\`broadcastLog\`, \`broadcastTwoWStatus\`, \`broadcastDevicePosition\`, \`broadcastDeviceAction\`, \`broadcastLastAddress\`).
+            * Drastically reduces idle CPU, stack, and heap overhead by bypassing JSON serialization and cross-thread socket dispatches when no browser is viewing the web dashboard.
+            * Activated \`shouldBroadcastLog()\` filter before log dispatching to eliminate spam.
+          * 🔍 **Granular RTC Crash Diagnostics**:
+            * Introduced progressive execution markers across all RF packet processing stages (\`radio: callback dispatch\`, \`rx: msgRcvd enter\`, \`rx: msgRcvd parse\`, \`rx: msgRcvd dispatch cmd\`, \`rx: msgRcvd done\`, \`radio: callback done\`) for instant, pinpoint diagnosis of any future exceptions.
+
+          ---
+
+          ## 🌟 v3.1.0 Highlights (Production Ready Release)
 
           * ⚡ **MQTT Disabled by Default on Clean Devices**:
             * Out of the box, Omni-IO now defaults to the Native ESPHome API (Zero-Broker) for seamless, instant Home Assistant auto-discovery.

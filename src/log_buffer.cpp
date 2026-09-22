@@ -1,3 +1,7 @@
+/*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
 #include <vector>
 #include <Arduino.h>
 #include <log_buffer.h>
@@ -84,7 +88,9 @@ void addLogMessage(const String &msg) {
     const String storedMessage(logRing[slot]);
     Serial.printf("[%10lu ms] %s\n", now, storedMessage.c_str());
 #if defined(WEBSERVER)
-    broadcastLog(storedMessage);
+    if (shouldBroadcastLog(storedMessage)) {
+        broadcastLog(storedMessage);
+    }
 #endif
 #if defined(SYSLOG)
     sendSyslog(storedMessage);

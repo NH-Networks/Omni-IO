@@ -351,10 +351,14 @@ void IRAM_ATTR forgePacket(iohcPacket* packet, const std::vector<uint8_t> &toSen
 }
 
 bool msgRcvd(IOHC::iohcPacket *iohc) {
+    setCrashMarker("rx: msgRcvd enter");
+    if (!iohc) {
+        return true;
+    }
     JsonDocument doc;
     doc["type"] = "Unk";
 #if defined(WEBSERVER)
-    if (!iohc || iohc->buffer_length < sizeof(_header) || iohc->buffer_length > MAX_FRAME_LEN) {
+    if (iohc->buffer_length < sizeof(_header) || iohc->buffer_length > MAX_FRAME_LEN) {
         const uint8_t safeLen = iohc ? std::min<uint8_t>(iohc->buffer_length, MAX_FRAME_LEN) : 0;
         const uint8_t expectedLength = (iohc && safeLen > 0)
                                            ? iohc->payload.packet.header.CtrlByte1.asStruct.MsgLen + 1
@@ -379,6 +383,7 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
     IOHC::Address3 lastFrom{};
     memcpy(lastFrom.b, iohc->payload.packet.header.source, sizeof(lastFrom.b));
     IOHC::lastFromAddress.store(lastFrom);
+    setCrashMarker("rx: msgRcvd parse");
 #if defined(WEBSERVER)
     const char *protoStr = (iohc->payload.packet.header.CtrlByte1.asStruct.Protocol == 1) ? "1W" : "2W";
     broadcastLastAddress(bytesToHexString(lastFrom.b, sizeof(lastFrom.b)).c_str(), "", protoStr);
@@ -519,6 +524,7 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
                 static_cast<uint16_t>(receivedSequence + 1));
         }
     }
+    setCrashMarker("rx: msgRcvd dispatch cmd");
     switch (iohc->payload.packet.header.cmd) {
         case iohcDevice::RECEIVED_DISCOVER_0x28: {
             printf("2W Pairing Asked\n");
@@ -567,9 +573,11 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
             break;
         }
         case iohcDevice::RECEIVED_DISCOVER_REMOTE_ANSWER_0x2B: {
-            sysTable->addObject(iohc->payload.packet.header.source, iohc->payload.packet.msg.p0x2b.backbone,
-                                iohc->payload.packet.msg.p0x2b.actuator, iohc->payload.packet.msg.p0x2b.manufacturer,
-                                iohc->payload.packet.msg.p0x2b.info);
+            if (sysTable && iohc->buffer_length >= sizeof(_header) + sizeof(iohc->payload.packet.msg.p0x2b)) {
+                sysTable->addObject(iohc->payload.packet.header.source, iohc->payload.packet.msg.p0x2b.backbone,
+                                    iohc->payload.packet.msg.p0x2b.actuator, iohc->payload.packet.msg.p0x2b.manufacturer,
+                                    iohc->payload.packet.msg.p0x2b.info);
+            }
             break;
         }
         case iohcDevice::RECEIVED_DISCOVER_ACTUATOR_0x2C: {
@@ -635,7 +643,7 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
         }
         case iohcDevice::RECEIVED_LAUNCH_KEY_TRANSFERT_0x38: {
             printf("2W Key Transfert Asked after Command %2.2X\n", iohc->payload.packet.header.cmd);
-            if (!Cmd::pairMode) break;
+            if (!Cmd::pairMode || iohc->buffer_length < 15) break;
             addLogMessage("2W pair step: received 0x38 key transfer request; sending 0x32 key transfer");
 
             std::vector<uint8_t> key_transfert;
@@ -703,6 +711,7 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
             break;
         }
         case iohcDevice::RECEIVED_CHALLENGE_REQUEST_0x3C: {
+            if (iohc->buffer_length < 15 || !cozyDevice2W) break;
             // Answer only to our gateway, not to others devices
             if (cozyDevice2W->isFake(iohc->payload.packet.header.source, iohc->payload.packet.header.target)) {
                 // (true) { //
@@ -900,16 +909,14 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
             break;
         }
         case 0x51: {
-            std::vector<uint8_t> nameReceived;
-            nameReceived.assign(iohc->payload.buffer + 9, iohc->payload.buffer + 25);
-            //            std::string asciiName;
-
-            for (char byte: nameReceived) {
-                //    asciiName += std::toupper(byte);
-                printf("%c", std::toupper(byte));
+            if (iohc->buffer_length >= 25) {
+                std::vector<uint8_t> nameReceived;
+                nameReceived.assign(iohc->payload.buffer + 9, iohc->payload.buffer + 25);
+                for (char byte: nameReceived) {
+                    printf("%c", std::toupper(byte));
+                }
+                printf("\n");
             }
-            //            printf("%s\n", asciiName.c_str());
-            printf("\n");
             break;
         }
         case iohcDevice::RECEIVED_DISCOVER_ACTUATOR_ACK_0x2D: {
@@ -951,7 +958,7 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
         break;
     }
         case iohcDevice::RECEIVED_STATUS_0xFE: {
-            if (Cmd::scanMode) {
+            if (Cmd::scanMode && iohc->buffer_length >= 10) {
                 otherDevice2W->memorizeOther2W = {};
                 // printf(" Unknown %X Cmd %X ", iohc->payload.buffer[9], IOHC::lastSendCmd);
                 otherDevice2W->mapValid[IOHC::lastSendCmd.load()] = iohc->payload.buffer[9];
@@ -959,6 +966,9 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
             break;
         }
         case 0x30: {
+            if (iohc->buffer_length < sizeof(_header) + sizeof(iohc->payload.packet.msg.p0x30)) {
+                break;
+            }
             for (uint8_t idx = 0; idx < 16; idx++)
                 keyCap[idx] = iohc->payload.packet.msg.p0x30.enc_key[idx];
 
@@ -1040,7 +1050,8 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
                 solarPairSession.active &&
                 sameAddress(solarPairSession.source,
                             iohc->payload.packet.header.source) &&
-                millis() - solarPairSession.startedMs <= 120000UL) {
+                millis() - solarPairSession.startedMs <= 120000UL &&
+                iohc->buffer_length >= sizeof(_header) + sizeof(iohc->payload.packet.msg.p0x39)) {
                 solarPairSession.challengeData =
                     iohc->payload.packet.msg.p0x39.data;
                 memcpy(solarPairSession.challengeSequence,
@@ -1066,6 +1077,7 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
     }
 
     publishMsg(iohc);
+    setCrashMarker("rx: msgRcvd done");
     return true;
 }
 
@@ -1080,6 +1092,9 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
  * @return The function `publishMsg` is returning `false`.
  */
 bool publishMsg(IOHC::iohcPacket *iohc) {
+    if (!iohc || iohc->buffer_length < sizeof(_header)) {
+        return false;
+    }
     JsonDocument doc;
 
     doc["type"] = "Cozy";
@@ -1099,7 +1114,8 @@ bool publishMsg(IOHC::iohcPacket *iohc) {
     }
 
     if (iohc->payload.packet.header.CtrlByte1.asStruct.Protocol == 1 &&
-        iohc->payload.packet.header.cmd == 0x00) {
+        iohc->payload.packet.header.cmd == 0x00 &&
+        iohc->buffer_length >= sizeof(_header) + sizeof(iohc->payload.packet.msg.p0x00_14)) {
         uint16_t main =
                 (iohc->payload.packet.msg.p0x00_14.main[0] << 8) |
                 iohc->payload.packet.msg.p0x00_14.main[1];

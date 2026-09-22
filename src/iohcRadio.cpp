@@ -1,4 +1,8 @@
 /*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
+/*
    Copyright (c) 2024. CRIDP https://github.com/cridp
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -163,7 +167,11 @@ namespace IOHC {
         Callback *callback = NULL;
         while (true) {
             if (xQueueReceive(callbackQueue, &callback, portMAX_DELAY) == pdPASS && callback != NULL) {
-                (*callback->callback)(callback->packet);
+                setCrashMarker("radio: callback dispatch");
+                if (callback->callback && *(callback->callback) && callback->packet) {
+                    (*(callback->callback))(callback->packet);
+                }
+                setCrashMarker("radio: callback done");
                 delete callback->packet;
                 vPortFree(callback);
             }
@@ -193,7 +201,7 @@ namespace IOHC {
 #endif
 
         callbackQueue = xQueueCreate(40, sizeof(struct Callback *));
-        auto callbackTaskCode = xTaskCreatePinnedToCore(callbackTaskLoop, "CallbackTask", 4096, NULL, 5, &callbackTask, 0);
+        auto callbackTaskCode = xTaskCreatePinnedToCore(callbackTaskLoop, "CallbackTask", 8192, NULL, 5, &callbackTask, 0);
         if (callbackTaskCode != pdPASS || callbackQueue == NULL) {
             printf("ERROR: Can't create callback-task or corresponding queue %d\n", callbackTaskCode);
             // sx127x_destroy(device);
@@ -696,6 +704,9 @@ void iohcRadio::onTxTicker(void *arg) {
 }
 
 bool queueCallback(IohcPacketDelegate* callback, iohcPacket* packet) {
+    if (!callback || !packet) {
+        return false;
+    }
     Callback *callbackData = (Callback*) pvPortMalloc(sizeof(Callback));
     if (callbackData == NULL) {
         return false;
@@ -996,7 +1007,7 @@ bool queueCallback(IohcPacketDelegate* callback, iohcPacket* packet) {
         iohcPacket *receivedPacket = iohc;
         iohc = nullptr;
         if (rxCB) {
-            setCrashMarker("radio: rx callback queued");
+            setCrashMarker("radio: rx callback queuing");
             if (!queueCallback(&rxCB, receivedPacket)) {
                 delete receivedPacket;
             }

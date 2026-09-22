@@ -94,6 +94,9 @@ static void fillTwoWStatus(JsonObject &obj) {
 }
 
 static void broadcastTwoWStatus() {
+  if (ws.count() == 0) {
+    return;
+  }
   JsonDocument doc;
   doc["type"] = "twowstatus";
   JsonObject status = doc["status"].to<JsonObject>();
@@ -171,6 +174,9 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
 }
 
 void broadcastLog(const String &msg) {
+  if (ws.count() == 0) {
+    return;
+  }
   JsonDocument doc;
   doc["type"] = "log";
   doc["message"] = msg;
@@ -180,6 +186,9 @@ void broadcastLog(const String &msg) {
 }
 
 void broadcastDevicePosition(const String &id, int position) {
+  if (ws.count() == 0) {
+    return;
+  }
   JsonDocument doc;
   doc["type"] = "position";
   doc["id"] = id;
@@ -190,6 +199,9 @@ void broadcastDevicePosition(const String &id, int position) {
 }
 
 void broadcastDeviceAction(const String &id, const String &action, int position, int target, const String &source) {
+  if (ws.count() == 0) {
+    return;
+  }
   JsonDocument doc;
   doc["type"] = "deviceaction";
   doc["id"] = id;
@@ -215,6 +227,10 @@ void broadcastLastAddress(const String &addr, const String &action, const String
     if (!protocol.isEmpty()) {
       s_lastFromProtocol = protocol;
     }
+  }
+
+  if (ws.count() == 0) {
+    return;
   }
 
   JsonDocument doc;
@@ -977,7 +993,7 @@ void handleApiInfo(AsyncWebServerRequest *request, JsonObject &root) {
   root["environment"] = "unknown";
 #endif
 #else
-  root["version"] = "3.1.0";
+  root["version"] = "3.1.1";
 #endif
   root["uptimeMs"] = millis();
   root["freeHeap"] = ESP.getFreeHeap();
