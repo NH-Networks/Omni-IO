@@ -110,7 +110,12 @@ namespace Radio {
 
         pinMode(SCAN_LED, OUTPUT);
         digitalWrite(SCAN_LED, 1);
-        Serial.println("Radio Chip is ready");
+        uint8_t version = readByte(REG_VERSION);
+        if (version == 0x12) {
+            Serial.printf("Radio Chip SX1276 detected (version 0x%02X)\n", version);
+        } else {
+            Serial.printf("ERROR: Radio Chip not responding on SPI! (REG_VERSION = 0x%02X, expected 0x12)\n", version);
+        }
     }
 
 void setPreambleLength(uint16_t preambleLen) {
@@ -231,16 +236,28 @@ void setPreambleLength(uint16_t preambleLen) {
         // Start image and RSSI calibration
         writeByte(
             REG_IMAGECAL, (RF_IMAGECAL_AUTOIMAGECAL_MASK & RF_IMAGECAL_IMAGECAL_MASK) | RF_IMAGECAL_IMAGECAL_START);
-        // Wait end of calibration
+        // Wait end of calibration with timeout
+        uint32_t startMs = millis();
         while ((readByte(REG_IMAGECAL) & RF_IMAGECAL_IMAGECAL_RUNNING) == RF_IMAGECAL_IMAGECAL_RUNNING) {
+            if (millis() - startMs > 100) {
+                Serial.println("Warning: Radio image calibration timeout (LF band)");
+                break;
+            }
+            delayMicroseconds(100);
         }
         // Set a Frequency in HF band
         Radio::setCarrier(Radio::Carrier::Frequency, 868000000);
         // Start image and RSSI calibration
         writeByte(
             REG_IMAGECAL, (RF_IMAGECAL_AUTOIMAGECAL_MASK & RF_IMAGECAL_IMAGECAL_MASK) | RF_IMAGECAL_IMAGECAL_START);
-        // Wait end of calibration
+        // Wait end of calibration with timeout
+        startMs = millis();
         while ((readByte(REG_IMAGECAL) & RF_IMAGECAL_IMAGECAL_RUNNING) == RF_IMAGECAL_IMAGECAL_RUNNING) {
+            if (millis() - startMs > 100) {
+                Serial.println("Warning: Radio image calibration timeout (HF band)");
+                break;
+            }
+            delayMicroseconds(100);
         }
 
         // Restore context

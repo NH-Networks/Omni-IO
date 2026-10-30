@@ -1,4 +1,8 @@
 /*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
+/*
    Copyright (c) 2024. CRIDP https://github.com/cridp
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -51,7 +55,9 @@
 #define RADIO_MOSI_PIN      27
 #define RADIO_CS_PIN        18
 #define RADIO_DIO0_PIN      26
-#define RADIO_RST_PIN       14
+#ifndef RADIO_RST_PIN
+#define RADIO_RST_PIN       23 // TTGO LoRa32 V2.1 (T3 V1.6/V1.6.1) uses GPIO 23
+#endif
 #define BOARD_LED_PIN       25
 #define RADIO_DIO1_PIN      33 //LILYGO
 #define RADIO_DIO2_PIN      32 //LILYGO

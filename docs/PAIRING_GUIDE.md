@@ -54,9 +54,11 @@ sequenceDiagram
 
 ### Step 3: Pair Omni-IO with the Motor
 1. In the Omni-IO Web UI, click **Edit** on your newly created device.
-2. Click the **Pair (Koppel)** button.
+2. Click the **Pair (Koppel)** button. Behind the scenes, the Web UI issues the `add` command, transmitting the encrypted key frame (`0x30`) to register Omni-IO as an authorized controller.
+   > [!TIP]
+   > If you are configuring via the Serial CLI or REST API, run the `add <device>` command (e.g., `add SUNS`) rather than `pair` (`0x2E`).
 3. Omni-IO will transmit the registration frame.
-4. The motor will perform another brief **jog** (up-and-down movement).
+4. The motor will perform another brief **jog** (short up-and-down movement) to confirm acceptance of the key.
 5. **Done!** Your device is now paired and can be controlled via the Web UI, MQTT, and Home Assistant.
 
 ---
@@ -65,12 +67,15 @@ sequenceDiagram
 
 Because 1W io-homecontrol motors do not report continuous live position feedback, Omni-IO calculates precise percentage positions ($0\% = \text{Closed}, 100\% = \text{Open}$) based on motor travel time.
 
-### How to Calibrate:
+### How to Calibrate (Dual Open / Close Timings):
+Omni-IO supports asymmetric travel time calibration for motors that open and close at different speeds:
 1. Completely open the shutter or blind.
-2. Use a stopwatch: press **Close** in Omni-IO and measure the exact time in seconds until the motor fully stops at the bottom limit.
-3. Open the **Edit** dialog for the device in the Omni-IO Web UI.
-4. Enter the measured duration in the **Travel Time (seconds)** field (e.g., `18`).
-5. Click **Save**.
+2. Use a stopwatch: press **Close** in Omni-IO and measure the exact time in seconds until the motor fully stops at the bottom limit (**Close Travel Time**).
+3. Completely close the shutter or blind.
+4. Use a stopwatch: press **Open** in Omni-IO and measure the exact time in seconds until the motor fully stops at the top limit (**Open Travel Time**).
+5. Open the **Edit** dialog for the device in the Omni-IO Web UI.
+6. Enter both values in the **Open travel time (s)** and **Close travel time (s)** fields (or via CLI: `time1W <desc> <openSec> <closeSec>`).
+7. Click **Save**.
 
 Omni-IO will now smoothly interpolate position updates and publish live percentages to Home Assistant during movement.
 

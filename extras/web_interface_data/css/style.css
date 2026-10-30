@@ -52,6 +52,11 @@ body {
     background-color: var(--background);
     color: var(--color-text);
     -webkit-font-smoothing: antialiased;
+    /* Footer at the bottom of short pages without exceeding the viewport */
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: 100dvh;
 }
 header {
   background: linear-gradient(135deg, var(--color-accent2) 0%, var(--color-accent) 100%);
@@ -86,7 +91,7 @@ header img.logo:active {
   transform: scale(0.95);
 }
 main {
-  min-height: calc(90dvh);
+  flex: 1 0 auto;
 }
 main > div, .card-popup {
     padding: 0;
