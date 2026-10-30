@@ -1429,8 +1429,12 @@ void handleApiEspHomeSet(AsyncWebServerRequest *request, JsonObject &doc, JsonOb
 
 void handleFirmwareUpdate(AsyncWebServerRequest *request) {
   if (Update.hasError()) {
+    String message = "Firmware update failed";
+    if (Update.getError() != 0) {
+      message += ": error=" + String(Update.getError());
+    }
     request->send(500, "application/json",
-                  "{\"message\":\"Firmware update failed\"}");
+                  String("{\"message\":\"") + message + "\"}");
   } else {
     request->send(200, "application/json",
                   "{\"message\":\"Firmware update successful, rebooting\"}");
@@ -1461,7 +1465,7 @@ void handleFirmwareUpload(AsyncWebServerRequest *request, String filename,
     }
   }
   if (!Update.hasError()) {
-    if (Update.write(data, len) != len) {
+    if (len && Update.write(data, len) != len) {
       Update.printError(Serial);
     }
   }
