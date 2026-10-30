@@ -57,7 +57,7 @@ This guide provides solutions to common issues encountered during setup, WiFi co
 ### Web UI loading feels sluggish or causes connection timeouts
 * **Cause**: Multiple parallel HTTP requests from modern browsers loading 16+ assets concurrently can overload the ESP32's async socket stack and slow down LittleFS SPI flash access (issue #8).
 * **Solution**:
-  * Omni-IO v3.1.2 includes HTTP asset caching (`max-age=86400`) and removes blocking LittleFS writes during radio transmission. Once loaded, assets are served directly from the browser cache without burdening the ESP32.
+  * Omni-IO v3.1.2+ includes HTTP asset caching (`max-age=86400`) and removes blocking LittleFS writes during radio transmission. Once loaded, assets are served directly from the browser cache without burdening the ESP32.
   * Ensure WiFi signal strength is healthy (RSSI > -70 dBm).
 
 ---

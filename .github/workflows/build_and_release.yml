@@ -87,6 +87,24 @@ jobs:
 
           ---
 
+          ## 🛠️ What's New in v3.1.3 (Board Pinout & Initialization Hardening)
+
+          * 📟 **LilyGo LoRa32 v2.1 (T3 v1.6/v1.6.1) Hardware Pinout Fix**:
+            * Updated radio reset GPIO pin (`RADIO_RST_PIN`) to default to GPIO 23 for LilyGo LoRa32 v2.1 boards (#6).
+            * Added preprocessor guard to allow board-specific custom override while preserving backward compatibility.
+          * 🛡️ **Radio Calibration Timeout Guard**:
+            * Guarded low-frequency and high-frequency image calibration loops in `src/SX1276Helpers.cpp` with a 100 ms timeout to prevent indefinite boot hang (#7).
+            * Explicitly verifies `REG_VERSION` (0x42, expected 0x12) on the SPI bus with clear diagnostic logging during hardware initialization.
+          * 📦 **Clean Initial Configuration Files**:
+            * Cleaned bundled release filesystem data files (`1W.json`, `RemoteMap.json`, `Cozy2W.json`) in `extras/` to empty dictionaries to ensure fresh installations start without dummy devices (#9).
+          * 📖 **Pairing & Calibration Documentation**:
+            * Updated `docs/PAIRING_GUIDE.md` clarifying that Somfy Situo and similar motors require the key transfer frame `add` (`0x30`) rather than standard pairing frame `0x2E` (#10).
+            * Added documentation for calibrating asymmetric dual travel times.
+          * 🎨 **Web UI Layout Polish**:
+            * Fixed viewport scroll overflow on short screens so page footers dock gracefully at the bottom without unnecessary scrollbars (#13).
+
+          ---
+
           ## 🚀 What's New in v3.1.2 (Radio Latency Optimization & Dual Travel Times)
 
           * ⚡ **Radio Latency Optimization & Instant Responsiveness**:

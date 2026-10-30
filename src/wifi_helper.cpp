@@ -162,7 +162,7 @@ static void handleWifiConnected() {
 #ifdef FIRMWARE_VERSION
             MDNS.addServiceTxt("esphomelib", "tcp", "project_version", FIRMWARE_VERSION);
 #else
-            MDNS.addServiceTxt("esphomelib", "tcp", "project_version", "3.1.2");
+            MDNS.addServiceTxt("esphomelib", "tcp", "project_version", "3.1.3");
 #endif
         }
         startEspHomeServer();
