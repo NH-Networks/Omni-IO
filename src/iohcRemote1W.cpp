@@ -697,7 +697,8 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
                     break;
                 }
         }
-        this->save(); // Save sequence number
+        // Sequence number is already persisted to NVS via nvs_write_sequence().
+        // File save() is only needed when device metadata/settings change, avoiding SPI flash stall on every command.
     }
 
    bool iohcRemote1W::load() {
@@ -815,19 +816,32 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
                 updateFile = true;
             }
 
-            if (jobj["travel_time"].is<uint32_t>()) {
-                r.travelTime = jobj["travel_time"].as<uint32_t>();
+            if (jobj["open_travel_time"].is<uint32_t>()) {
+                r.openTravelTime = jobj["open_travel_time"].as<uint32_t>();
+            } else if (jobj["travel_time"].is<uint32_t>()) {
+                r.openTravelTime = jobj["travel_time"].as<uint32_t>();
             } else {
-                r.travelTime = DEFAULT_TRAVEL_TIME_SEC;
+                r.openTravelTime = DEFAULT_TRAVEL_TIME_SEC;
                 updateFile = true;
             }
+
+            if (jobj["close_travel_time"].is<uint32_t>()) {
+                r.closeTravelTime = jobj["close_travel_time"].as<uint32_t>();
+            } else if (jobj["travel_time"].is<uint32_t>()) {
+                r.closeTravelTime = jobj["travel_time"].as<uint32_t>();
+            } else {
+                r.closeTravelTime = DEFAULT_TRAVEL_TIME_SEC;
+                updateFile = true;
+            }
+
+            r.travelTime = std::max(r.openTravelTime, r.closeTravelTime);
             if (jobj["paired"].is<bool>()) {
                 r.paired = jobj["paired"].as<bool>();
             } else {
                 r.paired = false;
                 updateFile = true;
             }
-            r.positionTracker.setTravelTime(r.travelTime);
+            r.positionTracker.setTravelTimes(r.openTravelTime, r.closeTravelTime);
             if (jobj["position"].is<float>() || jobj["position"].is<int>()) {
                 r.positionTracker.setPosition(
                     std::clamp(jobj["position"].as<float>(), 0.0f, 100.0f));
@@ -896,6 +910,8 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
             jobj["name"] = r.name;
 
             jobj["travel_time"] = r.travelTime;
+            jobj["open_travel_time"] = r.openTravelTime;
+            jobj["close_travel_time"] = r.closeTravelTime;
             jobj["position"] = static_cast<int>(std::round(r.positionTracker.getPosition()));
 
             jobj["paired"] = r.paired;
@@ -955,6 +971,8 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
         r.type = {0, 0};
         r.manufacturer = 2;
         r.name = name;
+        r.openTravelTime = DEFAULT_TRAVEL_TIME_SEC;
+        r.closeTravelTime = DEFAULT_TRAVEL_TIME_SEC;
         r.travelTime = DEFAULT_TRAVEL_TIME_SEC;
         r.paired = false;
 
@@ -971,7 +989,7 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
         }));
         r.description = desc;
 
-        r.positionTracker.setTravelTime(r.travelTime);
+        r.positionTracker.setTravelTimes(r.openTravelTime, r.closeTravelTime);
         remotes.push_back(r);
         nvs_write_sequence(r.node, r.sequence);
         save();
@@ -983,7 +1001,7 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
             std::string id = bytesToHexString(r.node, sizeof(r.node));
             std::string key = bytesToHexString(r.key, sizeof(r.key));
             publishDiscovery(id, r.name, key);
-            publishTravelTimeDiscovery(id, r.name, key, r.travelTime);
+            publishTravelTimesDiscovery(id, r.name, key, r.openTravelTime, r.closeTravelTime);
             mqttClient.subscribe(("iown/" + id + "/set").c_str(), 0);
             mqttClient.subscribe(("iown/" + id + "/position/set").c_str(), 0);
             mqttClient.subscribe(("iown/" + id + "/pair").c_str(), 0);
@@ -1012,8 +1030,10 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
             learned.manufacturer = manufacturer;
             learned.paired = true;
 
+            learned.openTravelTime = DEFAULT_TRAVEL_TIME_SEC;
+            learned.closeTravelTime = DEFAULT_TRAVEL_TIME_SEC;
             learned.travelTime = DEFAULT_TRAVEL_TIME_SEC;
-            learned.positionTracker.setTravelTime(learned.travelTime);
+            learned.positionTracker.setTravelTimes(learned.openTravelTime, learned.closeTravelTime);
 
             const std::string addressString =
                 bytesToHexString(node, sizeof(address));
@@ -1041,8 +1061,8 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
             const std::string keyString =
                 bytesToHexString(it->key, sizeof(it->key));
             publishDiscovery(id, it->name, keyString);
-            publishTravelTimeDiscovery(
-                id, it->name, keyString, it->travelTime);
+            publishTravelTimesDiscovery(
+                id, it->name, keyString, it->openTravelTime, it->closeTravelTime);
             mqttClient.subscribe(("iown/" + id + "/set").c_str(), 0);
             mqttClient.subscribe(
                 ("iown/" + id + "/position/set").c_str(), 0);
@@ -1210,6 +1230,10 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
     }
 
     bool iohcRemote1W::setTravelTime(const std::string &description, uint32_t travelTime) {
+        return setTravelTimes(description, travelTime, travelTime);
+    }
+
+    bool iohcRemote1W::setTravelTimes(const std::string &description, uint32_t openTravelTime, uint32_t closeTravelTime) {
         auto it = std::find_if(remotes.begin(), remotes.end(), [&](const remote &e) {
             return e.description == description;
         });
@@ -1217,14 +1241,35 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
             Serial.printf("Device %s not found\n", description.c_str());
             return false;
         }
-        it->travelTime = travelTime;
-        it->positionTracker.setTravelTime(travelTime);
+        it->openTravelTime = openTravelTime;
+        it->closeTravelTime = closeTravelTime;
+        it->travelTime = std::max(openTravelTime, closeTravelTime);
+        it->positionTracker.setTravelTimes(openTravelTime, closeTravelTime);
         save();
-#if defined(ESPHOME_API)
         std::string id = bytesToHexString(it->node, sizeof(it->node));
-        notifyEspHomeTravelTime(id, travelTime);
+#if defined(ESPHOME_API)
+        notifyEspHomeTravelTimes(id, openTravelTime, closeTravelTime);
+#endif
+#if defined(MQTT)
+        publishTravelTimesState(id, openTravelTime, closeTravelTime);
 #endif
         return true;
+    }
+
+    bool iohcRemote1W::setOpenTravelTime(const std::string &description, uint32_t openTravelTime) {
+        auto it = std::find_if(remotes.begin(), remotes.end(), [&](const remote &e) {
+            return e.description == description;
+        });
+        if (it == remotes.end()) return false;
+        return setTravelTimes(description, openTravelTime, it->closeTravelTime);
+    }
+
+    bool iohcRemote1W::setCloseTravelTime(const std::string &description, uint32_t closeTravelTime) {
+        auto it = std::find_if(remotes.begin(), remotes.end(), [&](const remote &e) {
+            return e.description == description;
+        });
+        if (it == remotes.end()) return false;
+        return setTravelTimes(description, it->openTravelTime, closeTravelTime);
     }
 
 

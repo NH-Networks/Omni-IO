@@ -69,6 +69,7 @@ uint16_t getEspHomeConnectedClients();
 void notifyEspHomeCoverPosition(const std::string &id, float position);
 void notifyEspHomeCoverState(const std::string &id, const char *state);
 void notifyEspHomeTravelTime(const std::string &id, uint32_t travelTime);
+void notifyEspHomeTravelTimes(const std::string &id, uint32_t openTravelTime, uint32_t closeTravelTime);
 void notifyEspHomeDiagnostics();
 void syncEspHomeDevices();
 
@@ -83,10 +84,10 @@ inline uint16_t getEspHomeConnectedClients() { return 0; }
 inline void notifyEspHomeCoverPosition(const std::string &, float) {}
 inline void notifyEspHomeCoverState(const std::string &, const char *) {}
 inline void notifyEspHomeTravelTime(const std::string &, uint32_t) {}
+inline void notifyEspHomeTravelTimes(const std::string &, uint32_t, uint32_t) {}
 inline void notifyEspHomeDiagnostics() {}
 inline void syncEspHomeDevices() {}
 
 #endif // ESPHOME_API
 
 #endif // ESPHOME_SERVER_H
-

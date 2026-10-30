@@ -31,8 +31,11 @@
 #if defined(MQTT)
 #include <mqtt_handler.h>
 #endif
-#define LONG_PREAMBLE_MS 1920
-#define SHORT_PREAMBLE_MS 40
+// Preamble length in bytes for SX1276 FSK register (REG_PREAMBLE: 1 byte = 8 bits = 208.33 us @ 38400 baud)
+// Long preamble: 240 bytes = 1920 bits = 50 ms (wakes up battery LPM listeners)
+// Short preamble: 40 bytes = 320 bits = 8.33 ms (fast repeats)
+#define LONG_PREAMBLE_BYTES 240
+#define SHORT_PREAMBLE_BYTES 40
 
 namespace IOHC {
     static void radioTickerTaskLoop(void *arg) {
@@ -128,10 +131,6 @@ namespace IOHC {
      * the interrupt service routine is complete.
      */
     void IRAM_ATTR handle_payload_interrupt_fromisr() {
-        if (!digitalRead(RADIO_PACKET_AVAIL)) {
-            return;
-        }
-
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
         if (iohcRadio::txBatchActive) {
             iohcRadio::txComplete = true;
@@ -139,6 +138,9 @@ namespace IOHC {
                 vTaskNotifyGiveFromISR(iohcRadio::txTaskHandle, &xHigherPriorityTaskWoken);
             }
         } else {
+            if (!digitalRead(RADIO_PACKET_AVAIL)) {
+                return;
+            }
             twoWPayloadIrqCount++;
             iohcRadio::setRadioState(iohcRadio::RadioState::PAYLOAD);
             vTaskNotifyGiveFromISR(handle_interrupt, &xHigherPriorityTaskWoken);
@@ -573,9 +575,9 @@ void iohcRadio::startQueuedSend() {
 
     auto packet = packets2send[txCounter];
 
-    // 🟢 Set long preamble for first packet
-    Radio::setPreambleLength(LONG_PREAMBLE_MS);
-    ets_printf("TX: Using LONG preamble (%d ms)\n", LONG_PREAMBLE_MS);
+    // 🟢 Set long preamble for first packet (240 bytes = 1920 bits = 50 ms)
+    Radio::setPreambleLength(LONG_PREAMBLE_BYTES);
+    ets_printf("TX: Using LONG preamble (%d bytes / ~50ms)\n", LONG_PREAMBLE_BYTES);
 
     // Send first packet immediately
     Radio::setStandby();
@@ -686,6 +688,7 @@ void iohcRadio::onTxTicker(void *arg) {
 
     radio->setRadioState(RadioState::TX); // Stay TX until done
     Radio::setStandby();
+    Radio::setPreambleLength(SHORT_PREAMBLE_BYTES);
     if (packet->frequency != 0) {
         Radio::setCarrier(Radio::Carrier::Frequency, packet->frequency);
     }

@@ -309,5 +309,7 @@
   "label.received_just_now": "Reçu: À l'instant",
   "label.received_ago_sec": "Reçu: il y a {sec}s",
   "label.received_ago_min": "Reçu: il y a {min}m",
-  "label.received_ago_hours": "Reçu: il y a plus d'une heure"
+  "label.received_ago_hours": "Reçu: il y a plus d'une heure",
+  "popup.label_timing_open": "Temps d'ouverture (s):",
+  "popup.label_timing_close": "Temps de fermeture (s):"
 }

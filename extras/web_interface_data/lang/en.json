@@ -309,5 +309,7 @@
   "label.received_just_now": "Received: Just now",
   "label.received_ago_sec": "Received: {sec}s ago",
   "label.received_ago_min": "Received: {min}m ago",
-  "label.received_ago_hours": "Received: > 1 hour ago"
+  "label.received_ago_hours": "Received: > 1 hour ago",
+  "popup.label_timing_open": "Open travel time (s):",
+  "popup.label_timing_close": "Close travel time (s):"
 }

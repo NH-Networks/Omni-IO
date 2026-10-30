@@ -75,7 +75,10 @@
             // Safety fallback: auto-clear back to idle after travel_time + 2s
             var cached = (app && app.state && app.state.devicesCache) ?
                 app.state.devicesCache.find(function (d) { return d.id === deviceId; }) : null;
-            var travelSec = (cached && cached.travel_time > 0) ? cached.travel_time : 15;
+            var isOpening = (normalizedState === "OPENING");
+            var travelSec = isOpening
+                ? ((cached && cached.open_travel_time > 0) ? cached.open_travel_time : ((cached && cached.travel_time > 0) ? cached.travel_time : 15))
+                : ((cached && cached.close_travel_time > 0) ? cached.close_travel_time : ((cached && cached.travel_time > 0) ? cached.travel_time : 15));
             _stateTimers[deviceId] = setTimeout(function () {
                 delete _stateTimers[deviceId];
                 if (deviceEl.dataset.state === normalizedState) {
@@ -109,6 +112,10 @@
         var animDuration;
         if (action === "stop") {
             animDuration = 0.2;
+        } else if (action === "opening" && cached && (cached.open_travel_time > 0 || cached.travel_time > 0)) {
+            animDuration = cached.open_travel_time || cached.travel_time;
+        } else if (action === "closing" && cached && (cached.close_travel_time > 0 || cached.travel_time > 0)) {
+            animDuration = cached.close_travel_time || cached.travel_time;
         } else if (cached && cached.travel_time > 0) {
             animDuration = cached.travel_time;
         }
@@ -299,16 +306,18 @@
                 {
                     showSave: true,
                     showInput: true,
-                    showTiming: true,
+                    showTiming: false,
+                    showDualTiming: true,
                     showRoom: true,
                     btnShowDelete: true,
                     defaultValue: currentDevice.name,
-                    defaultTiming: currentDevice.travel_time,
+                    defaultTimingOpen: currentDevice.open_travel_time || currentDevice.travel_time || 10,
+                    defaultTimingClose: currentDevice.close_travel_time || currentDevice.travel_time || 10,
                     defaultRoom: existingRoom,
                     roomSuggestions: getAllUniqueRooms(app.state.devicesCache),
                     pairLabel: app.i18nText("popup.pair_label_device", "Add / Remove the device to the physical screen"),
                     deleteInfo: app.i18nText("popup.delete_device_info", "Only use when the device is not linked to a physical screen."),
-                    onSave: async function (newName, newTiming, deviceVal, newRoom) {
+                    onSave: async function (newName, legacyTiming, deviceVal, newRoom, newOpenTiming, newCloseTiming) {
                         try {
                             if (typeof newRoom !== "undefined") {
                                 setDeviceRoom(currentDevice.id, newRoom);
@@ -319,12 +328,15 @@
                                     command: "edit1W " + newName
                                 });
                             }
-                            var parsedTiming = parseInt(newTiming, 10);
-                            if (!isNaN(parsedTiming) && parsedTiming > 0 && parsedTiming !== currentDevice.travel_time) {
-                                await window.OmniIoApi.postJson("/api/command", {
-                                    deviceId: currentDevice.id,
-                                    command: "time1W " + parsedTiming
-                                });
+                            var parsedOpen = parseInt(newOpenTiming, 10);
+                            var parsedClose = parseInt(newCloseTiming, 10);
+                            if (!isNaN(parsedOpen) && !isNaN(parsedClose) && parsedOpen > 0 && parsedClose > 0) {
+                                if (parsedOpen !== currentDevice.open_travel_time || parsedClose !== currentDevice.close_travel_time) {
+                                    await window.OmniIoApi.postJson("/api/command", {
+                                        deviceId: currentDevice.id,
+                                        command: "time1W " + parsedOpen + " " + parsedClose
+                                    });
+                                }
                             }
                             await fetchAndDisplayDevices(app);
                         } catch (error) {}

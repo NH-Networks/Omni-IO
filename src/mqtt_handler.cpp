@@ -60,7 +60,7 @@ static void handleMqttConnectImpl();
 #ifdef FIRMWARE_VERSION
 #define IOHC_SW_VERSION FIRMWARE_VERSION
 #else
-#define IOHC_SW_VERSION "3.1.1"
+#define IOHC_SW_VERSION "3.1.2"
 #endif
 
 static void populateGatewayDevice(JsonVariant variant) {
@@ -196,16 +196,17 @@ static void publishButtonDiscovery(const std::string &id, const std::string &nam
     mqttClient.publish(topic.c_str(), 0, true, payload.c_str(), len);
 }
 
-void publishTravelTimeDiscovery(const std::string &id, const std::string &name,
-                                const std::string &key, uint32_t travelTime) {
+static void publishSingleNumberDiscovery(const std::string &id, const std::string &name,
+                                        const std::string &key, const std::string &suffix,
+                                        const std::string &subName, uint32_t currentVal) {
     JsonDocument doc;
-    doc["name"] = name + " travel time";
-    doc["unique_id"] = id + "_travel_time";
-    doc["command_topic"] = "iown/" + id + "/travel_time/set";
-    doc["state_topic"] = "iown/" + id + "/travel_time";
+    doc["name"] = name + " " + subName;
+    doc["unique_id"] = id + "_" + suffix;
+    doc["command_topic"] = "iown/" + id + "/" + suffix + "/set";
+    doc["state_topic"] = "iown/" + id + "/" + suffix;
     doc["unit_of_measurement"] = "s";
     doc["min"] = 0;
-    doc["max"] = 60;
+    doc["max"] = 120;
     doc["step"] = 1;
 
     JsonObject device = doc["device"].to<JsonObject>();
@@ -220,13 +221,34 @@ void publishTravelTimeDiscovery(const std::string &id, const std::string &name,
     std::string payload;
     size_t len = serializeJson(doc, payload);
 
-    std::string topic = mqtt_discovery_topic + "/number/" + id + "_travel_time/config";
+    std::string topic = mqtt_discovery_topic + "/number/" + id + "_" + suffix + "/config";
     mqttClient.publish(topic.c_str(), 0, true, payload.c_str(), len);
 
-    // publish current value
-    std::string stateTopic = "iown/" + id + "/travel_time";
-    std::string value = std::to_string(travelTime);
+    std::string stateTopic = "iown/" + id + "/" + suffix;
+    std::string value = std::to_string(currentVal);
     mqttClient.publish(stateTopic.c_str(), 0, true, value.c_str());
+}
+
+void publishTravelTimesDiscovery(const std::string &id, const std::string &name,
+                                 const std::string &key, uint32_t openTravelTime, uint32_t closeTravelTime) {
+    publishSingleNumberDiscovery(id, name, key, "open_travel_time", "open travel time", openTravelTime);
+    publishSingleNumberDiscovery(id, name, key, "close_travel_time", "close travel time", closeTravelTime);
+    publishSingleNumberDiscovery(id, name, key, "travel_time", "travel time", std::max(openTravelTime, closeTravelTime));
+}
+
+void publishTravelTimeDiscovery(const std::string &id, const std::string &name,
+                                const std::string &key, uint32_t travelTime) {
+    publishTravelTimesDiscovery(id, name, key, travelTime, travelTime);
+}
+
+void publishTravelTimesState(const std::string &id, uint32_t openTravelTime, uint32_t closeTravelTime) {
+    if (!mqttClient.connected()) return;
+    std::string openTopic = "iown/" + id + "/open_travel_time";
+    std::string closeTopic = "iown/" + id + "/close_travel_time";
+    std::string legacyTopic = "iown/" + id + "/travel_time";
+    mqttClient.publish(openTopic.c_str(), 0, true, std::to_string(openTravelTime).c_str());
+    mqttClient.publish(closeTopic.c_str(), 0, true, std::to_string(closeTravelTime).c_str());
+    mqttClient.publish(legacyTopic.c_str(), 0, true, std::to_string(std::max(openTravelTime, closeTravelTime)).c_str());
 }
 
 void publishDiscovery(const std::string &id, const std::string &name, const std::string &key) {
@@ -399,7 +421,7 @@ static void handleMqttConnectImpl() {
         std::string key = bytesToHexString(r.key, sizeof(r.key));
         std::string name = r.name.empty() ? r.description : r.name;
         publishDiscovery(id, name, key);
-        publishTravelTimeDiscovery(id, name, key, r.travelTime);
+        publishTravelTimesDiscovery(id, name, key, r.openTravelTime, r.closeTravelTime);
         const float position = r.positionTracker.getPosition();
         publishCoverPosition(id, position);
         publishCoverState(id, position >= 99.5f ? "OPEN" :
@@ -470,6 +492,8 @@ void onMqttConnect(bool sessionPresent) {
     mqttClient.subscribe("iown/+/add", 0);
     mqttClient.subscribe("iown/+/remove", 0);
     mqttClient.subscribe("iown/+/travel_time/set", 0);
+    mqttClient.subscribe("iown/+/open_travel_time/set", 0);
+    mqttClient.subscribe("iown/+/close_travel_time/set", 0);
 
     //mqttClient.publish("iown/Frame", 0, false, R"({"cmd": "powerOn", "_data": "Gateway"})", 38);
 
@@ -649,6 +673,40 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
     std::string topicStr(topic);
     std::string payloadStr(buf);
 
+    if (topicStr.rfind("iown/", 0) == 0 && topicStr.find("/open_travel_time/set", 5) != std::string::npos) {
+        std::string id = topicStr.substr(5, topicStr.find("/open_travel_time/set", 5) - 5);
+        std::transform(id.begin(), id.end(), id.begin(), ::tolower);
+        const auto &remotes = IOHC::iohcRemote1W::getInstance()->getRemotes();
+        auto it = std::find_if(remotes.begin(), remotes.end(), [&](const auto &r) {
+            return bytesToHexString(r.node, sizeof(r.node)) == id;
+        });
+        if (it != remotes.end()) {
+            uint32_t tt = strtoul(payloadStr.c_str(), nullptr, 10);
+            if (tt > 0) {
+                IOHC::iohcRemote1W::getInstance()->setOpenTravelTime(it->description, tt);
+            }
+            mqttClient.publish(topicStr.c_str(), 0, true, "", 0);
+        }
+        return;
+    }
+
+    if (topicStr.rfind("iown/", 0) == 0 && topicStr.find("/close_travel_time/set", 5) != std::string::npos) {
+        std::string id = topicStr.substr(5, topicStr.find("/close_travel_time/set", 5) - 5);
+        std::transform(id.begin(), id.end(), id.begin(), ::tolower);
+        const auto &remotes = IOHC::iohcRemote1W::getInstance()->getRemotes();
+        auto it = std::find_if(remotes.begin(), remotes.end(), [&](const auto &r) {
+            return bytesToHexString(r.node, sizeof(r.node)) == id;
+        });
+        if (it != remotes.end()) {
+            uint32_t tt = strtoul(payloadStr.c_str(), nullptr, 10);
+            if (tt > 0) {
+                IOHC::iohcRemote1W::getInstance()->setCloseTravelTime(it->description, tt);
+            }
+            mqttClient.publish(topicStr.c_str(), 0, true, "", 0);
+        }
+        return;
+    }
+
     if (topicStr.rfind("iown/", 0) == 0 && topicStr.find("/travel_time/set", 5) != std::string::npos) {
         std::string id = topicStr.substr(5, topicStr.find("/travel_time/set", 5) - 5);
         std::transform(id.begin(), id.end(), id.begin(), ::tolower);
@@ -659,10 +717,7 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
         if (it != remotes.end()) {
             uint32_t tt = strtoul(payloadStr.c_str(), nullptr, 10);
             if (tt > 0) {
-                IOHC::iohcRemote1W::getInstance()->setTravelTime(it->description, tt);
-                std::string stateTopic = "iown/" + id + "/travel_time";
-                std::string val = std::to_string(tt);
-                mqttClient.publish(stateTopic.c_str(), 0, true, val.c_str());
+                IOHC::iohcRemote1W::getInstance()->setTravelTimes(it->description, tt, tt);
             }
             mqttClient.publish(topicStr.c_str(), 0, true, "", 0);
         }

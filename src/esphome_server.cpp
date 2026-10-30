@@ -29,7 +29,7 @@
 #ifdef FIRMWARE_VERSION
 #define ESPHOME_FIRMWARE_VERSION FIRMWARE_VERSION
 #else
-#define ESPHOME_FIRMWARE_VERSION "3.1.1"
+#define ESPHOME_FIRMWARE_VERSION "3.1.2"
 #endif
 
 // FNV-1a 32-bit hash for stable entity keys across reboots
@@ -356,7 +356,43 @@ void sendCoverEntityList(int sock, const std::string &hexId, const std::string &
         sendFrame(sock, EspHomeMsg::LIST_ENTITIES_COVER_RESPONSE, w);
     }
 
-    // 2. Travel Time Number Entity
+    // 2. Open & Close Travel Time Number Entities (and legacy Travel Time)
+    {
+        std::string objId = "cover_" + hexId + "_open_travel_time";
+        uint32_t key = espHomeFnv1a(objId);
+
+        ProtoWriter w;
+        w.writeStringField(1, objId);                     // object_id
+        w.writeFixed32Field(2, key);                      // key
+        w.writeStringField(3, name + " Open Travel Time");// name
+        w.writeStringField(5, "mdi:timer-outline");       // icon
+        w.writeFloatField(6, 0.0f);                       // min_value
+        w.writeFloatField(7, 120.0f);                     // max_value
+        w.writeFloatField(8, 1.0f);                       // step
+        w.writeVarintField(10, 1);                        // entity_category = 1 (config)
+        w.writeStringField(11, "s");                      // unit_of_measurement
+        w.writeVarintField(12, 2);                        // mode = 2 (slider)
+
+        sendFrame(sock, EspHomeMsg::LIST_ENTITIES_NUMBER_RESPONSE, w);
+    }
+    {
+        std::string objId = "cover_" + hexId + "_close_travel_time";
+        uint32_t key = espHomeFnv1a(objId);
+
+        ProtoWriter w;
+        w.writeStringField(1, objId);                      // object_id
+        w.writeFixed32Field(2, key);                       // key
+        w.writeStringField(3, name + " Close Travel Time");// name
+        w.writeStringField(5, "mdi:timer-outline");        // icon
+        w.writeFloatField(6, 0.0f);                        // min_value
+        w.writeFloatField(7, 120.0f);                      // max_value
+        w.writeFloatField(8, 1.0f);                        // step
+        w.writeVarintField(10, 1);                         // entity_category = 1 (config)
+        w.writeStringField(11, "s");                       // unit_of_measurement
+        w.writeVarintField(12, 2);                         // mode = 2 (slider)
+
+        sendFrame(sock, EspHomeMsg::LIST_ENTITIES_NUMBER_RESPONSE, w);
+    }
     {
         std::string objId = "cover_" + hexId + "_travel_time";
         uint32_t key = espHomeFnv1a(objId);
@@ -533,12 +569,28 @@ void dumpInitialStates(int sock) {
         cw.writeVarintField(5, currentOp);
         sendFrame(sock, EspHomeMsg::COVER_STATE_RESPONSE, cw);
 
-        // Travel time state
-        uint32_t ttKey = espHomeFnv1a("cover_" + hexId + "_travel_time");
-        ProtoWriter tw;
-        tw.writeFixed32Field(1, ttKey);
-        tw.writeFloatField(2, static_cast<float>(r.travelTime));
-        sendFrame(sock, EspHomeMsg::NUMBER_STATE_RESPONSE, tw);
+        // Travel time states (open, close, legacy)
+        {
+            uint32_t openKey = espHomeFnv1a("cover_" + hexId + "_open_travel_time");
+            ProtoWriter tw;
+            tw.writeFixed32Field(1, openKey);
+            tw.writeFloatField(2, static_cast<float>(r.openTravelTime));
+            sendFrame(sock, EspHomeMsg::NUMBER_STATE_RESPONSE, tw);
+        }
+        {
+            uint32_t closeKey = espHomeFnv1a("cover_" + hexId + "_close_travel_time");
+            ProtoWriter tw;
+            tw.writeFixed32Field(1, closeKey);
+            tw.writeFloatField(2, static_cast<float>(r.closeTravelTime));
+            sendFrame(sock, EspHomeMsg::NUMBER_STATE_RESPONSE, tw);
+        }
+        {
+            uint32_t ttKey = espHomeFnv1a("cover_" + hexId + "_travel_time");
+            ProtoWriter tw;
+            tw.writeFixed32Field(1, ttKey);
+            tw.writeFloatField(2, static_cast<float>(r.travelTime));
+            sendFrame(sock, EspHomeMsg::NUMBER_STATE_RESPONSE, tw);
+        }
     }
 
     // Diagnostics
@@ -733,16 +785,20 @@ void handleNumberCommand(ProtoReader &reader) {
     const auto &remotes = IOHC::iohcRemote1W::getInstance()->getRemotes();
     for (const auto &r : remotes) {
         std::string hexId = bytesToHexString(r.node, sizeof(r.node));
-        if (espHomeFnv1a("cover_" + hexId + "_travel_time") == key) {
+        if (espHomeFnv1a("cover_" + hexId + "_open_travel_time") == key) {
             uint32_t tt = static_cast<uint32_t>(std::max(0.0f, state));
-            IOHC::iohcRemote1W::getInstance()->setTravelTime(r.description, tt);
+            IOHC::iohcRemote1W::getInstance()->setOpenTravelTime(r.description, tt);
+            addLogMessage(String("ESPHome open travel time set: ") + r.description.c_str() + " -> " + String(tt) + "s");
+            break;
+        } else if (espHomeFnv1a("cover_" + hexId + "_close_travel_time") == key) {
+            uint32_t tt = static_cast<uint32_t>(std::max(0.0f, state));
+            IOHC::iohcRemote1W::getInstance()->setCloseTravelTime(r.description, tt);
+            addLogMessage(String("ESPHome close travel time set: ") + r.description.c_str() + " -> " + String(tt) + "s");
+            break;
+        } else if (espHomeFnv1a("cover_" + hexId + "_travel_time") == key) {
+            uint32_t tt = static_cast<uint32_t>(std::max(0.0f, state));
+            IOHC::iohcRemote1W::getInstance()->setTravelTimes(r.description, tt, tt);
             addLogMessage(String("ESPHome travel time set: ") + r.description.c_str() + " -> " + String(tt) + "s");
-
-            // Broadcast back new state
-            ProtoWriter w;
-            w.writeFixed32Field(1, key);
-            w.writeFloatField(2, static_cast<float>(tt));
-            broadcastFrameToSubscribers(EspHomeMsg::NUMBER_STATE_RESPONSE, w);
             break;
         }
     }
@@ -1203,17 +1259,40 @@ void notifyEspHomeCoverState(const std::string &id, const char *state) {
     broadcastFrameToSubscribers(EspHomeMsg::COVER_STATE_RESPONSE, cw);
 }
 
-void notifyEspHomeTravelTime(const std::string &id, uint32_t travelTime) {
+void notifyEspHomeTravelTimes(const std::string &id, uint32_t openTravelTime, uint32_t closeTravelTime) {
     if (!s_serverRunning) return;
 
     std::string lowerId = id;
     std::transform(lowerId.begin(), lowerId.end(), lowerId.begin(), ::tolower);
-    uint32_t key = espHomeFnv1a("cover_" + lowerId + "_travel_time");
 
-    ProtoWriter w;
-    w.writeFixed32Field(1, key);
-    w.writeFloatField(2, static_cast<float>(travelTime));
-    broadcastFrameToSubscribers(EspHomeMsg::NUMBER_STATE_RESPONSE, w);
+    // Open travel time
+    {
+        uint32_t key = espHomeFnv1a("cover_" + lowerId + "_open_travel_time");
+        ProtoWriter w;
+        w.writeFixed32Field(1, key);
+        w.writeFloatField(2, static_cast<float>(openTravelTime));
+        broadcastFrameToSubscribers(EspHomeMsg::NUMBER_STATE_RESPONSE, w);
+    }
+    // Close travel time
+    {
+        uint32_t key = espHomeFnv1a("cover_" + lowerId + "_close_travel_time");
+        ProtoWriter w;
+        w.writeFixed32Field(1, key);
+        w.writeFloatField(2, static_cast<float>(closeTravelTime));
+        broadcastFrameToSubscribers(EspHomeMsg::NUMBER_STATE_RESPONSE, w);
+    }
+    // Legacy general travel time
+    {
+        uint32_t key = espHomeFnv1a("cover_" + lowerId + "_travel_time");
+        ProtoWriter w;
+        w.writeFixed32Field(1, key);
+        w.writeFloatField(2, static_cast<float>(std::max(openTravelTime, closeTravelTime)));
+        broadcastFrameToSubscribers(EspHomeMsg::NUMBER_STATE_RESPONSE, w);
+    }
+}
+
+void notifyEspHomeTravelTime(const std::string &id, uint32_t travelTime) {
+    notifyEspHomeTravelTimes(id, travelTime, travelTime);
 }
 
 void notifyEspHomeDiagnostics() {

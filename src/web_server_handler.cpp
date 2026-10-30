@@ -424,6 +424,8 @@ void handleApiDevices(AsyncWebServerRequest *request, JsonArray &root) {
     deviceObj["description"] = r.description.c_str();
     deviceObj["position"] = r.positionTracker.getPosition();
     deviceObj["travel_time"] = r.travelTime;
+    deviceObj["open_travel_time"] = r.openTravelTime;
+    deviceObj["close_travel_time"] = r.closeTravelTime;
     deviceObj["paired"] = r.paired;
     deviceObj["active"] = r.paired;
     deviceObj["repeatOnNoResponse"] = r.repeatOnNoResponse;
@@ -993,7 +995,7 @@ void handleApiInfo(AsyncWebServerRequest *request, JsonObject &root) {
   root["environment"] = "unknown";
 #endif
 #else
-  root["version"] = "3.1.1";
+  root["version"] = "3.1.2";
 #endif
   root["uptimeMs"] = millis();
   root["freeHeap"] = ESP.getFreeHeap();
@@ -1598,6 +1600,7 @@ void setupWebServer() {
   auto &staticHandler =
       server.serveStatic("/", LittleFS, "/web_interface_data/");
   staticHandler.setDefaultFile("index.html");
+  staticHandler.setCacheControl("max-age=86400"); // Cache static assets to eliminate latency & flash I/O
   staticHandler.setTryGzipFirst(false);
   staticHandler.setFilter([](AsyncWebServerRequest *request) {
     return !request->url().startsWith("/api");

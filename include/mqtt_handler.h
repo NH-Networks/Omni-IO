@@ -32,6 +32,9 @@ void onMqttMessage(char *topic, char *payload,
 void publishDiscovery(const std::string &id, const std::string &name, const std::string &key);
 void publishTravelTimeDiscovery(const std::string &id, const std::string &name,
                                 const std::string &key, uint32_t travelTime);
+void publishTravelTimesDiscovery(const std::string &id, const std::string &name,
+                                 const std::string &key, uint32_t openTravelTime, uint32_t closeTravelTime);
+void publishTravelTimesState(const std::string &id, uint32_t openTravelTime, uint32_t closeTravelTime);
 void handleMqttConnect();
 void publishHeartbeat();
 void mqttFuncHandler(const char *cmd);
@@ -48,6 +51,9 @@ inline void publishCoverPosition(const std::string &, float) {}
 inline void publishDiscovery(const std::string &, const std::string &, const std::string &) {}
 inline void publishTravelTimeDiscovery(const std::string &, const std::string &,
                                 const std::string &, uint32_t) {}
+inline void publishTravelTimesDiscovery(const std::string &, const std::string &,
+                                 const std::string &, uint32_t, uint32_t) {}
+inline void publishTravelTimesState(const std::string &, uint32_t, uint32_t) {}
 inline void removeDiscovery(const std::string &) {}
 inline void publishHeartbeat() {}
 inline void initMqtt() {}
@@ -56,4 +62,3 @@ inline void connectToMqtt() {}
 #endif // MQTT
 
 #endif // MQTT_HANDLER_H
-

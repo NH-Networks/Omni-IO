@@ -261,22 +261,24 @@ void createCommands() {
         }
         IOHC::iohcRemote1W::getInstance()->renameRemote(cmd->at(1), name);
     });
-    Cmd::addHandler((char *) "time1W", (char *) "Set 1W device travel time", [](Tokens *cmd)-> void {
+    Cmd::addHandler((char *) "time1W", (char *) "Set 1W device travel time (open & close)", [](Tokens *cmd)-> void {
         if (cmd->size() < 3) {
-            Serial.println("Usage: time1W <description> <seconds>");
+            Serial.println("Usage: time1W <description> <openSeconds> [closeSeconds]");
             return;
         }
-        uint32_t t = strtoul(cmd->at(2).c_str(), nullptr, 10);
-        IOHC::iohcRemote1W::getInstance()->setTravelTime(cmd->at(1), t);
+        uint32_t openSec = strtoul(cmd->at(2).c_str(), nullptr, 10);
+        uint32_t closeSec = (cmd->size() >= 4) ? strtoul(cmd->at(3).c_str(), nullptr, 10) : openSec;
+        IOHC::iohcRemote1W::getInstance()->setTravelTimes(cmd->at(1), openSec, closeSec);
     });
 
     Cmd::addHandler((char *) "list1W", (char *) "List 1W devices", [](Tokens *cmd)-> void {
         const auto &remotes = IOHC::iohcRemote1W::getInstance()->getRemotes();
         for (const auto &r : remotes) {
-            Serial.printf("%s: %s %u %s\n",
+            Serial.printf("%s: %s [open=%us close=%us] %s\n",
                           r.description.c_str(),
                           r.name.c_str(),
-                          r.travelTime,
+                          r.openTravelTime,
+                          r.closeTravelTime,
                           r.paired ? "paired" : "unpaired");
         }
     });

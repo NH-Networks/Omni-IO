@@ -309,5 +309,7 @@
   "label.received_just_now": "Ontvangen: Zojuist",
   "label.received_ago_sec": "Ontvangen: {sec}s geleden",
   "label.received_ago_min": "Ontvangen: {min}m geleden",
-  "label.received_ago_hours": "Ontvangen: > 1 uur geleden"
+  "label.received_ago_hours": "Ontvangen: > 1 uur geleden",
+  "popup.label_timing_open": "Looptijd openen (s):",
+  "popup.label_timing_close": "Looptijd sluiten (s):"
 }

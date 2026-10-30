@@ -309,5 +309,7 @@
   "label.received_just_now": "Empfangen: Gerade eben",
   "label.received_ago_sec": "Empfangen: vor {sec}s",
   "label.received_ago_min": "Empfangen: vor {min}m",
-  "label.received_ago_hours": "Empfangen: vor > 1 Stunde"
+  "label.received_ago_hours": "Empfangen: vor > 1 Stunde",
+  "popup.label_timing_open": "Laufzeit Öffnen (s):",
+  "popup.label_timing_close": "Laufzeit Schließen (s):"
 }

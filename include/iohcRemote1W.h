@@ -62,7 +62,9 @@ namespace IOHC {
             bool repeatOnNoResponse{false}; // When true, send extra bursts for unreliable 1W devices
             std::string description;
             std::string name;
-            uint32_t travelTime{}; // seconds to fully open or close
+            uint32_t openTravelTime{10};  // seconds to fully open (0 -> 100%)
+            uint32_t closeTravelTime{10}; // seconds to fully close (100 -> 0%)
+            uint32_t travelTime{10};      // legacy fallback (max of open and close)
             BlindPosition positionTracker{};
             enum class Movement { Idle, Opening, Closing } movement{Movement::Idle};
             float lastPublishedPosition{0.0f};
@@ -87,6 +89,9 @@ namespace IOHC {
         bool removeRemote(const std::string &description);
         bool renameRemote(const std::string &description, const std::string &name);
         bool setTravelTime(const std::string &description, uint32_t travelTime);
+        bool setTravelTimes(const std::string &description, uint32_t openTravelTime, uint32_t closeTravelTime);
+        bool setOpenTravelTime(const std::string &description, uint32_t openTravelTime);
+        bool setCloseTravelTime(const std::string &description, uint32_t closeTravelTime);
         bool importLearnedRemote(const address node, const uint8_t *key,
                                  uint16_t sequence, uint8_t type,
                                  uint8_t manufacturer);
@@ -106,4 +111,3 @@ namespace IOHC {
     };
 }
 #endif
-

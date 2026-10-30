@@ -84,6 +84,22 @@
         labelTiming.textContent = popupOptions.timingLabel || "timing:";
         inputTiming.value = showTiming ? (popupOptions.defaultTiming || "") : "";
 
+        const showDualTiming = !!popupOptions.showDualTiming;
+        const labelTimingOpen = document.getElementById("label-timing-open");
+        const inputTimingOpen = document.getElementById("popup-input-timing-open");
+        const labelTimingClose = document.getElementById("label-timing-close");
+        const inputTimingClose = document.getElementById("popup-input-timing-close");
+        if (labelTimingOpen && inputTimingOpen) {
+            labelTimingOpen.style.display = showDualTiming ? "block" : "none";
+            inputTimingOpen.style.display = showDualTiming ? "block" : "none";
+            inputTimingOpen.value = showDualTiming ? (popupOptions.defaultTimingOpen || "") : "";
+        }
+        if (labelTimingClose && inputTimingClose) {
+            labelTimingClose.style.display = showDualTiming ? "block" : "none";
+            inputTimingClose.style.display = showDualTiming ? "block" : "none";
+            inputTimingClose.value = showDualTiming ? (popupOptions.defaultTimingClose || "") : "";
+        }
+
         const labelRoom = document.getElementById("label-room");
         const inputRoom = document.getElementById("popup-input-room");
         const roomSuggestionsList = document.getElementById("room-suggestions-list");
@@ -194,10 +210,12 @@
         saveBtn.onclick = function () {
             const value = showInput ? input.value : true;
             const timingValue = showTiming ? inputTiming.value : undefined;
+            const openTimingValue = showDualTiming && inputTimingOpen ? inputTimingOpen.value : undefined;
+            const closeTimingValue = showDualTiming && inputTimingClose ? inputTimingClose.value : undefined;
             const deviceValue = showDevicePopup ? devicePopup.value : undefined;
             const roomValue = showRoom && inputRoom ? inputRoom.value.trim() : undefined;
             if (popupOptions.onSave) {
-                popupOptions.onSave(value, timingValue, deviceValue, roomValue);
+                popupOptions.onSave(value, timingValue, deviceValue, roomValue, openTimingValue, closeTimingValue);
             }
             closePopup();
         };

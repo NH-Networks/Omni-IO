@@ -87,7 +87,25 @@ jobs:
 
           ---
 
-          ## 🚀 What's New in v3.1.1 (Stability & Radio Pipeline Hardening)
+          ## 🚀 What's New in v3.1.2 (Radio Latency Optimization & Dual Travel Times)
+
+          * ⚡ **Radio Latency Optimization & Instant Responsiveness**:
+            * Fixed critical SX1276 FSK preamble configuration (\`REG_PREAMBLE\` takes bytes, not bits), reducing 1-Way transmission airtime from >2000 ms to ~200 ms (10x faster response time).
+            * Fixed preamble length for retransmissions in \`onTxTicker\`, eliminating unnecessary long preambles on repeated bursts.
+            * Hardened \`handle_payload_interrupt_fromisr()\` interrupt handler race condition by removing premature low-level state pin read in ISR.
+            * Eliminated blocking synchronous LittleFS flash writes (\`save()\`) during command dispatch; rolling code sequences are safely and atomically persisted in NVS.
+            * Enabled static asset HTTP caching (\`max-age=86400\`) on web server handlers, eliminating web UI interface sluggishness and SPI flash read contention.
+          * ⏱️ **Dual Asymmetric Travel Times (Open vs Close)**:
+            * Added individual \`openTravelTime\` and \`closeTravelTime\` calibration per screen across the entire stack.
+            * Full backward compatibility: legacy single \`travel_time\` remains supported as default fallback.
+            * Native ESPHome API: auto-exposes individual \`open_travel_time\` and \`close_travel_time\` number entities to Home Assistant alongside dynamic position simulation.
+            * MQTT: individual state and command topics for open and close timings (\`travel_time_open\`, \`travel_time_close\`).
+            * Web UI: dual timing inputs in device settings modal with dynamic directional curtain animation and multilingual localization (NL, EN, DE, FR).
+            * CLI: extended \`time1W\` command (\`time1W <desc> <openSec> [closeSec]\`) and \`list1W\` view.
+
+          ---
+
+          ## 🛡️ v3.1.1 Highlights (Stability & Radio Pipeline Hardening)
 
           * 🛡️ **FreeRTOS Callback Task & Queue Hardening**:
             * Doubled \`CallbackTask\` stack allocation from 4 KB to **8 KB** (\`8192 bytes\`), providing safe headroom for complex JSON serialization, dynamic string operations, and nested callbacks.
