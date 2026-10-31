@@ -87,6 +87,24 @@ jobs:
 
           ---
 
+          ## 📡 What's New in v3.1.5 (Low Power Mode Radio Preamble Restoration & Git Hygiene)
+
+          * 📡 **Restored 1920-Byte Default Preamble for Low Power Mode (LPM)**:
+            * Restored default \`LONG_PREAMBLE_BYTES = 1920\` (400 ms @ 38,400 baud) for the initial 1-Way transmission packet (#14).
+            * Fully restores responsiveness for battery- and solar-powered actuators (such as Velux KSX 100 WW and SSL solar roller shutters) that sleep heavily and sample RF carrier only once every ~350–400 ms.
+            * Fast retransmissions continue to use \`SHORT_PREAMBLE_BYTES = 40\` (~8.33 ms).
+          * ⚙️ **Configurable Radio Preamble via CLI, NVS & Preprocessor**:
+            * Added \`radioPreamble [long_bytes] [short_bytes]\` interactive command to serial and web terminals.
+            * Runtime changes are persistently stored in NVS (\`rf_pre_long\`, \`rf_pre_short\`).
+            * Wrapped preamble definitions with \`#ifndef\` for compile-time overrides (\`-DLONG_PREAMBLE_BYTES=...\`).
+            * Exposed live \`radioLongPreamble\` and \`radioShortPreamble\` byte metrics under the \`/api/info\` REST endpoint.
+          * 📖 **Troubleshooting & LPM Timing Documentation**:
+            * Added Section 7 to \`docs/TROUBLESHOOTING.md\` detailing io-homecontrol timing calculations for LPM motors and preamble configuration.
+          * 🛡️ **Repository Hygiene & Artifact Security**:
+            * Strengthened \`.gitignore\` and untracked legacy scratch scripts to prevent any internal test artifacts from leaking into public releases.
+
+          ---
+
           ## 🌐 What's New in v3.1.4 (ESPHome Native API & Network Latency Hardening)
 
           * 📶 **WiFi Modem Sleep Disabled**:
