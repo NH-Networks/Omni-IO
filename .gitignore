@@ -12,18 +12,23 @@ compile_commands.json
 *.swp
 *.orig
 *.org
+*.tmp
+*.bak
+*.log
 
 # ESP-IDF / CMake leftovers
 sdkconfig.HeltecESP32
 CMakeLists.txt
 src/CMakeLists.txt
 
-# Scratch & Local OTA Binaries
+# Scratch, Local OTA Binaries & Local Test Scripts
 scratch/
 *.bin
 
 # Agent instructions & internal knowledge base (local only)
 AGENTS.md
 knowledge.md
-
-
+GEMINI.md
+CLAUDE.md
+.antigravity/
+.gemini/
