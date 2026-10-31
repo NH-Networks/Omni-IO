@@ -87,6 +87,22 @@ jobs:
 
           ---
 
+          ## 🌐 What's New in v3.1.4 (ESPHome Native API & Network Latency Hardening)
+
+          * 📶 **WiFi Modem Sleep Disabled**:
+            * Enforced \`WIFI_PS_NONE\` and \`WiFi.setSleep(false)\` across the entire connection lifecycle (\`initWifi()\`, \`handleWifiConnected()\`, and reconnect events).
+            * Eliminates 2.5-second DTIM sleep latency spikes, bringing ping latency down to ~6 ms and preventing cross-VLAN/subnet ARP drops and TCP connection failures (\`Errno 113 EHOSTUNREACH\`).
+          * 🔌 **ESPHome TCP Keepalive & Socket Timeout Hardening**:
+            * Relaxed TCP keepalive on client connections from 15s to 60s idle (\`TCP_KEEPIDLE = 60s\`), with 10s intervals (\`TCP_KEEPINTVL = 10s\`) and 5 probes (\`TCP_KEEPCNT = 5\`), providing 110s resilience against network jitter.
+            * Configured explicit 10s socket send/receive timeouts (\`SO_RCVTIMEO\` / \`SO_SNDTIMEO\`).
+          * 🔄 **Transient Socket Write Retries**:
+            * Added a 10-attempt retry loop with 10 ms delays in \`sendFrame()\` when sockets return non-blocking \`EAGAIN\`, \`EWOULDBLOCK\`, or \`EINTR\`.
+            * Prevents immediate false disconnects (\`disconnected (socket write error)\`) during momentary Wi-Fi airtime bursts.
+          * 🛡️ **Safe Diagnostic Notification Dispatch**:
+            * Decoupled ESPHome RSSI diagnostic notifications from the resource-constrained \`esp_timer\` task (3.5 KB stack) by dispatching via event flags to the dedicated \`WiFi_Worker\` task (8 KB stack).
+
+          ---
+
           ## 🛠️ What's New in v3.1.3 (Board Pinout & Initialization Hardening)
 
           * 📟 **LilyGo LoRa32 v2.1 (T3 v1.6/v1.6.1) Hardware Pinout Fix**:
