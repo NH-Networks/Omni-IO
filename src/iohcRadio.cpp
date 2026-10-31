@@ -120,6 +120,12 @@ namespace IOHC {
                " rx=" + String(Radio::readByte(REG_RXCONFIG), HEX) +
                " dioMap=" + String(Radio::readByte(REG_DIOMAPPING1), HEX) + "/" +
                             String(Radio::readByte(REG_DIOMAPPING2), HEX);
+#elif defined(RADIO_SX126X)
+        return " freq=" + String(frequency) +
+               " dio1=" + String(digitalRead(RADIO_DIO1_PIN)) +
+               " irq_payload=" + String(twoWPayloadIrqCount) +
+               " irqStatus=" + String(Radio::getIrqStatus(), HEX) +
+               " rssi=" + String(Radio::getRssiInst());
 #else
         return "";
 #endif
@@ -161,6 +167,15 @@ namespace IOHC {
      * the interrupt service routine is complete.
      */
     void IRAM_ATTR handle_payload_interrupt_fromisr() {
+#if defined(RADIO_SX127X)
+        if (!digitalRead(RADIO_PACKET_AVAIL)) {
+            return;
+        }
+#elif defined(RADIO_SX126X)
+        if (!digitalRead(RADIO_DIO1_PIN)) {
+            return;
+        }
+#endif
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
         if (iohcRadio::txBatchActive) {
             iohcRadio::txComplete = true;
@@ -183,7 +198,13 @@ namespace IOHC {
             return;
         }
 
+#if defined(RADIO_SX127X)
         const bool syncActive = digitalRead(RADIO_PREAMBLE_DETECTED);
+#elif defined(RADIO_SX126X)
+        const bool syncActive = digitalRead(RADIO_DIO1_PIN);
+#else
+        const bool syncActive = false;
+#endif
         if (syncActive) {
             twoWSyncIrqCount++;
             iohcRadio::setRadioState(iohcRadio::RadioState::PREAMBLE);
@@ -225,9 +246,13 @@ namespace IOHC {
 #if defined(RADIO_SX127X)
         //        attachInterrupt(RADIO_PACKET_AVAIL, i_payload, CHANGE); //
         //        attachInterrupt(RADIO_PREAMBLE_DETECTED, i_preamble, CHANGE); //
+#if defined(RADIO_SX127X)
         attachInterrupt(RADIO_DIO0_PIN, handle_payload_interrupt_fromisr, RISING); //CHANGE); //
         //        attachInterrupt(RADIO_DIO1_PIN, handle_interrupt_fromisr, RISING); // CHANGE); //
         attachInterrupt(RADIO_DIO2_PIN, handle_sync_interrupt_fromisr, CHANGE);
+#elif defined(RADIO_SX126X)
+        attachInterrupt(RADIO_DIO1_PIN, handle_payload_interrupt_fromisr, RISING);
+#endif
 #elif defined(CC1101)
         attachInterrupt(RADIO_PREAMBLE_DETECTED, i_preamble, RISING);
 #endif
@@ -617,7 +642,11 @@ void iohcRadio::startQueuedSend() {
         Radio::setCarrier(Radio::Carrier::Frequency, packet->frequency);
     }
     Radio::clearFlags();
+#if defined(RADIO_SX127X)
     Radio::writeBytes(REG_FIFO, packet->payload.buffer, packet->buffer_length);
+#elif defined(RADIO_SX126X)
+    Radio::writeTxBuffer(packet->payload.buffer, packet->buffer_length);
+#endif
     Radio::setTx();
     txStartedAtUs = esp_timer_get_time();
     //packetStamp = esp_timer_get_time();
@@ -647,12 +676,21 @@ void iohcRadio::onTxTicker(void *arg) {
     auto packet = radio->packets2send[radio->txCounter];
 
     // 🩵 Fallback: Check IRQFLAGS2 (0x3F) for PacketSent in FSK mode
+#if defined(RADIO_SX127X)
     uint8_t irqFlags2 = Radio::readByte(0x3F); // REG_IRQFLAGS2
     if (irqFlags2 & 0x08) { // Bit 3 == PacketSent (TXDONE in FSK)
         ets_printf("FSK: Detected PacketSent (TXDONE) via register (ISR missed?)\n");
         Radio::writeByte(0x3F, 0x08); // Clear PacketSent bit
         iohcRadio::txComplete = true;
     }
+#elif defined(RADIO_SX126X)
+    uint16_t irqStatus = Radio::getIrqStatus();
+    if (irqStatus & SX126X_IRQ_TX_DONE) {
+        ets_printf("SX1262: Detected PacketSent (TXDONE) via register\n");
+        Radio::clearIrqStatus(SX126X_IRQ_TX_DONE);
+        iohcRadio::txComplete = true;
+    }
+#endif
     if (!radio->txComplete &&
         esp_timer_get_time() - radio->txStartedAtUs > 2000000ULL) {
         ets_printf("TX: PacketSent timeout; forcing completion\n");
@@ -726,7 +764,11 @@ void iohcRadio::onTxTicker(void *arg) {
         Radio::setCarrier(Radio::Carrier::Frequency, packet->frequency);
     }
     Radio::clearFlags();
+#if defined(RADIO_SX127X)
     Radio::writeBytes(REG_FIFO, packet->payload.buffer, packet->buffer_length);
+#elif defined(RADIO_SX126X)
+    Radio::writeTxBuffer(packet->payload.buffer, packet->buffer_length);
+#endif
     Radio::setTx();
     radio->txStartedAtUs = esp_timer_get_time();
     //packetStamp = esp_timer_get_time();
@@ -817,6 +859,19 @@ bool queueCallback(IohcPacketDelegate* callback, iohcPacket* packet) {
             //            iohc->afc = f * (32000000.0 / 524288.0); // static_cast<float>(1 << 19));
             iohc->afc = /*(int32_t)*/f * 61.0;
             //            iohc->rssiAt = micros();
+        }
+#elif defined(RADIO_SX126X)
+        if (stats) {
+            iohc->rssi = -static_cast<float>(Radio::getRssiInst()) / 2.0f;
+            iohc->snr = 0;
+            iohc->afc = 0;
+        }
+        uint8_t rxBuf[MAX_FRAME_LEN] = {0};
+        uint8_t rxLen = 0;
+        Radio::readRxBuffer(rxBuf, rxLen);
+        if (rxLen > 0 && rxLen <= MAX_FRAME_LEN) {
+            memcpy(iohc->payload.buffer, rxBuf, rxLen);
+            iohc->buffer_length = rxLen;
         }
 #elif defined(CC1101)
         __g_preamble = false;
@@ -1060,6 +1115,8 @@ bool queueCallback(IohcPacketDelegate* callback, iohcPacket* packet) {
     void IRAM_ATTR iohcRadio::i_preamble() {
 #if defined(RADIO_SX127X)
         bool preamble = digitalRead(RADIO_PREAMBLE_DETECTED);
+#elif defined(RADIO_SX126X)
+        bool preamble = digitalRead(RADIO_DIO1_PIN);
 #elif defined(CC1101)
         __g_preamble = true;
         bool preamble = __g_preamble;
@@ -1074,6 +1131,9 @@ bool queueCallback(IohcPacketDelegate* callback, iohcPacket* packet) {
     void IRAM_ATTR iohcRadio::i_payload() {
 #if defined(RADIO_SX127X)
         bool payload = digitalRead(RADIO_PACKET_AVAIL);
+        iohcRadio::setRadioState(payload ? iohcRadio::RadioState::PAYLOAD : iohcRadio::RadioState::RX);
+#elif defined(RADIO_SX126X)
+        bool payload = digitalRead(RADIO_DIO1_PIN);
         iohcRadio::setRadioState(payload ? iohcRadio::RadioState::PAYLOAD : iohcRadio::RadioState::RX);
 #endif
     }

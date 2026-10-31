@@ -7,6 +7,9 @@ This document classifies all files in this repository based on their origin, ide
 
 ## CloudAXS Proprietary (CloudAXS Nieuw)
 These files were fully created by CloudAXS. They do not contain upstream code and are exclusively licensed under `LICENSE-CLOUDAXS`.
+* `include/SX126xHelpers.h`
+* `include/sx126xRegs.h`
+* `src/SX126xHelpers.cpp`
 * `src/esphome_server.cpp`
 * `include/esphome_server.h`
 * `docs/API_AND_MQTT_REFERENCE.md`

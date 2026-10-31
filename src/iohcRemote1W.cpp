@@ -86,7 +86,7 @@ namespace IOHC {
             _iohcRemote1W = new iohcRemote1W();
             _iohcRemote1W->load();
             xTaskCreatePinnedToCore(positionTaskLoop, "positionTracker", 4096,
-                                    _iohcRemote1W, 1, nullptr, 1);
+                                    _iohcRemote1W, 1, nullptr, (portNUM_PROCESSORS > 1 ? 1 : 0));
         }
         return _iohcRemote1W;
     }

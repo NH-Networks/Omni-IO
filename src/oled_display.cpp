@@ -43,7 +43,14 @@
 #include <esphome_server.h>
 #endif
 
-// OLED screen dimensions
+#if defined(M5STACK_C6L)
+// OLED screen dimensions for M5Stack C6L (0.66" SSD1306 SPI)
+#define SCREEN_WIDTH  DISPLAY_WIDTH
+#define SCREEN_HEIGHT DISPLAY_HEIGHT
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &SPI, OLED_DC_PIN, OLED_RST_PIN, OLED_CS_PIN);
+#else
+// OLED screen dimensions for I2C boards
 #define SCREEN_WIDTH  128
 #define SCREEN_HEIGHT  64
 
@@ -54,6 +61,7 @@
 #define OLED_ADDRESS 0x3C
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RST);
+#endif
 DisplayBuffer displayBuffer;
 SemaphoreHandle_t displayBufferMutex = xSemaphoreCreateMutex();
 
@@ -78,11 +86,16 @@ static std::atomic<bool>     isDisplayDimmed{false};
 // Calling display.ssd1306_command() twice would send an I2C STOP after 0x81,
 // aborting the 2-byte command on SSD1306 controllers.
 static void setDisplayContrast(uint8_t contrast) {
+#if defined(M5STACK_C6L)
+    display.ssd1306_command(SSD1306_SETCONTRAST);
+    display.ssd1306_command(contrast);
+#else
     Wire.beginTransmission(OLED_ADDRESS);
     Wire.write(0x00);                // Co = 0, D/C# = 0 (Command mode stream)
     Wire.write(SSD1306_SETCONTRAST); // 0x81
     Wire.write(contrast);            // 0x00..0xFF
     Wire.endTransmission();
+#endif
 }
 
 // Map dim level to SSD1306 contrast byte
@@ -280,10 +293,18 @@ bool initDisplay() {
         cpuTempEnabled = showTemp;
     }
 
+#if defined(M5STACK_C6L)
+    pinMode(OLED_CS_PIN, OUTPUT);
+    digitalWrite(OLED_CS_PIN, HIGH);
+    if (!display.begin(SSD1306_SWITCHCAPVCC)) {
+        return false;
+    }
+#else
     Wire.begin(OLED_SDA, OLED_SCL);
     if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDRESS)) {
         return false;
     }
+#endif
 
     display.dim(false);
 
@@ -419,7 +440,7 @@ void drawHeader() {
 #if defined(MQTT)
     if (mqtt_enabled) {
         const auto mqttIcon = mqttIcons[mqttStatusToIconIndex()];
-        display.drawBitmap(127-8-1-16, 5, mqttIcon, 16, 5, SSD1306_WHITE);
+        display.drawBitmap(SCREEN_WIDTH - 1 - 8 - 1 - 16, 5, mqttIcon, 16, 5, SSD1306_WHITE);
     }
 #endif
 
@@ -427,15 +448,15 @@ void drawHeader() {
     if (esphome_enabled && isEspHomeServerRunning()) {
         int iconIdx = (getEspHomeConnectedClients() > 0) ? 1 : 0;
         const auto espIcon = espHomeIcons[iconIdx];
-        int xPos = (mqtt_enabled) ? (127 - 8 - 1 - 16 - 2 - 11) : (127 - 8 - 3 - 11);
+        int xPos = (mqtt_enabled) ? (SCREEN_WIDTH - 1 - 8 - 1 - 16 - 2 - 11) : (SCREEN_WIDTH - 1 - 8 - 3 - 11);
         display.drawBitmap(xPos, 3, espIcon, 11, 7, SSD1306_WHITE);
     }
 #endif
 
     const auto wifiIcon = wifiIcons[min(wifiStatus.signalStrengthPercent.load(), 99) / 25];
-    display.drawBitmap(127-8, 3, wifiIcon, 8, 7, SSD1306_WHITE);
+    display.drawBitmap(SCREEN_WIDTH - 1 - 8, 3, wifiIcon, 8, 7, SSD1306_WHITE);
 
-    if (cpuTempEnabled.load()) {
+    if (cpuTempEnabled.load() && SCREEN_WIDTH > 64) {
         int cpuX = (mqtt_enabled && esphome_enabled && isEspHomeServerRunning()) ? 62 : 74;
         display.setCursor(cpuX, 4);
         display.printf("%.0fC", temperatureRead());
@@ -444,11 +465,11 @@ void drawHeader() {
 
 void drawFooter() {
     if (wifiStatus.connectionStatus == ConnState::Connected) {
-        display.setCursor(1, 56);
+        display.setCursor(1, SCREEN_HEIGHT - 8);
         if (getSecondsSinceStart() / 10 % 2 == 0) {
-            display.println("http://omni-io.local");
+            display.println(SCREEN_WIDTH <= 64 ? "omni-io" : "http://omni-io.local");
         } else {
-            display.printf("IP: %s\n", WiFi.localIP().toString().c_str());
+            display.printf(SCREEN_WIDTH <= 64 ? "%s\n" : "IP: %s\n", WiFi.localIP().toString().c_str());
         }
     }
 }
