@@ -32,6 +32,7 @@
 #if defined(ESPHOME_API)
 #include <esphome_server.h>
 #endif
+#include <esp_wifi.h>
 #include <WiFiManager.h>
 #include <ESPmDNS.h>
 #include <TickerUsESP32.h>
@@ -41,6 +42,7 @@ const long PORTAL_TIMEOUT = 300000; // 5 minuten = 300.000 ms
 const uint32_t WIFI_NOTIFY_GOT_IP = BIT0;
 const uint32_t WIFI_NOTIFY_DISCONNECTED = BIT1;
 const uint32_t WIFI_NOTIFY_RECONNECT = BIT2;
+const uint32_t WIFI_NOTIFY_DIAG = BIT3;
 static constexpr uint32_t WIFI_RECONNECT_INTERVAL_MS = 10000;
 static constexpr uint32_t WIFI_STACK_RESET_AFTER_MS = 120000;
 static constexpr uint32_t WIFI_RESTART_AFTER_MS = 1800000;
@@ -57,6 +59,11 @@ static uint32_t s_wifiDisconnectedSinceMs = 0;
 static uint32_t s_lastWiFiReconnectAttemptMs = 0;
 static uint32_t s_lastWiFiStackResetMs = 0;
 static uint16_t s_wifiReconnectAttempts = 0;
+
+static void disableWiFiSleep() {
+    WiFi.setSleep(false);
+    esp_wifi_set_ps(WIFI_PS_NONE);
+}
 
 // Replicate WiFiManager::getRSSIasQuality() without constructing a WiFiManager object.
 static int rssiToQuality(int rssi) {
@@ -83,7 +90,7 @@ static void rssiTimerCb() {
         if (now - lastEspHomeDiagMs >= 30000UL || std::abs(newRssi - lastSentRssi) >= 5) {
             lastEspHomeDiagMs = now;
             lastSentRssi = newRssi;
-            notifyEspHomeDiagnostics();
+            notifyWiFiWorker(WIFI_NOTIFY_DIAG);
         }
 #endif
     }
@@ -111,6 +118,7 @@ static void onMqttAfterWifi() {
 
 static void handleWifiConnected() {
     if (WiFi.status() == WL_CONNECTED) {
+        disableWiFiSleep();
         wifiStatus.connectionStatus = ConnState::Connected;
         wifiStatus.rssi = WiFi.RSSI();
         wifiStatus.signalStrengthPercent = rssiToQuality(wifiStatus.rssi);
@@ -482,13 +490,24 @@ static void wifiWorker(void * pvParameters) {
             handleWifiConnected();
         }
 
+        if ((events & WIFI_NOTIFY_DIAG) != 0) {
+#if defined(ESPHOME_API)
+            notifyEspHomeDiagnostics();
+#endif
+        }
+
         maintainWiFiConnection();
     }
 }
 
 static void onWiFiEvent(WiFiEvent_t event) {
     switch (event) {
+        case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+            disableWiFiSleep();
+            break;
+
         case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+            disableWiFiSleep();
             notifyWiFiWorker(WIFI_NOTIFY_GOT_IP);
             break;
 
@@ -513,7 +532,7 @@ void initWifi() {
 
     WiFi.onEvent(onWiFiEvent);
     WiFi.setAutoReconnect(true);
-    WiFi.setSleep(false);
+    disableWiFiSleep();
 
     xTaskCreatePinnedToCore(wifiWorker, "WiFi_Worker", 8192, NULL, 3, &wifiWorkerTaskHandle, 1);
 

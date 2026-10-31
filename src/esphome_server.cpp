@@ -240,10 +240,22 @@ bool sendFrame(int sock, uint16_t msgType, const uint8_t *payload, size_t payloa
 
     size_t total = msg.buffer.size();
     size_t sent = 0;
+    int retries = 0;
     while (sent < total) {
         ssize_t res = send(sock, msg.buffer.data() + sent, total - sent, 0);
-        if (res <= 0) return false;
+        if (res <= 0) {
+            if (res < 0) {
+                if (errno == EINTR) continue;
+                if ((errno == EAGAIN || errno == EWOULDBLOCK) && retries++ < 10) {
+                    vTaskDelay(pdMS_TO_TICKS(10));
+                    continue;
+                }
+                Serial.printf("ESPHome: Socket %d write failed: errno=%d (%s)\n", sock, errno, strerror(errno));
+            }
+            return false;
+        }
         sent += res;
+        retries = 0;
     }
 
     // Refresh client's activity timestamp since frame was successfully transmitted
@@ -1011,15 +1023,15 @@ void esphomeServerTask(void *param) {
 
                 int keepAlive = 1;
                 setsockopt(newSock, SOL_SOCKET, SO_KEEPALIVE, reinterpret_cast<char*>(&keepAlive), sizeof(int));
-                int keepIdle = 15;
+                int keepIdle = 60;
                 setsockopt(newSock, IPPROTO_TCP, TCP_KEEPIDLE, reinterpret_cast<char*>(&keepIdle), sizeof(int));
-                int keepInterval = 5;
+                int keepInterval = 10;
                 setsockopt(newSock, IPPROTO_TCP, TCP_KEEPINTVL, reinterpret_cast<char*>(&keepInterval), sizeof(int));
-                int keepCount = 3;
+                int keepCount = 5;
                 setsockopt(newSock, IPPROTO_TCP, TCP_KEEPCNT, reinterpret_cast<char*>(&keepCount), sizeof(int));
 
                 struct timeval tvTimeout;
-                tvTimeout.tv_sec = 5;
+                tvTimeout.tv_sec = 10;
                 tvTimeout.tv_usec = 0;
                 setsockopt(newSock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<char*>(&tvTimeout), sizeof(tvTimeout));
                 setsockopt(newSock, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<char*>(&tvTimeout), sizeof(tvTimeout));
