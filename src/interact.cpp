@@ -19,6 +19,7 @@
  */
 #include <fileSystemHelpers.h>
 #include <iohcRemote1W.h>
+#include <iohcRadio.h>
 #include <iohcCozyDevice2W.h>
 #include <iohcOtherDevice2W.h>
 #include <iohcRemoteMap.h>
@@ -482,6 +483,24 @@ void createCommands() {
         IOHC::lastFromAddress.store(zero);
         broadcastLastAddress("------", "", "");
         Serial.println("Last address cleared");
+    });
+    Cmd::addHandler((char *) "radioPreamble", (char *) "Get/set radio preamble bytes (usage: radioPreamble [long_bytes] [short_bytes])", [](Tokens *cmd)-> void {
+        if (cmd->size() > 1) {
+            uint16_t longBytes = atoi(cmd->at(1).c_str());
+            uint16_t shortBytes = (cmd->size() > 2) ? atoi(cmd->at(2).c_str()) : 0;
+            IOHC::iohcRadio::setPreambleConfig(longBytes, shortBytes);
+            Serial.printf("Radio preamble updated: long=%d bytes (~%d ms), short=%d bytes (~%d ms)\n",
+                          IOHC::iohcRadio::getLongPreambleBytes(),
+                          (IOHC::iohcRadio::getLongPreambleBytes() * 8000) / 38400,
+                          IOHC::iohcRadio::getShortPreambleBytes(),
+                          (IOHC::iohcRadio::getShortPreambleBytes() * 8000) / 38400);
+        } else {
+            Serial.printf("Current radio preamble: long=%d bytes (~%d ms), short=%d bytes (~%d ms)\n",
+                          IOHC::iohcRadio::getLongPreambleBytes(),
+                          (IOHC::iohcRadio::getLongPreambleBytes() * 8000) / 38400,
+                          IOHC::iohcRadio::getShortPreambleBytes(),
+                          (IOHC::iohcRadio::getShortPreambleBytes() * 8000) / 38400);
+        }
     });
 #if defined(MQTT)
     Cmd::addHandler((char *) "mqttIp", (char *) "Set MQTT server IP", [](Tokens *cmd)-> void {

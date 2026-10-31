@@ -42,6 +42,8 @@ static constexpr char NVS_KEY_ESPHOME_EN[] = "esp_en";
 static constexpr char NVS_KEY_ESPHOME_PORT[] = "esp_port";
 static constexpr char NVS_KEY_ESPHOME_PWD[] = "esp_pwd";
 static constexpr char NVS_KEY_ESPHOME_NAME[] = "esp_name";
+static constexpr char NVS_KEY_RF_LONG_PREAMBLE[] = "rf_pre_long";
+static constexpr char NVS_KEY_RF_SHORT_PREAMBLE[] = "rf_pre_short";
 
 
 bool nvs_init();

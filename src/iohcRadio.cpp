@@ -28,16 +28,46 @@
 #include <log_buffer.h>
 #include <utils.h>
 #include <web_server_handler.h>
+#include <nvs_helpers.h>
 #if defined(MQTT)
 #include <mqtt_handler.h>
 #endif
 // Preamble length in bytes for SX1276 FSK register (REG_PREAMBLE: 1 byte = 8 bits = 208.33 us @ 38400 baud)
-// Long preamble: 240 bytes = 1920 bits = 50 ms (wakes up battery LPM listeners)
-// Short preamble: 40 bytes = 320 bits = 8.33 ms (fast repeats)
-#define LONG_PREAMBLE_BYTES 240
+// Long preamble: 1920 bytes = 15360 bits = 400 ms (io-homecontrol Low Power Mode / LPM wake-up duration for solar/battery motors like Velux KSX 100 WW)
+// Short preamble: 40 bytes = 320 bits = 8.33 ms (fast repeats for already-awake receivers)
+#ifndef LONG_PREAMBLE_BYTES
+#define LONG_PREAMBLE_BYTES 1920
+#endif
+
+#ifndef SHORT_PREAMBLE_BYTES
 #define SHORT_PREAMBLE_BYTES 40
+#endif
 
 namespace IOHC {
+    uint16_t iohcRadio::getLongPreambleBytes() {
+        uint16_t val = 0;
+        if (nvs_read_u16(NVS_KEY_RF_LONG_PREAMBLE, val) && val > 0) {
+            return val;
+        }
+        return LONG_PREAMBLE_BYTES;
+    }
+
+    uint16_t iohcRadio::getShortPreambleBytes() {
+        uint16_t val = 0;
+        if (nvs_read_u16(NVS_KEY_RF_SHORT_PREAMBLE, val) && val > 0) {
+            return val;
+        }
+        return SHORT_PREAMBLE_BYTES;
+    }
+
+    void iohcRadio::setPreambleConfig(uint16_t longBytes, uint16_t shortBytes) {
+        if (longBytes > 0) {
+            nvs_write_u16(NVS_KEY_RF_LONG_PREAMBLE, longBytes);
+        }
+        if (shortBytes > 0) {
+            nvs_write_u16(NVS_KEY_RF_SHORT_PREAMBLE, shortBytes);
+        }
+    }
     static void radioTickerTaskLoop(void *arg) {
         auto *radio = static_cast<iohcRadio *>(arg);
         const TickType_t interval = pdMS_TO_TICKS(1);
@@ -575,9 +605,11 @@ void iohcRadio::startQueuedSend() {
 
     auto packet = packets2send[txCounter];
 
-    // 🟢 Set long preamble for first packet (240 bytes = 1920 bits = 50 ms)
-    Radio::setPreambleLength(LONG_PREAMBLE_BYTES);
-    ets_printf("TX: Using LONG preamble (%d bytes / ~50ms)\n", LONG_PREAMBLE_BYTES);
+    // 🟢 Set long preamble for first packet
+    const uint16_t longPreamble = getLongPreambleBytes();
+    Radio::setPreambleLength(longPreamble);
+    ets_printf("TX: Using LONG preamble (%d bytes / ~%llu ms)\n",
+               longPreamble, (static_cast<uint64_t>(longPreamble) * 8000ULL) / 38400ULL);
 
     // Send first packet immediately
     Radio::setStandby();
@@ -688,7 +720,8 @@ void iohcRadio::onTxTicker(void *arg) {
 
     radio->setRadioState(RadioState::TX); // Stay TX until done
     Radio::setStandby();
-    Radio::setPreambleLength(SHORT_PREAMBLE_BYTES);
+    const uint16_t shortPreamble = getShortPreambleBytes();
+    Radio::setPreambleLength(shortPreamble);
     if (packet->frequency != 0) {
         Radio::setCarrier(Radio::Carrier::Frequency, packet->frequency);
     }

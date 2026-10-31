@@ -1,4 +1,8 @@
 /*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
+/*
    Copyright (c) 2024. CRIDP https://github.com/cridp
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -80,6 +84,9 @@ namespace IOHC {
             static TaskHandle_t txTaskHandle;
             static volatile bool txComplete;
             static volatile bool txBatchActive;
+            static uint16_t getLongPreambleBytes();
+            static uint16_t getShortPreambleBytes();
+            static void setPreambleConfig(uint16_t longBytes, uint16_t shortBytes);
             //static void setPreambleLength(uint16_t preambleLen);
 
         private:

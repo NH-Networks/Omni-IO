@@ -20,6 +20,7 @@
 #include <interact.h>
 #include <iohcCryptoHelpers.h>
 #include <iohcRemote1W.h>
+#include <iohcRadio.h>
 #include <iohcRemoteMap.h>
 #include <iohcPacket.h>
 #include <log_buffer.h>
@@ -1027,6 +1028,8 @@ void handleApiInfo(AsyncWebServerRequest *request, JsonObject &root) {
   root["esphomeEnabled"] = false;
   root["esphomeName"] = "";
 #endif
+  root["radioLongPreamble"] = IOHC::iohcRadio::getLongPreambleBytes();
+  root["radioShortPreamble"] = IOHC::iohcRadio::getShortPreambleBytes();
 }
 
 void handleApiLogs(AsyncWebServerRequest *request, JsonArray &root) {

@@ -70,6 +70,7 @@ This document provides a comprehensive list of all serial console and web interf
 | Command | Arguments | Description |
 | :--- | :--- | :--- |
 | `lastAddr` | | Display the last received RF node address |
+| `radioPreamble` | `[long_bytes] [short_bytes]` | Get or set radio preamble bytes (default: 1920 bytes / 400 ms long preamble for battery/solar LPM wake-up, 40 bytes / 8.3 ms short repeats) |
 | `verbose` | | Toggle verbose debug logging for RF packets |
 | `help` | | Display available commands |
 | `ls` | | List files in LittleFS filesystem |
