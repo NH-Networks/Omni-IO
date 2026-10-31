@@ -91,4 +91,20 @@ This guide provides solutions to common issues encountered during setup, WiFi co
 * **Expected Behavior**: When devices are modified in Omni-IO, `syncEspHomeDevices()` gracefully disconnects active ESPHome sessions. Home Assistant's `aioesphomeapi` client detects this and reconnects within 1.0–1.5 seconds, running entity discovery during the handshake.
 * **Troubleshooting**: If Home Assistant does not refresh after 5 seconds, reload the ESPHome integration under **Settings → Devices & Services → ESPHome → Reload**.
 
+---
+
+## 7. Radio & Motor Response Issues
+
+### Solar or battery-powered Velux motors do not react to commands
+* **Cause**: Solar and battery-powered actuators (such as the Velux KSX 100 WW or SSL solar roller shutters) run in Low Power Mode (LPM) and sleep to conserve battery. They only poll for RF signals once every 350–400 ms. If the transmission preamble is too short (< 400 ms), the motor will sleep through the entire transmission.
+* **Solution**:
+  * Omni-IO defaults to `1920` bytes (400 ms @ 38400 baud) for the initial wake-up packet.
+  * You can inspect or adjust the radio preamble at runtime via the serial/web terminal using:
+    ```bash
+    radioPreamble
+    radioPreamble 1920 40
+    ```
+  * Or via the REST API: `POST /api/command {"command": "radioPreamble 1920 40"}`.
+
+
 
