@@ -6,6 +6,8 @@
 #include <Arduino.h>
 #include <log_buffer.h>
 #include <user_config.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 #if defined(WEBSERVER)
 #include <web_server_handler.h>
@@ -21,6 +23,7 @@ namespace {
     char logRing[MAX_LOG_ENTRIES][MAX_LOG_ENTRY_LEN] = {};
     size_t logStart = 0;
     size_t logCount = 0;
+    SemaphoreHandle_t logMutex = nullptr;
     RTC_NOINIT_ATTR char crashMarker[96];
     RTC_NOINIT_ATTR uint32_t crashMarkerMagic;
     constexpr uint32_t CRASH_MARKER_MAGIC = 0x4d494f50; // MIOP
@@ -57,12 +60,21 @@ namespace {
     }
 }
 
+void initLogBuffer() {
+    if (!logMutex) {
+        logMutex = xSemaphoreCreateMutex();
+        if (!logMutex) {
+            Serial.println("Log buffer mutex creation failed");
+        }
+    }
+}
+
 void addLogMessage(const String &msg) {
-    static bool inLogMessage = false;
-    if (inLogMessage) {
+    if (!logMutex) {
+        Serial.printf("[%10lu ms] %s\n", millis(), msg.c_str());
         return;
     }
-    inLogMessage = true;
+    if (xSemaphoreTake(logMutex, portMAX_DELAY) != pdTRUE) return;
 
     static char lastMessage[MAX_LOG_ENTRY_LEN] = {};
     static unsigned long lastMessageMs = 0;
@@ -70,7 +82,7 @@ void addLogMessage(const String &msg) {
     const char *text = msg.c_str();
 
     if (strncmp(text, lastMessage, MAX_LOG_ENTRY_LEN) == 0 && now - lastMessageMs < 3000) {
-        inLogMessage = false;
+        xSemaphoreGive(logMutex);
         return;
     }
     snprintf(lastMessage, sizeof(lastMessage), "%s", text);
@@ -86,24 +98,30 @@ void addLogMessage(const String &msg) {
 
     snprintf(logRing[slot], MAX_LOG_ENTRY_LEN, "%s", text);
     const String storedMessage(logRing[slot]);
+    const bool broadcast = shouldBroadcastLog(storedMessage);
+    xSemaphoreGive(logMutex);
+
     Serial.printf("[%10lu ms] %s\n", now, storedMessage.c_str());
 #if defined(WEBSERVER)
-    if (shouldBroadcastLog(storedMessage)) {
+    if (broadcast) {
         broadcastLog(storedMessage);
     }
 #endif
 #if defined(SYSLOG)
     sendSyslog(storedMessage);
 #endif
-    inLogMessage = false;
 }
 
 std::vector<String> getLogMessages() {
     std::vector<String> logs;
+    if (!logMutex || xSemaphoreTake(logMutex, portMAX_DELAY) != pdTRUE) {
+        return logs;
+    }
     logs.reserve(logCount);
     for (size_t idx = 0; idx < logCount; ++idx) {
         logs.emplace_back(logRing[(logStart + idx) % MAX_LOG_ENTRIES]);
     }
+    xSemaphoreGive(logMutex);
     return logs;
 }
 

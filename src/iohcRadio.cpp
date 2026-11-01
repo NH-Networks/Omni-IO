@@ -84,7 +84,7 @@ namespace IOHC {
     volatile iohcRadio::RadioState iohcRadio::radioState = iohcRadio::RadioState::IDLE;
     TaskHandle_t iohcRadio::txTaskHandle = nullptr;
     volatile bool iohcRadio::txComplete = false;
-    volatile bool iohcRadio::txBatchActive = false;
+    std::atomic<bool> iohcRadio::txBatchActive{false};
 
 
     TaskHandle_t handle_interrupt;
@@ -210,7 +210,8 @@ namespace IOHC {
         }
     }
 
-    iohcRadio::iohcRadio() {
+    iohcRadio::iohcRadio() : sendQueueMutex(xSemaphoreCreateMutex()) {
+        configASSERT(sendQueueMutex);
         Radio::initHardware();
         Radio::calibrate();
 
@@ -313,7 +314,7 @@ namespace IOHC {
         // Enable frequency hopping to scan all configured channels.
 #if defined(ESP32)
         if (!tickerTaskHandle &&
-            xTaskCreatePinnedToCore(radioTickerTaskLoop, "radioTicker", 4096, this,
+            xTaskCreatePinnedToCore(radioTickerTaskLoop, "radioTicker", 8192, this,
                                     4, &tickerTaskHandle, 0) != pdPASS) {
             tickerTaskHandle = nullptr;
             addLogMessage("Failed to create radio ticker task");
@@ -569,21 +570,28 @@ void iohcRadio::queueSend(std::vector<iohcPacket *> &iohcTx) {
     if (iohcTx.empty()) {
         return;
     }
+    xSemaphoreTake(sendQueueMutex, portMAX_DELAY);
     sendQueue.push(std::move(iohcTx));
-    ets_printf("TX: Queued send batch. Queue depth=%d\n", static_cast<int>(sendQueue.size()));
+    const auto queueDepth = sendQueue.size();
+    xSemaphoreGive(sendQueueMutex);
+    ets_printf("TX: Queued send batch. Queue depth=%d\n", static_cast<int>(queueDepth));
 }
 
 void iohcRadio::startQueuedSend() {
-    if (radioState == RadioState::TX || packets2send.size() > 0 || sendQueue.empty()) {
+    xSemaphoreTake(sendQueueMutex, portMAX_DELAY);
+    if (txBatchActive || radioState == RadioState::TX || !packets2send.empty() || sendQueue.empty()) {
+        xSemaphoreGive(sendQueueMutex);
         return;
     }
 
-    setCrashMarker("radio: startQueuedSend");
     packets2send = std::move(sendQueue.front());
     sendQueue.pop();
     txCounter = 0;
     txComplete = false;
     txBatchActive = true;
+    xSemaphoreGive(sendQueueMutex);
+
+    setCrashMarker("radio: startQueuedSend");
     resumeTwoWScanAfterTx = twoWScanActive && twoWScanUntilMs > millis();
     resumeTwoWScanUntilMs = resumeTwoWScanAfterTx ? twoWScanUntilMs : 0;
     resumeTwoWScanWindowMs = resumeTwoWScanAfterTx

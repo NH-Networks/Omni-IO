@@ -257,10 +257,16 @@
             logEntry.style.display = "none";
         }
 
-        app.elements.statusMessages.appendChild(logEntry);
-        app.elements.statusMessages.scrollTop = app.elements.statusMessages.scrollHeight;
-        while (app.elements.statusMessages.children.length > 300) {
-            app.elements.statusMessages.removeChild(app.elements.statusMessages.firstChild);
+        var logContainer = app.elements.statusMessages;
+        var distanceFromBottom = logContainer.scrollHeight - logContainer.scrollTop - logContainer.clientHeight;
+        var followLatest = distanceFromBottom <= 24;
+
+        logContainer.appendChild(logEntry);
+        while (logContainer.children.length > 300) {
+            logContainer.removeChild(logContainer.firstChild);
+        }
+        if (followLatest) {
+            logContainer.scrollTop = logContainer.scrollHeight;
         }
         updateLogCount(app);
 

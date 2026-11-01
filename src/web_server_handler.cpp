@@ -69,20 +69,44 @@ struct TwoWFrameLog {
 
 static std::vector<TwoWFrameLog> g_twoWFrameLog;
 static constexpr size_t TWO_W_FRAME_LOG_LIMIT = 30;
+static SemaphoreHandle_t g_twoWStatusMutex = nullptr;
+
+static bool takeTwoWStatusMutex() {
+  return g_twoWStatusMutex && xSemaphoreTake(g_twoWStatusMutex, portMAX_DELAY) == pdTRUE;
+}
+
+struct TwoWStatusSnapshot {
+  TwoWStatus status;
+  std::vector<TwoWFrameLog> frames;
+};
+
+static bool snapshotTwoWStatus(TwoWStatusSnapshot &snapshot) {
+  if (!takeTwoWStatusMutex()) {
+    return false;
+  }
+  snapshot.status = g_twoWStatus;
+  snapshot.frames = g_twoWFrameLog;
+  xSemaphoreGive(g_twoWStatusMutex);
+  return true;
+}
 
 static void fillTwoWStatus(JsonObject &obj) {
-  obj["lastTxCommand"] = g_twoWStatus.lastTxCommand;
-  obj["lastTxResult"] = g_twoWStatus.lastTxResult;
-  obj["lastTxError"] = g_twoWStatus.lastTxError;
-  obj["lastRxType"] = g_twoWStatus.lastRxType;
-  obj["lastRxFrequency"] = g_twoWStatus.lastRxFrequency;
-  obj["lastRxFrom"] = g_twoWStatus.lastRxFrom;
-  obj["lastRxTo"] = g_twoWStatus.lastRxTo;
-  obj["lastRxCmd"] = g_twoWStatus.lastRxCmd;
-  obj["lastRxData"] = g_twoWStatus.lastRxData;
-  obj["lastRxCounter"] = g_twoWStatus.lastRxCounter;
+  TwoWStatusSnapshot snapshot;
+  if (!snapshotTwoWStatus(snapshot)) {
+    return;
+  }
+  obj["lastTxCommand"] = snapshot.status.lastTxCommand;
+  obj["lastTxResult"] = snapshot.status.lastTxResult;
+  obj["lastTxError"] = snapshot.status.lastTxError;
+  obj["lastRxType"] = snapshot.status.lastRxType;
+  obj["lastRxFrequency"] = snapshot.status.lastRxFrequency;
+  obj["lastRxFrom"] = snapshot.status.lastRxFrom;
+  obj["lastRxTo"] = snapshot.status.lastRxTo;
+  obj["lastRxCmd"] = snapshot.status.lastRxCmd;
+  obj["lastRxData"] = snapshot.status.lastRxData;
+  obj["lastRxCounter"] = snapshot.status.lastRxCounter;
   JsonArray frames = obj["frames"].to<JsonArray>();
-  for (const auto &frame : g_twoWFrameLog) {
+  for (const auto &frame : snapshot.frames) {
     JsonObject item = frames.add<JsonObject>();
     item["counter"] = frame.counter;
     item["type"] = frame.type;
@@ -279,9 +303,13 @@ void broadcastEspHomeStatus() {
 }
 
 void updateTwoWTxStatus(const String &command, const String &result, bool isError) {
+  if (!takeTwoWStatusMutex()) {
+    return;
+  }
   g_twoWStatus.lastTxCommand = command;
   g_twoWStatus.lastTxResult = result;
   g_twoWStatus.lastTxError = isError;
+  xSemaphoreGive(g_twoWStatusMutex);
   broadcastTwoWStatus();
 }
 
@@ -303,6 +331,9 @@ void updateTwoWRxStatus(const String &packetType, const String &from,
     safeData = safeData.substring(0, 180) + "...";
   }
 
+  if (!takeTwoWStatusMutex()) {
+    return;
+  }
   g_twoWStatus.lastRxType = packetType;
   g_twoWStatus.lastRxFrequency = frequency;
   g_twoWStatus.lastRxFrom = from;
@@ -322,6 +353,7 @@ void updateTwoWRxStatus(const String &packetType, const String &from,
   while (g_twoWFrameLog.size() > TWO_W_FRAME_LOG_LIMIT) {
     g_twoWFrameLog.erase(g_twoWFrameLog.begin());
   }
+  xSemaphoreGive(g_twoWStatusMutex);
   broadcastTwoWStatus();
 }
 
@@ -1069,7 +1101,7 @@ void handleApiInfo(AsyncWebServerRequest *request, JsonObject &root) {
   root["environment"] = "unknown";
 #endif
 #else
-  root["version"] = "3.1.6";
+  root["version"] = "3.1.7";
 #endif
   root["uptimeMs"] = millis();
   root["freeHeap"] = ESP.getFreeHeap();
@@ -1609,6 +1641,9 @@ void handleFilesystemUpload(AsyncWebServerRequest *request, String filename,
 
 void setupWebServer() {
   Serial.println("Initializing HTTP server ...");
+  if (!g_twoWStatusMutex) {
+    g_twoWStatusMutex = xSemaphoreCreateMutex();
+  }
 
   if (!LittleFS.exists("/web_interface_data/index.html")) {
     Serial.println("Warning: /web_interface_data/index.html not found");
@@ -1697,7 +1732,12 @@ void setupWebServer() {
 }
 
 void loopWebServer() {
-  ws.cleanupClients();
+  static uint32_t lastCleanupMs = 0;
+  const uint32_t nowMs = millis();
+  if (nowMs - lastCleanupMs >= 1000) {
+    lastCleanupMs = nowMs;
+    ws.cleanupClients(4);
+  }
 }
 
 #endif // defined(WEBSERVER)

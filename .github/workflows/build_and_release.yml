@@ -87,6 +87,29 @@ jobs:
 
           ---
 
+          ## 🛡️ What's New in v3.1.7 (FreeRTOS Dual-Core Concurrency & Stability Hardening)
+
+          * 🔒 **Thread-Safe Log Buffer & Mutex Protection**:
+            * Replaced the non-atomic recursion boolean in `log_buffer.cpp` with a dedicated FreeRTOS mutex (`logMutex`).
+            * Fully serializes concurrent logging across Core 0 (RF Radio worker) and Core 1 (Wi-Fi, WebServer, ESPHome, Syslog), eliminating memory corruption and unexplained task crashes during simultaneous RF/network activity.
+            * Log dispatch to external sinks (WebSocket broadcast and Syslog UDP) is safely executed outside the lock to prevent task deadlocks.
+          * 📡 **Radio Queue Serialization & Ticker Stack Expansion**:
+            * Serialized out-of-order radio send requests with `sendQueueMutex` and atomic `txBatchActive` flags, ensuring consecutive Web/MQTT/ESPHome commands are safely queued and transmitted without interleaving SPI hardware transactions.
+            * Expanded `radioTicker` FreeRTOS task stack allocation from 4096 to 8192 bytes, providing headroom for heavy 1W/2W packet bursts and deep call stacks.
+          * 🌐 **Web Server & WebSocket Client Lock Contention Reduction**:
+            * Throttled periodic `ws.cleanupClients()` execution to 1 Hz in the main loop, significantly reducing lock contention with the AsyncTCP task.
+            * Added `g_twoWStatusMutex` snapshot isolation for 2-Way telemetry and frame history, preventing vector iterator corruption when web clients read `/api/devices` or `/api/info` during active 2W radio receptions.
+            * Protected WebSocket connect events against lock inversion deadlocks during page reloads.
+          * 🕒 **Early Boot Timezone & Numeric Reset Reason Diagnostics**:
+            * Initialized local timezone immediately upon boot and persistently after NVS load, ensuring early serial logs and pre-NTP messages display the correct local time offset.
+            * Appended numeric `esp_reset_reason_t` codes to boot reset messages for improved hardware diagnostic tracking.
+          * 📦 **Reproducible Build Dependency Pinning**:
+            * Pinned `async-mqtt-client` dependency to tagged release `v2.1.0` and silenced deprecated declarations warnings for reproducible CI/CD builds.
+          * 🎨 **Web Interface Log Viewer Refinements**:
+            * Implemented intelligent scroll locking (`followLatest`) in the live log viewer, allowing users to scroll up to inspect history without being forced down by incoming log broadcasts.
+
+          ---
+
           ## 📶 What's New in v3.1.6 (Smart Wi-Fi Roaming Assistant)
 
           * 📶 **Smart Wi-Fi Roaming Assistant for Multi-AP & Mesh Networks (#16)**:

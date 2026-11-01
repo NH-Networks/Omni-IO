@@ -60,7 +60,7 @@ static void handleMqttConnectImpl();
 #ifdef FIRMWARE_VERSION
 #define IOHC_SW_VERSION FIRMWARE_VERSION
 #else
-#define IOHC_SW_VERSION "3.1.6"
+#define IOHC_SW_VERSION "3.1.7"
 #endif
 
 static void populateGatewayDevice(JsonVariant variant) {

@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <vector>
 
+void initLogBuffer();
 void addLogMessage(const String &msg);
 std::vector<String> getLogMessages();
 void setCrashMarker(const char *marker);
