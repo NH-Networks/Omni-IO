@@ -61,6 +61,9 @@
             fallbackTimeoutInput: document.getElementById("fallback-timeout"),
             fallbackStatus: document.getElementById("fallback-status"),
             fallbackSaveButton: document.getElementById("fallback-save"),
+            roamEnabledInput: document.getElementById("roam-enabled"),
+            roamNightlyInput: document.getElementById("roam-nightly"),
+            roamStatus: document.getElementById("roam-status"),
             displayEnabledInput: document.getElementById("display-enabled"),
             displayScreensaverTimeoutInput: document.getElementById("display-screensaver-timeout"),
             displayOffTimeoutInput: document.getElementById("display-off-timeout"),
@@ -710,6 +713,7 @@
         app.loadWifiConfig();
         app.loadNetworkConfig();
         app.loadFallbackConfig();
+        if (typeof app.loadRoamConfig === "function") app.loadRoamConfig();
         app.loadDisplayConfig();
         app.loadSyslogConfig();
         app.fetchAndDisplayDevices();

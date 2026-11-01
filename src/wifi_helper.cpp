@@ -19,6 +19,7 @@
 */
 
 #include <wifi_helper.h>
+#include <iohcRadio.h>
 #include <oled_display.h>
 #include <user_config.h>
 #include <log_buffer.h>
@@ -59,6 +60,13 @@ static uint32_t s_wifiDisconnectedSinceMs = 0;
 static uint32_t s_lastWiFiReconnectAttemptMs = 0;
 static uint32_t s_lastWiFiStackResetMs = 0;
 static uint16_t s_wifiReconnectAttempts = 0;
+#ifndef MIN_VALID_NTP_EPOCH
+constexpr time_t MIN_VALID_NTP_EPOCH = 1600000000;
+#endif
+static uint32_t s_lastRoamCheckMs = 0;
+static uint32_t s_lowRssiSinceMs = 0;
+static uint32_t s_lastRoamSwitchMs = 0;
+static bool s_roamScanInProgress = false;
 
 static void disableWiFiSleep() {
     WiFi.setSleep(false);
@@ -118,6 +126,12 @@ static void onMqttAfterWifi() {
 
 static void handleWifiConnected() {
     if (WiFi.status() == WL_CONNECTED) {
+        wifi_config_t conf;
+        if (esp_wifi_get_config(WIFI_IF_STA, &conf) == ESP_OK && conf.sta.bssid_set) {
+            conf.sta.bssid_set = 0;
+            conf.sta.channel = 0;
+            esp_wifi_set_config(WIFI_IF_STA, &conf);
+        }
         disableWiFiSleep();
         wifiStatus.connectionStatus = ConnState::Connected;
         wifiStatus.rssi = WiFi.RSSI();
@@ -207,6 +221,17 @@ static void configureWifiDisconnected() {
 }
 
 static void handleWifiDisconnected() {
+    wifi_config_t conf;
+    if (esp_wifi_get_config(WIFI_IF_STA, &conf) == ESP_OK && conf.sta.bssid_set) {
+        conf.sta.bssid_set = 0;
+        conf.sta.channel = 0;
+        esp_wifi_set_config(WIFI_IF_STA, &conf);
+    }
+    if (s_roamScanInProgress) {
+        WiFi.scanDelete();
+        s_roamScanInProgress = false;
+    }
+    s_lowRssiSinceMs = 0;
     if (wifiStatus.connectionStatus == ConnState::Connected || s_wifiDisconnectedSinceMs == 0) {
         configureWifiDisconnected();
     }
@@ -216,6 +241,7 @@ static void applyAdvancedWiFiSettings() {
     wifi_config_t config;
     if (esp_wifi_get_config(WIFI_IF_STA, &config) == ESP_OK) {
         config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
+        config.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
 #ifdef REQUIRE_MINIMUM_WPA2_PSK
         // This is necessary to prevent the device from Evil Twin attacks, where an attacker creates an additional network with the same
         // SSID as the one selected. WPA2_PSK will detect that and even prevent sending the password.
@@ -311,6 +337,168 @@ static uint16_t readFallbackU16(const char *key, uint16_t fallback);
 static uint32_t readFallbackTimeoutMs();
 static void runConfigPortal(const std::string& ssid, bool hasWifiConfiguration);
 
+static void maintainRoamAssistant(uint32_t now) {
+    bool roamEnabled = true;
+    nvs_read_bool(NVS_KEY_NET_ROAM_EN, roamEnabled);
+    if (!roamEnabled) {
+        if (s_roamScanInProgress) {
+            WiFi.scanDelete();
+            s_roamScanInProgress = false;
+        }
+        s_lowRssiSinceMs = 0;
+        return;
+    }
+
+    uint16_t roamThresh = 55;
+    uint16_t roamDelta = 15;
+    uint16_t roamIntervalMin = 30;
+    bool roamNightOnly = true;
+    uint16_t roamStartHour = 0;
+    uint16_t roamEndHour = 7;
+
+    nvs_read_u16(NVS_KEY_NET_ROAM_THRESH, roamThresh);
+    nvs_read_u16(NVS_KEY_NET_ROAM_DELTA, roamDelta);
+    nvs_read_u16(NVS_KEY_NET_ROAM_INTERVAL, roamIntervalMin);
+    nvs_read_bool(NVS_KEY_NET_ROAM_NIGHT, roamNightOnly);
+    nvs_read_u16(NVS_KEY_NET_ROAM_START, roamStartHour);
+    nvs_read_u16(NVS_KEY_NET_ROAM_END, roamEndHour);
+
+    // 1. Process background scan if one is currently in progress
+    if (s_roamScanInProgress) {
+        int16_t scanCount = WiFi.scanComplete();
+        if (scanCount == WIFI_SCAN_RUNNING) {
+            return; // Still scanning
+        }
+        s_roamScanInProgress = false;
+        if (scanCount <= 0) {
+            Serial.printf("WiFi: Roam Assistant: background scan ended (code %d)\n", scanCount);
+            WiFi.scanDelete();
+            return;
+        }
+
+        const std::string configuredSsid = getConfiguredSSID();
+        uint8_t *curBssid = WiFi.BSSID();
+        int bestIdx = -1;
+        int bestRssi = -127;
+
+        for (int i = 0; i < scanCount; ++i) {
+            if (WiFi.SSID(i) == configuredSsid.c_str()) {
+                uint8_t *bssid = WiFi.BSSID(i);
+                if (curBssid && memcmp(bssid, curBssid, 6) == 0) {
+                    continue; // Skip the AP we are already connected to
+                }
+                int r = WiFi.RSSI(i);
+                if (r > bestRssi) {
+                    bestRssi = r;
+                    bestIdx = i;
+                }
+            }
+        }
+
+        int currentRssi = WiFi.RSSI();
+        int gain = bestIdx >= 0 ? (bestRssi - currentRssi) : 0;
+
+        if (bestIdx >= 0 && gain >= static_cast<int>(roamDelta)) {
+            uint8_t targetBssid[6];
+            memcpy(targetBssid, WiFi.BSSID(bestIdx), 6);
+            int32_t targetChannel = WiFi.channel(bestIdx);
+
+            char bssidStr[18];
+            snprintf(bssidStr, sizeof(bssidStr), "%02X:%02X:%02X:%02X:%02X:%02X",
+                     targetBssid[0], targetBssid[1], targetBssid[2],
+                     targetBssid[3], targetBssid[4], targetBssid[5]);
+
+            Serial.printf("WiFi: Roam Assistant: switching to AP %s (ch %d, RSSI %d dBm, gain +%d dBm)\n",
+                          bssidStr, targetChannel, bestRssi, gain);
+
+            String logMsg = "WiFi: Roaming to AP " + String(bssidStr) + " (" + String(bestRssi) + " dBm, +" + String(gain) + " dBm gain)";
+            addLogMessage(logMsg.c_str());
+
+            wifi_config_t conf;
+            if (esp_wifi_get_config(WIFI_IF_STA, &conf) == ESP_OK) {
+                conf.sta.bssid_set = 1;
+                memcpy(conf.sta.bssid, targetBssid, 6);
+                conf.sta.channel = targetChannel;
+                esp_wifi_set_config(WIFI_IF_STA, &conf);
+                esp_wifi_disconnect();
+                esp_wifi_connect();
+            }
+            s_lastRoamSwitchMs = now;
+            s_lowRssiSinceMs = 0;
+        } else {
+            Serial.printf("WiFi: Roam Assistant: scan finished, no candidate meeting gain >= %u dBm (best candidate: %d dBm, gain: %d dBm)\n",
+                          roamDelta, bestRssi, gain);
+        }
+
+        WiFi.scanDelete();
+        return;
+    }
+
+    // 2. Check time window if night-only is enabled
+    if (roamNightOnly) {
+        time_t tNow = time(nullptr);
+        if (tNow < MIN_VALID_NTP_EPOCH) {
+            return; // Wait for NTP synchronization before evaluating time window
+        }
+        struct tm tmInfo;
+        localtime_r(&tNow, &tmInfo);
+        bool inNightWindow = false;
+        if (roamStartHour <= roamEndHour) {
+            inNightWindow = (tmInfo.tm_hour >= roamStartHour && tmInfo.tm_hour < roamEndHour);
+        } else {
+            inNightWindow = (tmInfo.tm_hour >= roamStartHour || tmInfo.tm_hour < roamEndHour);
+        }
+        if (!inNightWindow) {
+            s_lowRssiSinceMs = 0;
+            return;
+        }
+    }
+
+    // 3. Check current RSSI against threshold
+    int currentRssi = WiFi.RSSI();
+    int threshold = -static_cast<int>(roamThresh);
+    if (currentRssi == 0 || currentRssi >= threshold) {
+        s_lowRssiSinceMs = 0;
+        return;
+    }
+
+    // 4. Must stay below threshold for at least 60 seconds
+    if (s_lowRssiSinceMs == 0) {
+        s_lowRssiSinceMs = now;
+        return;
+    }
+    if (now - s_lowRssiSinceMs < 60000UL) {
+        return;
+    }
+
+    // 5. Check interval and switch cool-down
+    uint32_t intervalMs = static_cast<uint32_t>(roamIntervalMin) * 60000UL;
+    if (intervalMs < 300000UL) {
+        intervalMs = 300000UL; // Minimum 5 minutes
+    }
+    if (now - s_lastRoamCheckMs < intervalMs) {
+        return;
+    }
+    if (now - s_lastRoamSwitchMs < 1800000UL) {
+        return; // 30-minute cool-down after an actual roam switch
+    }
+
+    // 6. Ensure no RF transmission is currently active
+    if (IOHC::iohcRadio::txBatchActive) {
+        return;
+    }
+
+    // 7. Start non-blocking background scan
+    Serial.printf("WiFi: Roam Assistant: RSSI %d dBm below threshold %d dBm, starting background scan...\n",
+                  currentRssi, threshold);
+    s_lastRoamCheckMs = now;
+    WiFi.scanDelete();
+    int16_t res = WiFi.scanNetworks(true, false);
+    if (res == WIFI_SCAN_RUNNING) {
+        s_roamScanInProgress = true;
+    }
+}
+
 static void maintainWiFiConnection() {
     const uint32_t now = millis();
 
@@ -321,6 +509,7 @@ static void maintainWiFiConnection() {
             wifiStatus.rssi = WiFi.RSSI();
             wifiStatus.signalStrengthPercent = rssiToQuality(wifiStatus.rssi);
         }
+        maintainRoamAssistant(now);
         return;
     }
 

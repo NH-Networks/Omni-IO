@@ -914,6 +914,79 @@ void handleApiFallbackSet(AsyncWebServerRequest *request, JsonObject &doc, JsonO
   root["message"] = "Fallback AP settings saved";
 }
 
+void handleApiRoamGet(AsyncWebServerRequest *request, JsonObject &root) {
+  bool enabled = true;
+  uint16_t threshold = 55;
+  uint16_t delta = 15;
+  uint16_t interval = 30;
+  bool nightOnly = true;
+  uint16_t startHour = 0;
+  uint16_t endHour = 7;
+
+  nvs_read_bool(NVS_KEY_NET_ROAM_EN, enabled);
+  nvs_read_u16(NVS_KEY_NET_ROAM_THRESH, threshold);
+  nvs_read_u16(NVS_KEY_NET_ROAM_DELTA, delta);
+  nvs_read_u16(NVS_KEY_NET_ROAM_INTERVAL, interval);
+  nvs_read_bool(NVS_KEY_NET_ROAM_NIGHT, nightOnly);
+  nvs_read_u16(NVS_KEY_NET_ROAM_START, startHour);
+  nvs_read_u16(NVS_KEY_NET_ROAM_END, endHour);
+
+  root["enabled"] = enabled;
+  root["threshold"] = threshold;
+  root["delta"] = delta;
+  root["interval"] = interval;
+  root["nightOnly"] = nightOnly;
+  root["startHour"] = startHour;
+  root["endHour"] = endHour;
+  root["currentRssi"] = WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0;
+
+  if (WiFi.status() == WL_CONNECTED && WiFi.BSSID()) {
+    uint8_t *b = WiFi.BSSID();
+    char bssidStr[18];
+    snprintf(bssidStr, sizeof(bssidStr), "%02X:%02X:%02X:%02X:%02X:%02X",
+             b[0], b[1], b[2], b[3], b[4], b[5]);
+    root["currentBssid"] = bssidStr;
+  } else {
+    root["currentBssid"] = "";
+  }
+}
+
+void handleApiRoamSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
+  bool enabled = doc["enabled"] | true;
+  int rawThresh = doc["threshold"] | 55;
+  if (rawThresh < 0) rawThresh = -rawThresh;
+  if (rawThresh < 30) rawThresh = 30;
+  if (rawThresh > 90) rawThresh = 90;
+
+  int rawDelta = doc["delta"] | 15;
+  if (rawDelta < 5) rawDelta = 5;
+  if (rawDelta > 40) rawDelta = 40;
+
+  int rawInterval = doc["interval"] | 30;
+  if (rawInterval < 5) rawInterval = 5;
+  if (rawInterval > 720) rawInterval = 720;
+
+  bool nightOnly = doc["nightOnly"] | true;
+  int startHour = doc["startHour"] | 0;
+  if (startHour < 0) startHour = 0;
+  if (startHour > 23) startHour = 23;
+
+  int endHour = doc["endHour"] | 7;
+  if (endHour < 0) endHour = 0;
+  if (endHour > 23) endHour = 23;
+
+  nvs_write_bool(NVS_KEY_NET_ROAM_EN, enabled);
+  nvs_write_u16(NVS_KEY_NET_ROAM_THRESH, static_cast<uint16_t>(rawThresh));
+  nvs_write_u16(NVS_KEY_NET_ROAM_DELTA, static_cast<uint16_t>(rawDelta));
+  nvs_write_u16(NVS_KEY_NET_ROAM_INTERVAL, static_cast<uint16_t>(rawInterval));
+  nvs_write_bool(NVS_KEY_NET_ROAM_NIGHT, nightOnly);
+  nvs_write_u16(NVS_KEY_NET_ROAM_START, static_cast<uint16_t>(startHour));
+  nvs_write_u16(NVS_KEY_NET_ROAM_END, static_cast<uint16_t>(endHour));
+
+  root["success"] = true;
+  root["message"] = "WiFi roaming settings saved";
+}
+
 void handleApiWifiGet(AsyncWebServerRequest *request, JsonObject &root) {
   root["ssid"] = getConfiguredWiFiSSID();
   root["connected"] = WiFi.status() == WL_CONNECTED;
@@ -1552,6 +1625,7 @@ void setupWebServer() {
   server.on("/api/wifi", HTTP_GET, jsonGet(handleApiWifiGet));
   server.on("/api/network", HTTP_GET, jsonGet(handleApiNetworkGet));
   server.on("/api/fallback", HTTP_GET, jsonGet(handleApiFallbackGet));
+  server.on("/api/roam", HTTP_GET, jsonGet(handleApiRoamGet));
 #if defined(SSD1306_DISPLAY)
   server.on("/api/display", HTTP_GET, jsonGet(handleApiDisplayGet));
 #endif
@@ -1569,6 +1643,7 @@ void setupWebServer() {
   server.on("/api/wifi", HTTP_POST, jsonPost(handleApiWifiSet));
   server.on("/api/network", HTTP_POST, jsonPost(handleApiNetworkSet));
   server.on("/api/fallback", HTTP_POST, jsonPost(handleApiFallbackSet));
+  server.on("/api/roam", HTTP_POST, jsonPost(handleApiRoamSet));
 #if defined(SSD1306_DISPLAY)
   server.on("/api/display", HTTP_POST, jsonPost(handleApiDisplaySet));
 #endif

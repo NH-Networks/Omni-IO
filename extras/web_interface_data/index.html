@@ -8,13 +8,13 @@ Original upstream portions remain licensed under Apache-2.0.
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title data-i18n="page.title">Omni-IO - Device Control</title>
-    <link rel="icon" href="img/logo.svg?v=2.0.0" type="image/svg+xml" />
+    <link rel="icon" href="img/logo.svg?v=3.1.5" type="image/svg+xml" />
     <link rel="stylesheet" href="css/style.css?v=2.0.1" />
   </head>
 
   <body>
     <header>
-      <img src="img/logo.svg?v=2.0.0" alt="Omni-IO Logo" class="logo" onclick="showPage('devices')" role="button" tabindex="0" title="Devices" />
+      <img src="img/logo.svg?v=3.1.5" alt="Omni-IO Logo" class="logo" onclick="showPage('devices')" role="button" tabindex="0" title="Devices" />
       <h1 data-i18n="header.title">Device Control</h1>
       <div class="header-status">
         <div id="mqtt-status-pill" class="mqtt-pill" title="MQTT Status" role="button" tabindex="0">
@@ -490,8 +490,29 @@ Original upstream portions remain licensed under Apache-2.0.
                 <small class="field-hint"
                   >Leave blank to keep the current password.</small
                 >
+                <div style="border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 15px 0 10px 0; padding-top: 10px;">
+                  <label
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 8px;
+                      margin-bottom: 8px;
+                    "
+                    ><input type="checkbox" id="roam-enabled" /> Auto-roam to stronger AP when signal is degraded</label
+                  >
+                  <label
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 8px;
+                      margin-bottom: 4px;
+                    "
+                    ><input type="checkbox" id="roam-nightly" /> Only roam during night time (00:00 - 07:00)</label
+                  >
+                  <div id="roam-status" class="field-status" style="margin-top: 4px;"></div>
+                </div>
                 <p class="restart-notice">
-                  Note: The device will restart after saving.
+                  Note: The device will restart after saving WiFi network credentials.
                 </p>
                 <div id="wifi-config-status" class="field-status"></div>
                 <button id="wifi-config-save">Save</button>
@@ -895,15 +916,15 @@ Original upstream portions remain licensed under Apache-2.0.
         </div>
       </div>
     </div>
-    <script src="js/i18n.js?v=2.0.0"></script>
-    <script src="js/toast.js?v=2.0.0"></script>
-    <script src="js/api.js?v=2.0.0"></script>
-    <script src="js/popup.js?v=2.0.0"></script>
-    <script src="js/devices.js?v=2.0.0"></script>
-    <script src="js/remotes.js?v=2.0.0"></script>
-    <script src="js/settings.js?v=2.0.0"></script>
-    <script src="js/app.js?v=2.0.0"></script>
-    <script src="js/menu.js?v=2.0.0"></script>
+    <script src="js/i18n.js?v=3.1.5"></script>
+    <script src="js/toast.js?v=3.1.5"></script>
+    <script src="js/api.js?v=3.1.5"></script>
+    <script src="js/popup.js?v=3.1.5"></script>
+    <script src="js/devices.js?v=3.1.5"></script>
+    <script src="js/remotes.js?v=3.1.5"></script>
+    <script src="js/settings.js?v=3.1.5"></script>
+    <script src="js/app.js?v=3.1.5"></script>
+    <script src="js/menu.js?v=3.1.5"></script>
   </body>
 </html>
 
