@@ -87,6 +87,19 @@ jobs:
 
           ---
 
+          ## 📶 What's New in v3.1.6 (Smart Wi-Fi Roaming Assistant)
+
+          * 📶 **Smart Wi-Fi Roaming Assistant for Multi-AP & Mesh Networks (#16)**:
+            * **Intelligent Background Roaming**: Periodically scans for stronger Access Points (BSSID) on the configured SSID and smoothly reconnects when the current signal degrades below threshold.
+            * **Asynchronous Non-Blocking Scanning**: Uses non-blocking Wi-Fi scans (`WiFi.scanNetworks(true)`) to ensure critical RF radio operations and web/API services remain completely responsive during scans.
+            * **Night-Window Restriction**: Added optional night-window guard (defaulting to 00:00–07:00) so AP handoffs only execute during quiet hours, completely preventing daytime disconnections.
+            * **Best-Practice Signal Thresholds & Flap Prevention**: Static best-practice parameters (-55 dBm signal threshold, +15 dBm minimum RSSI gain, 30-minute scan interval, 30-minute roaming cooldown) ensure the device only roams when a significant improvement is guaranteed.
+          * 🎨 **Streamlined Web Interface**:
+            * Cleanly integrated two roaming checkboxes directly into the **WiFi Network** card under Settings.
+            * Bumped web asset versions to `?v=3.1.6` for immediate browser cache busting.
+
+          ---
+
           ## 📡 What's New in v3.1.5 (Low Power Mode Radio Preamble Restoration & Git Hygiene)
 
           * 📡 **Restored 1920-Byte Default Preamble for Low Power Mode (LPM)**:
