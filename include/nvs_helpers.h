@@ -44,6 +44,13 @@ static constexpr char NVS_KEY_ESPHOME_PWD[] = "esp_pwd";
 static constexpr char NVS_KEY_ESPHOME_NAME[] = "esp_name";
 static constexpr char NVS_KEY_RF_LONG_PREAMBLE[] = "rf_pre_long";
 static constexpr char NVS_KEY_RF_SHORT_PREAMBLE[] = "rf_pre_short";
+static constexpr char NVS_KEY_NET_ROAM_EN[] = "roam_en";
+static constexpr char NVS_KEY_NET_ROAM_THRESH[] = "roam_thresh";
+static constexpr char NVS_KEY_NET_ROAM_DELTA[] = "roam_delta";
+static constexpr char NVS_KEY_NET_ROAM_INTERVAL[] = "roam_interval";
+static constexpr char NVS_KEY_NET_ROAM_NIGHT[] = "roam_night";
+static constexpr char NVS_KEY_NET_ROAM_START[] = "roam_start";
+static constexpr char NVS_KEY_NET_ROAM_END[] = "roam_end";
 
 
 bool nvs_init();

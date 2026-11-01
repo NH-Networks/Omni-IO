@@ -390,6 +390,72 @@
         }
     }
 
+    function setRoamStatus(app, message, isError) {
+        if (!app.elements.roamStatus) {
+            return;
+        }
+        app.elements.roamStatus.textContent = message || "";
+        app.elements.roamStatus.classList.toggle("error", !!isError);
+        setSettingsStatus(app, message, isError);
+    }
+
+    async function loadRoamConfig(app) {
+        if (!app.elements.roamEnabledInput) {
+            return;
+        }
+        try {
+            setRoamStatus(app, "Loading roaming settings...");
+            const config = await window.OmniIoApi.requestJson("/api/roam");
+            app.elements.roamEnabledInput.checked = config.enabled !== false;
+            app.elements.roamNightlyInput.checked = config.nightOnly !== false;
+            app.elements.roamStartHourInput.value = config.startHour ?? 0;
+            app.elements.roamEndHourInput.value = config.endHour ?? 7;
+            app.elements.roamThresholdInput.value = -(config.threshold || 55);
+            app.elements.roamDeltaInput.value = config.delta || 15;
+            app.elements.roamIntervalInput.value = config.interval || 30;
+
+            let statusMsg = "Roaming settings loaded";
+            if (config.currentRssi) {
+                statusMsg += " (Current: " + config.currentRssi + " dBm";
+                if (config.currentBssid) {
+                    statusMsg += ", " + config.currentBssid;
+                }
+                statusMsg += ")";
+            }
+            setRoamStatus(app, statusMsg);
+        } catch (error) {
+            console.error("Error fetching roam config", error);
+            setRoamStatus(app, error.message || "Failed to load roaming settings", true);
+        }
+    }
+
+    async function saveRoamConfig(app) {
+        if (!app.elements.roamSaveButton) {
+            return;
+        }
+        app.elements.roamSaveButton.disabled = true;
+        try {
+            let thresh = Math.abs(Number(app.elements.roamThresholdInput.value || -55));
+            if (!thresh) thresh = 55;
+
+            const result = await window.OmniIoApi.postJson("/api/roam", {
+                enabled: app.elements.roamEnabledInput.checked,
+                nightOnly: app.elements.roamNightlyInput.checked,
+                startHour: Number(app.elements.roamStartHourInput.value || 0),
+                endHour: Number(app.elements.roamEndHourInput.value || 7),
+                threshold: thresh,
+                delta: Number(app.elements.roamDeltaInput.value || 15),
+                interval: Number(app.elements.roamIntervalInput.value || 30)
+            });
+            setRoamStatus(app, result.message || "Roaming settings saved");
+        } catch (error) {
+            console.error("Error saving roam config", error);
+            setRoamStatus(app, error.message || "Failed to save roaming settings", true);
+        } finally {
+            app.elements.roamSaveButton.disabled = false;
+        }
+    }
+
     async function loadDisplayConfig(app) {
         if (!app.elements.displayEnabledInput) {
             return;
@@ -724,6 +790,12 @@
             });
         }
 
+        if (app.elements.roamSaveButton) {
+            app.elements.roamSaveButton.addEventListener("click", function () {
+                app.saveRoamConfig();
+            });
+        }
+
         const restartButton = document.getElementById("settings-restart");
         if (restartButton) {
             restartButton.addEventListener("click", function () {
@@ -778,6 +850,12 @@
         };
         app.saveFallbackConfig = function () {
             return saveFallbackConfig(app);
+        };
+        app.loadRoamConfig = function () {
+            return loadRoamConfig(app);
+        };
+        app.saveRoamConfig = function () {
+            return saveRoamConfig(app);
         };
         app.scanWifiNetworks = function () {
             return scanWifiNetworks(app);
