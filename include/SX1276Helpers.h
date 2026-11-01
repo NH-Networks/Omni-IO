@@ -1,4 +1,8 @@
 /*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
+/*
    Copyright (c) 2024. CRIDP https://github.com/cridp
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -37,8 +41,8 @@
 #define SPI_Write   0x80
 #define SPI_Read    0x00
 
-#define TxReady  {while (!(readByte(REG_IRQFLAGS1) & RF_IRQFLAGS1_TXREADY));}   // Check for TxReady flag
-#define RxReady  {while (!(readByte(REG_IRQFLAGS1) & RF_IRQFLAGS1_PLLLOCK));}   // Check for PllLock flag; do not use with sequencer
+#define TxReady  {uint32_t _t=100000; while (!(readByte(REG_IRQFLAGS1) & RF_IRQFLAGS1_TXREADY) && --_t) delayMicroseconds(1);}   // Check for TxReady flag
+#define RxReady  {uint32_t _t=100000; while (!(readByte(REG_IRQFLAGS1) & RF_IRQFLAGS1_PLLLOCK) && --_t) delayMicroseconds(1);}   // Check for PllLock flag; do not use with sequencer
 
 #define RF_PACKETCONFIG2_IOHOME_POWERFRAME  0x10    // Missing from SX1276 FSK modem registers and bits definitions
 

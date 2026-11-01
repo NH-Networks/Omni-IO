@@ -87,6 +87,26 @@ jobs:
 
           ---
 
+          ## 🏆 What's New in v3.2.0 (Milestone Reliability & Core Engine Hardening)
+
+          * 🛡️ **Syslog Asynchronous Backoff & Non-Blocking Web Operations**:
+            * Introduced a 60-second backoff and rate limiter for remote Syslog transmission, preventing repetitive blocking DNS lookups (`WiFi.hostByName`) from freezing FreeRTOS execution threads when the configured syslog server is unreachable.
+            * Separated `loadSyslogConfig()` from network initialization so that web clients querying `/api/syslog` under Settings never block on synchronous host resolution.
+          * 📡 **Radio Engine Transmission Completion & Memory Safety**:
+            * Resolved a potential dynamic memory leak in `iohcRadio::sent()` by guaranteeing that allocated packet pointers are always freed, even when no transmit callback (`txCB`) is attached.
+            * Offloaded packet decode, string formatting, and MQTT log publishing out of the high-priority radio timer loop into the asynchronous `callbackTaskLoop`, eliminating microsecond-level timing jitter during RF transmission bursts.
+          * 📻 **SX1276 Hardware Initialization & State Machine Safeguards**:
+            * Refined the SX1276 power-on-reset routine to transition through `RF_OPMODE_SLEEP` before configuring FSK registers, strictly honoring Semtech hardware specifications for reliable LoRa-to-FSK modulation switching on cold boots.
+            * Augmented hardware polling loops (`TxReady` and `RxReady`) with 100 ms timeout bounds to prevent infinite CPU lockups if SPI communication is interrupted.
+          * 💾 **Thread-Safe LittleFS Device Persistence**:
+            * Enforced a FreeRTOS mutex (`s_remoteSaveMutex`) around `iohcRemote1W::save()` to serialize atomic configuration writes (`/1W.json.tmp` -> `.bak` -> `.json`), completely preventing file-locking race conditions during rapid device command updates or web interactions.
+          * 🔌 **Graceful WebSocket Termination on Device Reboot**:
+            * Replaced immediate restarts in OTA firmware and filesystem update endpoints with a phased shutdown sequence (`ws.closeAll(1001, "restarting")` followed by client cleanup and restart delay), preventing browser socket dangling and abrupt TCP reset errors.
+          * 🎨 **Production Version Alignment**:
+            * Synchronized all system subsystems (ESPHome API, MQTT, mDNS, Web Server API, and Web UI static assets) to `v3.2.0`.
+
+          ---
+
           ## 🛡️ What's New in v3.1.7 (FreeRTOS Dual-Core Concurrency & Stability Hardening)
 
           * 🔒 **Thread-Safe Log Buffer & Mutex Protection**:

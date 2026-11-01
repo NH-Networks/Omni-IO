@@ -815,11 +815,14 @@ static void scheduleRestart(const char *taskName) {
   if (!rebootScheduled.exchange(true)) {
     xTaskCreate(
       [](void *) {
-        vTaskDelay(pdMS_TO_TICKS(3000));
+        vTaskDelay(pdMS_TO_TICKS(1200));
+        ws.closeAll(1001, "restarting");
+        ws.cleanupClients();
+        vTaskDelay(pdMS_TO_TICKS(1800));
         ESP.restart();
       },
       taskName,
-      2048,
+      3072,
       nullptr,
       5,
       nullptr
@@ -1101,7 +1104,7 @@ void handleApiInfo(AsyncWebServerRequest *request, JsonObject &root) {
   root["environment"] = "unknown";
 #endif
 #else
-  root["version"] = "3.1.7";
+  root["version"] = "3.2.0";
 #endif
   root["uptimeMs"] = millis();
   root["freeHeap"] = ESP.getFreeHeap();
@@ -1277,7 +1280,7 @@ void handleApiDisplaySet(AsyncWebServerRequest *request, JsonObject &doc, JsonOb
 
 #if defined(SYSLOG)
 void handleApiSyslogGet(AsyncWebServerRequest *request, JsonObject &root) {
-  initSyslog();
+  loadSyslogConfig();
 
   root["enabled"] = syslog_enabled;
   root["server"] = syslog_server.c_str();
@@ -1546,20 +1549,7 @@ void handleFirmwareUpdate(AsyncWebServerRequest *request) {
   } else {
     request->send(200, "application/json",
                   "{\"message\":\"Firmware update successful, rebooting\"}");
-    static std::atomic<bool> rebootScheduled{false};
-    if (!rebootScheduled.exchange(true)) {
-      xTaskCreate(
-        [](void *) {
-          vTaskDelay(pdMS_TO_TICKS(3000));
-          ESP.restart();
-        },
-        "reboot",
-        2048,
-        nullptr,
-        5,
-        nullptr
-      );
-    }
+    scheduleRestart("ota-reboot");
   }
 }
 
@@ -1595,20 +1585,7 @@ void handleFilesystemUpdate(AsyncWebServerRequest *request) {
   } else {
     request->send(200, "application/json",
                   "{\"message\":\"Filesystem update successful, rebooting\"}");
-    static std::atomic<bool> rebootScheduled{false};
-    if (!rebootScheduled.exchange(true)) {
-      xTaskCreate(
-        [](void *) {
-          vTaskDelay(pdMS_TO_TICKS(3000));
-          ESP.restart();
-        },
-        "reboot",
-        2048,
-        nullptr,
-        5,
-        nullptr
-      );
-    }
+    scheduleRestart("fs-reboot");
   }
 }
 
