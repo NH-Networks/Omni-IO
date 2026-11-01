@@ -490,8 +490,29 @@ Original upstream portions remain licensed under Apache-2.0.
                 <small class="field-hint"
                   >Leave blank to keep the current password.</small
                 >
+                <div style="border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 15px 0 10px 0; padding-top: 10px;">
+                  <label
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 8px;
+                      margin-bottom: 8px;
+                    "
+                    ><input type="checkbox" id="roam-enabled" /> Auto-roam to stronger AP when signal is degraded</label
+                  >
+                  <label
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 8px;
+                      margin-bottom: 4px;
+                    "
+                    ><input type="checkbox" id="roam-nightly" /> Only roam during night time (00:00 - 07:00)</label
+                  >
+                  <div id="roam-status" class="field-status" style="margin-top: 4px;"></div>
+                </div>
                 <p class="restart-notice">
-                  Note: The device will restart after saving.
+                  Note: The device will restart after saving WiFi network credentials.
                 </p>
                 <div id="wifi-config-status" class="field-status"></div>
                 <button id="wifi-config-save">Save</button>
@@ -544,67 +565,6 @@ Original upstream portions remain licensed under Apache-2.0.
                 />
                 <div id="fallback-status" class="field-status">Loading...</div>
                 <button id="fallback-save">Save</button>
-              </div>
-            </section>
-            <section id="wifi-roam-section">
-              <div class="title">
-                <h2>WiFi Roaming Assistant</h2>
-              </div>
-              <div class="card">
-                <label
-                  style="
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    margin-bottom: 10px;
-                  "
-                  ><input type="checkbox" id="roam-enabled" /> Auto-roam to stronger AP when signal is degraded</label
-                >
-                <label
-                  style="
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    margin-bottom: 10px;
-                  "
-                  ><input type="checkbox" id="roam-nightly" /> Only roam during night window</label
-                >
-                <div class="compact-grid" style="grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
-                  <div>
-                    <label for="roam-start-hour">Night start hour (0-23):</label>
-                    <input type="number" id="roam-start-hour" min="0" max="23" placeholder="0" />
-                  </div>
-                  <div>
-                    <label for="roam-end-hour">Night end hour (0-23):</label>
-                    <input type="number" id="roam-end-hour" min="0" max="23" placeholder="7" />
-                  </div>
-                </div>
-                <label for="roam-threshold">Signal threshold (dBm, e.g. -55):</label>
-                <input
-                  type="number"
-                  id="roam-threshold"
-                  min="-90"
-                  max="-30"
-                  placeholder="-55"
-                />
-                <label for="roam-delta">Minimum signal gain (dBm, e.g. 15):</label>
-                <input
-                  type="number"
-                  id="roam-delta"
-                  min="5"
-                  max="40"
-                  placeholder="15"
-                />
-                <label for="roam-interval">Check interval (minutes):</label>
-                <input
-                  type="number"
-                  id="roam-interval"
-                  min="10"
-                  max="720"
-                  placeholder="30"
-                />
-                <div id="roam-status" class="field-status"></div>
-                <button id="roam-save">Save</button>
               </div>
             </section>
             <section id="network-config-section">
