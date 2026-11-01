@@ -183,9 +183,15 @@ namespace IOHC {
                 vTaskNotifyGiveFromISR(iohcRadio::txTaskHandle, &xHigherPriorityTaskWoken);
             }
         } else {
+#if defined(RADIO_SX127X)
             if (!digitalRead(RADIO_PACKET_AVAIL)) {
                 return;
             }
+#elif defined(RADIO_SX126X)
+            if (!digitalRead(RADIO_DIO1_PIN)) {
+                return;
+            }
+#endif
             twoWPayloadIrqCount++;
             iohcRadio::setRadioState(iohcRadio::RadioState::PAYLOAD);
             vTaskNotifyGiveFromISR(handle_interrupt, &xHigherPriorityTaskWoken);
@@ -244,15 +250,10 @@ namespace IOHC {
         // Attach interrupts to Preamble detected and end of packet sent/received
         /* TODO this is wrongly named and/or assigned, but work like that*/
 #if defined(RADIO_SX127X)
-        //        attachInterrupt(RADIO_PACKET_AVAIL, i_payload, CHANGE); //
-        //        attachInterrupt(RADIO_PREAMBLE_DETECTED, i_preamble, CHANGE); //
-#if defined(RADIO_SX127X)
-        attachInterrupt(RADIO_DIO0_PIN, handle_payload_interrupt_fromisr, RISING); //CHANGE); //
-        //        attachInterrupt(RADIO_DIO1_PIN, handle_interrupt_fromisr, RISING); // CHANGE); //
+        attachInterrupt(RADIO_DIO0_PIN, handle_payload_interrupt_fromisr, RISING);
         attachInterrupt(RADIO_DIO2_PIN, handle_sync_interrupt_fromisr, CHANGE);
 #elif defined(RADIO_SX126X)
         attachInterrupt(RADIO_DIO1_PIN, handle_payload_interrupt_fromisr, RISING);
-#endif
 #elif defined(CC1101)
         attachInterrupt(RADIO_PREAMBLE_DETECTED, i_preamble, RISING);
 #endif
@@ -845,6 +846,7 @@ bool queueCallback(IohcPacketDelegate* callback, iohcPacket* packet) {
         auto iohc = new iohcPacket;
         iohc->buffer_length = 0;
         iohc->frequency = scan_freqs[currentFreqIdx];
+        bool rxOverflow = false;
 
         _g_payload_millis = esp_timer_get_time();
         packetStamp.store(_g_payload_millis);
@@ -872,6 +874,8 @@ bool queueCallback(IohcPacketDelegate* callback, iohcPacket* packet) {
         if (rxLen > 0 && rxLen <= MAX_FRAME_LEN) {
             memcpy(iohc->payload.buffer, rxBuf, rxLen);
             iohc->buffer_length = rxLen;
+        } else if (rxLen > MAX_FRAME_LEN) {
+            rxOverflow = true;
         }
 #elif defined(CC1101)
         __g_preamble = false;
@@ -889,7 +893,6 @@ bool queueCallback(IohcPacketDelegate* callback, iohcPacket* packet) {
 
 #if defined(RADIO_SX127X)
 
-        bool rxOverflow = false;
         uint16_t fifoCount = 0;
         uint32_t emptySinceUs = 0;
         const uint32_t readStartedUs = micros();
