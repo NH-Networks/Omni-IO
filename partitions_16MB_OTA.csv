@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 CloudAXS
+# SPDX-License-Identifier: LicenseRef-CloudAXS-Proprietary
+# 16MB OTA layout (M5Stack Unit C6L): two 2 MB app slots, one LittleFS partition.
+# Name,   Type, SubType, Offset,   Size,     Flags
+nvs,      data, nvs,     0x9000,   0x5000,
+otadata,  data, ota,     0xe000,   0x2000,
+app0,     app,  ota_0,   0x10000,  0x200000,
+app1,     app,  ota_1,   0x210000, 0x200000,
+spiffs,   data, spiffs,  0x410000, 0x200000,
