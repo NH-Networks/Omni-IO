@@ -67,9 +67,11 @@ std::string Line::get(const int width) {
     const std::string addition = leftLen > window.end ? elipses : "";
     const auto text = leftText.substr(window.start, window.cnt - addition.length());
 
-    const std::string fillText(width - window.cnt - rightLen, ' ');
+    // right text can be wider than the display (e.g. 64px OLED), so never use a negative fill length
+    const std::string fillText(std::max(0, width - window.cnt - rightLen), ' ');
 
-    return text + addition + fillText + rightText;
+    const auto result = text + addition + fillText + rightText;
+    return width > 0 && static_cast<int>(result.length()) > width ? result.substr(0, width) : result;
 }
 
 DisplayBuffer::DisplayBuffer(): scroller(40, 20) {
