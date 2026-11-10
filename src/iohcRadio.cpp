@@ -552,6 +552,55 @@ namespace IOHC {
         Radio::setRx();
         radio->setRadioState(iohcRadio::RadioState::RX);
 
+#elif defined(RADIO_SX126X)
+        if (txBatchActive) {
+            return;
+        }
+
+        if (radioState == iohcRadio::RadioState::PAYLOAD) {
+            const uint16_t irq = Radio::getIrqStatus();
+            if (irq & SX126X_IRQ_RX_DONE) {
+                radio->receive(false);
+            }
+            Radio::clearFlags();
+            Radio::setRx();
+            radio->setRadioState(iohcRadio::RadioState::RX);
+            radio->tickCounter = 0;
+            radio->preCounter = 0;
+            return;
+        }
+
+        if (radioState != iohcRadio::RadioState::RX) return;
+
+        if (radio->twoWScanActive &&
+            static_cast<long>(millis() - radio->twoWScanUntilMs) >= 0) {
+            radio->stopTwoWScan();
+            return;
+        }
+
+        radio->tickCounter = radio->tickCounter + 1;
+        if (radio->tickCounter * SM_GRANULARITY_US < radio->scanTimeUs) return;
+        radio->tickCounter = 0;
+
+        if (radio->num_freqs == 1) return;
+
+        // Do not hop away while a frame has been synchronised and is still being received
+        if (Radio::getIrqStatus() & SX126X_IRQ_SYNCWORD_VALID) {
+            radio->preCounter = radio->preCounter + 1;
+            if ((radio->preCounter * radio->scanTimeUs) < SM_PREAMBLE_RECOVERY_TIMEOUT_US) return;
+        }
+        radio->preCounter = 0;
+
+        radio->currentFreqIdx += 1;
+        if (radio->currentFreqIdx >= radio->num_freqs)
+            radio->currentFreqIdx = 0;
+
+        Radio::setStandby();
+        Radio::setCarrier(Radio::Carrier::Frequency, radio->scan_freqs[radio->currentFreqIdx]);
+        Radio::clearFlags();
+        Radio::setRx();
+        radio->setRadioState(iohcRadio::RadioState::RX);
+
 #elif defined(CC1101)
         if (__g_preamble){
             radio->receive();
