@@ -192,7 +192,7 @@ namespace IOHC {
                 return;
             }
 #endif
-            twoWPayloadIrqCount++;
+            twoWPayloadIrqCount = twoWPayloadIrqCount + 1;
             iohcRadio::setRadioState(iohcRadio::RadioState::PAYLOAD);
             vTaskNotifyGiveFromISR(handle_interrupt, &xHigherPriorityTaskWoken);
         }
@@ -212,7 +212,7 @@ namespace IOHC {
         const bool syncActive = false;
 #endif
         if (syncActive) {
-            twoWSyncIrqCount++;
+            twoWSyncIrqCount = twoWSyncIrqCount + 1;
             iohcRadio::setRadioState(iohcRadio::RadioState::PREAMBLE);
         } else {
             iohcRadio::setRadioState(iohcRadio::RadioState::RX);
@@ -715,7 +715,7 @@ void iohcRadio::onTxTicker(void *arg) {
         // inform callback we finished sending this packet, this transfers ownership of the packet to the callback queue
         radio->sent(packet);
 
-        radio->txCounter++;
+        radio->txCounter = radio->txCounter + 1;
 
 
         // 🛑 Check if all packets are sent
