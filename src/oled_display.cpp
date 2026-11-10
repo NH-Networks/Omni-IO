@@ -434,10 +434,17 @@ void setDisplayEnabled(bool enabled) {
     notifyDisplayTask();
 }
 
+// 64 px wide panels (M5Stack C6L) cannot fit the 128x64 header/footer layout.
+static constexpr bool kNarrowDisplay = SCREEN_WIDTH <= 64;
+static constexpr int kContentTop = kNarrowDisplay ? 13 : 20;
+static constexpr int kFooterHeight = kNarrowDisplay ? 16 : 8;
+
 void drawLogo(int x, int y) {
     display.drawBitmap(x+1, y+1, omniIoLogo, 16, 10, SSD1306_WHITE);
-    display.setCursor(x+20, y+4);
-    display.print("Omni-IO");
+    if (!kNarrowDisplay) {
+        display.setCursor(x+20, y+4);
+        display.print("Omni-IO");
+    }
 }
 
 void drawHeader() {
@@ -471,11 +478,27 @@ void drawHeader() {
 
 void drawFooter() {
     if (wifiStatus.connectionStatus == ConnState::Connected) {
+        const bool showHostname = getSecondsSinceStart() / 10 % 2 == 0;
+        if (kNarrowDisplay) {
+            // 10 characters per line: print the IP as two halves, e.g. "192.168." / "10.50"
+            if (showHostname) {
+                display.setCursor(1, SCREEN_HEIGHT - 8);
+                display.print("omni-io");
+            } else {
+                const String ip = WiFi.localIP().toString();
+                const int split = ip.indexOf('.', ip.indexOf('.') + 1) + 1;
+                display.setCursor(1, SCREEN_HEIGHT - 16);
+                display.print(ip.substring(0, split).c_str());
+                display.setCursor(1, SCREEN_HEIGHT - 8);
+                display.print(ip.substring(split).c_str());
+            }
+            return;
+        }
         display.setCursor(1, SCREEN_HEIGHT - 8);
-        if (getSecondsSinceStart() / 10 % 2 == 0) {
-            display.println(SCREEN_WIDTH <= 64 ? "omni-io" : "http://omni-io.local");
+        if (showHostname) {
+            display.println("http://omni-io.local");
         } else {
-            display.printf(SCREEN_WIDTH <= 64 ? "%s\n" : "IP: %s\n", WiFi.localIP().toString().c_str());
+            display.printf("IP: %s\n", WiFi.localIP().toString().c_str());
         }
     }
 }
@@ -494,15 +517,22 @@ void drawData(const std::vector<std::string>& currentLines) {
     drawHeader();
 
     if (esp_timer_get_time() < discoveryEndMicros.load()) {
-        display.setCursor(10, 25);
-        display.setTextSize(2);
-        display.println("DISCOVERY");
-        display.setCursor(10, 45);
-        display.setTextSize(1);
-        display.println("Mode Active...");
+        if (kNarrowDisplay) {
+            display.setCursor(2, kContentTop + 2);
+            display.println("DISCOVERY");
+            display.setCursor(2, kContentTop + 12);
+            display.println("Mode on");
+        } else {
+            display.setCursor(10, 25);
+            display.setTextSize(2);
+            display.println("DISCOVERY");
+            display.setCursor(10, 45);
+            display.setTextSize(1);
+            display.println("Mode Active...");
+        }
         setTimerSpeed(fast);
     } else {
-        display.setCursor(0, 20);
+        display.setCursor(0, kContentTop);
         const bool hasData = drawContents(currentLines);
         if (!hasData) {
             setTimerSpeed(slow);
@@ -513,6 +543,36 @@ void drawData(const std::vector<std::string>& currentLines) {
 }
 
 void drawLogo() {
+    if (kNarrowDisplay) {
+        // Compact block (48 px wide) that always stays on screen: logo, name, CPU temp, IP in two halves
+        const bool showCpu = cpuTempEnabled.load();
+        const bool showIp = wifiStatus.connectionStatus == ConnState::Connected;
+        const int blockHeight = 12 + 8 + (showCpu ? 8 : 0) + (showIp ? 16 : 0);
+        const int x = (SCREEN_WIDTH - 48) * std::rand() / RAND_MAX;
+        const int y = (SCREEN_HEIGHT - blockHeight) * std::rand() / RAND_MAX;
+        display.setTextSize(1);
+        display.setTextColor(SSD1306_WHITE);
+        display.drawBitmap(x + 1, y + 1, omniIoLogo, 16, 10, SSD1306_WHITE);
+        int lineY = y + 12;
+        display.setCursor(x, lineY);
+        display.print("Omni-IO");
+        lineY += 8;
+        if (showCpu) {
+            display.setCursor(x, lineY);
+            display.printf("CPU %.0fC", temperatureRead());
+            lineY += 8;
+        }
+        if (showIp) {
+            const String ip = WiFi.localIP().toString();
+            const int split = ip.indexOf('.', ip.indexOf('.') + 1) + 1;
+            display.setCursor(x, lineY);
+            display.print(ip.substring(0, split).c_str());
+            display.setCursor(x, lineY + 8);
+            display.print(ip.substring(split).c_str());
+        }
+        return;
+    }
+
     const int x = 50.0 * std::rand() / RAND_MAX;
     const int y = 30.0 * std::rand() / RAND_MAX;
     drawLogo(x, y);
@@ -580,7 +640,7 @@ void displayTask(void *) {
 #endif
 
             int width = SCREEN_WIDTH / 6;
-            int height = (SCREEN_HEIGHT - 20 - 8) / 8;
+            int height = (SCREEN_HEIGHT - kContentTop - kFooterHeight) / 8;
             xSemaphoreTake(displayBufferMutex, portMAX_DELAY);
             currentLines = displayBuffer.getTextToDisplay(width, height);
             xSemaphoreGive(displayBufferMutex);
