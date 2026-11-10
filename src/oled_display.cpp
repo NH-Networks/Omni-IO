@@ -293,9 +293,18 @@ bool initDisplay() {
 #if defined(M5STACK_C6L)
     pinMode(OLED_CS_PIN, OUTPUT);
     digitalWrite(OLED_CS_PIN, HIGH);
+    // The bus is shared with the SX1262: start it on the board pins, otherwise
+    // Adafruit_SSD1306 starts it on the default pins and later SPI.begin() calls are ignored.
+    SPI.begin(RADIO_SCLK_PIN, RADIO_MISO_PIN, RADIO_MOSI_PIN, -1);
     if (!display.begin(SSD1306_SWITCHCAPVCC)) {
         return false;
     }
+    // Adafruit_SSD1306 has no 64x48 profile and falls back to sequential COM pins, which
+    // drops/shifts rows on this panel. Use the alternative COM pin configuration instead.
+    display.ssd1306_command(SSD1306_SETCOMPINS);
+    display.ssd1306_command(0x12);
+    // The panel is mounted upside down relative to the case (Grove port on top)
+    display.setRotation(2);
 #else
     Wire.begin(OLED_SDA, OLED_SCL);
     if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDRESS)) {
