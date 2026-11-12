@@ -10,6 +10,12 @@ on:
       - dev-main
       - Beta
       - 'feature/**'
+  pull_request:
+    branches:
+      - master
+      - dev-main
+      - Beta
+      - 'feature/**'
 
 jobs:
   build:
@@ -88,6 +94,7 @@ jobs:
           path: artifacts/
 
   release:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     needs: build
     permissions:
