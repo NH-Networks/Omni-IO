@@ -18,17 +18,29 @@ on:
       - 'feature/**'
 
 jobs:
+  prepare-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      environments: ${{ steps.set-envs.outputs.environments }}
+    steps:
+      - id: set-envs
+        run: |
+          TARGET_BRANCH="${{ github.base_ref || github.ref_name }}"
+          if [[ "$TARGET_BRANCH" == *"m5stack-c6l"* ]]; then
+            echo "Target branch is $TARGET_BRANCH: building M5StackC6L only"
+            echo 'environments=["M5StackC6L"]' >> "$GITHUB_OUTPUT"
+          else
+            echo "Target branch is $TARGET_BRANCH: building standard production boards"
+            echo 'environments=["HeltecLoraV2ESP32", "LilyGoTBeamV12ESP32", "LilyGoLoraESP32", "LilyGoT3S3"]' >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: prepare-matrix
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        env:
-          - HeltecLoraV2ESP32
-          - LilyGoTBeamV12ESP32
-          - LilyGoLoraESP32
-          - LilyGoT3S3
-          - M5StackC6L
+        env: ${{ fromJson(needs.prepare-matrix.outputs.environments) }}
 
     steps:
       - name: Checkout repository
@@ -101,7 +113,9 @@ jobs:
   release:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    needs: build
+    needs:
+      - prepare-matrix
+      - build
     permissions:
       contents: write
 
