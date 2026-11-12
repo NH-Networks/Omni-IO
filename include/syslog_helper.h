@@ -1,4 +1,8 @@
 /*
+ * Modifications Copyright 2026 CloudAXS.
+ * Original upstream portions remain licensed under Apache-2.0.
+ */
+/*
    Syslog helper for forwarding log messages to a remote server
 */
 
@@ -7,6 +11,9 @@
 
 #pragma once
 #include <Arduino.h>
+
+// Load syslog configuration from NVS without DNS resolution
+void loadSyslogConfig();
 
 // Initialize UDP + target IP from user_config.h
 void initSyslog();

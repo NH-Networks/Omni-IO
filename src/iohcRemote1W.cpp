@@ -41,6 +41,7 @@
 
 namespace IOHC {
     iohcRemote1W* iohcRemote1W::_iohcRemote1W = nullptr;
+    static SemaphoreHandle_t s_remoteSaveMutex = nullptr;
     static constexpr uint32_t DEFAULT_TRAVEL_TIME_SEC = 10;
 
     static void broadcastWebDeviceAction(const iohcRemote1W::remote &r, const char *action) {
@@ -889,9 +890,22 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
         // _sequence = 0x1402;    // DEBUG
         return true;
     }
-   bool iohcRemote1W::save() {
+    bool iohcRemote1W::save() {
+        if (!s_remoteSaveMutex) {
+            s_remoteSaveMutex = xSemaphoreCreateMutex();
+        }
+        if (s_remoteSaveMutex && xSemaphoreTake(s_remoteSaveMutex, pdMS_TO_TICKS(5000)) != pdTRUE) {
+            Serial.println("iohcRemote1W::save(): failed to acquire save lock, busy");
+            return false;
+        }
+
+        auto unlock = [](SemaphoreHandle_t m) {
+            if (m) xSemaphoreGive(m);
+        };
+
         if (remotes.empty()) {
             Serial.printf("Refusing to save empty 1W remote list to %s\n", IOHC_1W_REMOTE);
+            unlock(s_remoteSaveMutex);
             return false;
         }
 
@@ -901,32 +915,25 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
         fs::File f = LittleFS.open(tempFile, "w");
         if (!f) {
             Serial.printf("Failed to open temporary 1W settings file %s\n", tempFile);
+            unlock(s_remoteSaveMutex);
             return false;
         }
         JsonDocument doc;
         for (const auto&r: remotes) {
-            // jobj["key"] = bytesToHexString(_key, sizeof(_key));
             auto jobj = doc[bytesToHexString(r.node, sizeof(r.node))].to<JsonObject>();
             jobj["key"] = bytesToHexString(r.key, sizeof(r.key));
 
             uint8_t btmp[2];
-            // btmp[1] = _sequence & 0x00ff;
-            // btmp[0] = _sequence >> 8;
             btmp[1] = r.sequence & 0x00ff;
             btmp[0] = r.sequence >> 8;
 
             jobj["sequence"] = bytesToHexString(btmp, sizeof(btmp));
 
-            // JsonArray jarr = jobj.createNestedArray("type");
             auto jarr = jobj["type"].to<JsonArray>();
             for (uint8_t i : r.type) {
-                // if (i)
                 bool added = jarr.add(i);
-                // else
-                // break;
-                }
+            }
 
-            // jobj["manufacturer_id"] = _manufacturer;
             jobj["manufacturer_id"] = r.manufacturer;
             jobj["description"] = r.description;
             jobj["name"] = r.name;
@@ -937,7 +944,6 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
             jobj["position"] = static_cast<int>(std::round(r.positionTracker.getPosition()));
 
             jobj["paired"] = r.paired;
-
         }
         const size_t written = serializeJson(doc, f);
         f.flush();
@@ -945,6 +951,7 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
         if (written == 0) {
             LittleFS.remove(tempFile);
             Serial.println("Failed to serialize 1W settings");
+            unlock(s_remoteSaveMutex);
             return false;
         }
 
@@ -953,6 +960,7 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
             !LittleFS.rename(IOHC_1W_REMOTE, backupFile)) {
             LittleFS.remove(tempFile);
             Serial.println("Failed to back up 1W settings file");
+            unlock(s_remoteSaveMutex);
             return false;
         }
         if (!LittleFS.rename(tempFile, IOHC_1W_REMOTE)) {
@@ -961,10 +969,12 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
             if (LittleFS.exists(backupFile)) {
                 LittleFS.rename(backupFile, IOHC_1W_REMOTE);
             }
+            unlock(s_remoteSaveMutex);
             return false;
         }
         LittleFS.remove(backupFile);
 
+        unlock(s_remoteSaveMutex);
         return true;
     }
 

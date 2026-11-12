@@ -106,7 +106,12 @@ namespace Radio {
         digitalWrite(RADIO_NSS, HIGH);
         delayMicroseconds(BOARD_READY_AFTER_POR);
 
-        writeByte(REG_OPMODE, RF_OPMODE_STANDBY); // Put Radio in Standby mode
+        // Put Radio in Sleep first so modulation type (LoRa -> FSK) can be reliably switched
+        writeByte(REG_OPMODE, RF_OPMODE_SLEEP);
+        delay(1);
+        writeByte(REG_OPMODE, RF_OPMODE_LONGRANGEMODE_OFF | RF_OPMODE_MODULATIONTYPE_FSK | RF_OPMODE_SLEEP);
+        delay(1);
+        writeByte(REG_OPMODE, RF_OPMODE_LONGRANGEMODE_OFF | RF_OPMODE_MODULATIONTYPE_FSK | RF_OPMODE_STANDBY);
 
         pinMode(SCAN_LED, OUTPUT);
         digitalWrite(SCAN_LED, 1);

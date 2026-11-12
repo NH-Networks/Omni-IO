@@ -84,7 +84,7 @@ namespace IOHC {
     volatile iohcRadio::RadioState iohcRadio::radioState = iohcRadio::RadioState::IDLE;
     TaskHandle_t iohcRadio::txTaskHandle = nullptr;
     volatile bool iohcRadio::txComplete = false;
-    volatile bool iohcRadio::txBatchActive = false;
+    std::atomic<bool> iohcRadio::txBatchActive{false};
 
 
     TaskHandle_t handle_interrupt;
@@ -93,6 +93,7 @@ namespace IOHC {
     struct Callback {
         IohcPacketDelegate *callback;
         iohcPacket *packet;
+        bool isTxCompletion;
     };
 
     static volatile uint32_t twoWPayloadIrqCount = 0;
@@ -227,6 +228,14 @@ namespace IOHC {
         while (true) {
             if (xQueueReceive(callbackQueue, &callback, portMAX_DELAY) == pdPASS && callback != NULL) {
                 setCrashMarker("radio: callback dispatch");
+                if (callback->isTxCompletion && callback->packet) {
+                    packetStamp.store(esp_timer_get_time());
+                    callback->packet->decode(false);
+                    addLogMessage(String(callback->packet->decodeToString(true).c_str()));
+#if defined(MQTT)
+                    publishRadioLogEvent(callback->packet, "TX");
+#endif
+                }
                 if (callback->callback && *(callback->callback) && callback->packet) {
                     (*(callback->callback))(callback->packet);
                 }
@@ -237,7 +246,8 @@ namespace IOHC {
         }
     }
 
-    iohcRadio::iohcRadio() {
+    iohcRadio::iohcRadio() : sendQueueMutex(xSemaphoreCreateMutex()) {
+        configASSERT(sendQueueMutex);
         Radio::initHardware();
         Radio::calibrate();
 
@@ -339,7 +349,7 @@ namespace IOHC {
         // Enable frequency hopping to scan all configured channels.
 #if defined(ESP32)
         if (!tickerTaskHandle &&
-            xTaskCreatePinnedToCore(radioTickerTaskLoop, "radioTicker", 4096, this,
+            xTaskCreatePinnedToCore(radioTickerTaskLoop, "radioTicker", 8192, this,
                                     4, &tickerTaskHandle, 0) != pdPASS) {
             tickerTaskHandle = nullptr;
             addLogMessage("Failed to create radio ticker task");
@@ -644,21 +654,28 @@ void iohcRadio::queueSend(std::vector<iohcPacket *> &iohcTx) {
     if (iohcTx.empty()) {
         return;
     }
+    xSemaphoreTake(sendQueueMutex, portMAX_DELAY);
     sendQueue.push(std::move(iohcTx));
-    ets_printf("TX: Queued send batch. Queue depth=%d\n", static_cast<int>(sendQueue.size()));
+    const auto queueDepth = sendQueue.size();
+    xSemaphoreGive(sendQueueMutex);
+    ets_printf("TX: Queued send batch. Queue depth=%d\n", static_cast<int>(queueDepth));
 }
 
 void iohcRadio::startQueuedSend() {
-    if (radioState == RadioState::TX || packets2send.size() > 0 || sendQueue.empty()) {
+    xSemaphoreTake(sendQueueMutex, portMAX_DELAY);
+    if (txBatchActive || radioState == RadioState::TX || !packets2send.empty() || sendQueue.empty()) {
+        xSemaphoreGive(sendQueueMutex);
         return;
     }
 
-    setCrashMarker("radio: startQueuedSend");
     packets2send = std::move(sendQueue.front());
     sendQueue.pop();
     txCounter = 0;
     txComplete = false;
     txBatchActive = true;
+    xSemaphoreGive(sendQueueMutex);
+
+    setCrashMarker("radio: startQueuedSend");
     resumeTwoWScanAfterTx = twoWScanActive && twoWScanUntilMs > millis();
     resumeTwoWScanUntilMs = resumeTwoWScanAfterTx ? twoWScanUntilMs : 0;
     resumeTwoWScanWindowMs = resumeTwoWScanAfterTx
@@ -831,8 +848,8 @@ void iohcRadio::onTxTicker(void *arg) {
                esp_timer_get_time());
 }
 
-bool queueCallback(IohcPacketDelegate* callback, iohcPacket* packet) {
-    if (!callback || !packet) {
+bool queueCallback(IohcPacketDelegate* callback, iohcPacket* packet, bool isTxCompletion = false) {
+    if (!packet) {
         return false;
     }
     Callback *callbackData = (Callback*) pvPortMalloc(sizeof(Callback));
@@ -842,6 +859,7 @@ bool queueCallback(IohcPacketDelegate* callback, iohcPacket* packet) {
 
     callbackData->callback = callback;
     callbackData->packet = packet;
+    callbackData->isTxCompletion = isTxCompletion;
 
     if (xQueueSendToBack(callbackQueue, &callbackData, pdMS_TO_TICKS(25)) != pdPASS) {
         addLogMessage("Radio callback queue full; dropping packet");
@@ -863,15 +881,7 @@ bool queueCallback(IohcPacketDelegate* callback, iohcPacket* packet) {
  */
     bool IRAM_ATTR iohcRadio::sent(iohcPacket *packet) {
         bool ret = false;
-        if (packet) {
-            packetStamp.store(esp_timer_get_time());
-            packet->decode(true);
-            addLogMessage(String(packet->decodeToString(true).c_str()));
-#if defined(MQTT)
-            publishRadioLogEvent(packet, "TX");
-#endif
-        }
-        if (txCB && !queueCallback(&txCB, packet)) {
+        if (!queueCallback(txCB ? &txCB : nullptr, packet, true)) {
             delete packet;
         }
         return ret;

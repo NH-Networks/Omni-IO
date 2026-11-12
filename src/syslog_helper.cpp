@@ -32,6 +32,10 @@ WiFiUDP syslogUdp;
 IPAddress syslogIP;
 bool syslogReady = false;
 bool configLoaded = false;
+uint32_t syslogBackoffUntilMs = 0;
+uint32_t lastSyslogSendMs = 0;
+static constexpr uint32_t SYSLOG_MIN_SEND_INTERVAL_MS = 250;
+static constexpr uint32_t SYSLOG_ERROR_BACKOFF_MS = 60000;
 static const char *TAG = "SYSLOG";
 
 inline int pri(int facility, int severity) {
@@ -106,21 +110,15 @@ String currentHostIdent() {
 }
 } // namespace
 
+void loadSyslogConfig() {
+  ensureConfigLoaded();
+}
+
 // Initialize UDP + resolve syslog IP from user_config.h
 void initSyslog() {
   ensureConfigLoaded();
 
-  if (!syslog_enabled) {
-    resetSyslog();
-    return;
-  }
-
-  if (syslog_server.empty()) {
-    resetSyslog();
-    return;
-  }
-
-  if (syslog_port == 0 || syslog_port > 65535) {
+  if (!syslog_enabled || syslog_server.empty() || syslog_port == 0 || syslog_port > 65535) {
     resetSyslog();
     return;
   }
@@ -130,9 +128,15 @@ void initSyslog() {
     return;
   }
 
+  const uint32_t nowMs = millis();
+  if (static_cast<int32_t>(nowMs - syslogBackoffUntilMs) < 0) {
+    return;
+  }
+
   if (!syslogIP.fromString(syslog_server.c_str())) {
     if (WiFi.hostByName(syslog_server.c_str(), syslogIP) != 1) {
       resetSyslog();
+      syslogBackoffUntilMs = nowMs + SYSLOG_ERROR_BACKOFF_MS;
       return;
     }
   }
@@ -146,16 +150,20 @@ void initSyslog() {
 // Real sender with RFC header
 void sendSyslog(const String &msg, int severity) {
   ensureConfigLoaded();
-  if (!syslog_enabled) {
+  if (!syslog_enabled || WiFi.status() != WL_CONNECTED) {
     return;
   }
-  if (WiFi.status() != WL_CONNECTED) {
+  const uint32_t nowMs = millis();
+  if (static_cast<int32_t>(nowMs - syslogBackoffUntilMs) < 0) {
     return;
   }
   if (!syslogReady) {
     initSyslog();
   }
   if (!syslog_enabled || !syslogReady) {
+    return;
+  }
+  if (lastSyslogSendMs != 0 && nowMs - lastSyslogSendMs < SYSLOG_MIN_SEND_INTERVAL_MS) {
     return;
   }
 
@@ -173,10 +181,19 @@ void sendSyslog(const String &msg, int severity) {
       "<" + String(p) + ">" + ts + ho + " " + SYSLOG_APP + ": ";
   const String wire = header + "[" SYSLOG_SECRET "] " + msg;
 
-  syslogUdp.beginPacket(syslogIP, syslog_port);
-  syslogUdp.write(reinterpret_cast<const uint8_t *>(wire.c_str()),
-                  wire.length());
-  syslogUdp.endPacket();
+  if (!syslogUdp.beginPacket(syslogIP, syslog_port)) {
+    resetSyslog();
+    syslogBackoffUntilMs = nowMs + SYSLOG_ERROR_BACKOFF_MS;
+    return;
+  }
+  const size_t written = syslogUdp.write(reinterpret_cast<const uint8_t *>(wire.c_str()),
+                                         wire.length());
+  if (written != wire.length() || !syslogUdp.endPacket()) {
+    resetSyslog();
+    syslogBackoffUntilMs = nowMs + SYSLOG_ERROR_BACKOFF_MS;
+    return;
+  }
+  lastSyslogSendMs = nowMs;
 }
 
 // Legacy overload without severity (defaults to info)
@@ -192,6 +209,7 @@ void resetSyslog() {
 #else // !SYSLOG
 
 // No-op definitions so you can build without SYSLOG
+void loadSyslogConfig() {}
 void initSyslog() {}
 void resetSyslog() {}
 void sendSyslog(const String &) {}

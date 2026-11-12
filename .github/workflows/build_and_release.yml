@@ -16,18 +16,18 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           fetch-tags: true
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
       - name: Cache PlatformIO
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.platformio
@@ -92,180 +92,37 @@ jobs:
           cat > changelog.md <<EOF
           # 🎉 Omni-IO Release ${{ github.ref_name }}
 
-          Welcome to the **${{ github.ref_name }}** maintenance release of **Omni-IO**, the open-source ESP32 gateway and controller for **io-homecontrol®** (868.95 MHz) devices (Somfy, Velux, and compatible HVAC/blinds systems).
+          Welcome to the **${{ github.ref_name }}** production release of **Omni-IO**, the open-source ESP32 gateway and controller for **io-homecontrol®** (868.95 MHz) devices (Somfy, Velux, and compatible HVAC/blinds systems).
 
           ---
 
-          ## 📡 What's New in v3.1.5 (Low Power Mode Radio Preamble Restoration & Git Hygiene)
+          ## 🏆 What's New in v3.2.0 (Milestone Reliability & Core Engine Hardening)
 
-          * 📡 **Restored 1920-Byte Default Preamble for Low Power Mode (LPM)**:
-            * Restored default \`LONG_PREAMBLE_BYTES = 1920\` (400 ms @ 38,400 baud) for the initial 1-Way transmission packet (#14).
-            * Fully restores responsiveness for battery- and solar-powered actuators (such as Velux KSX 100 WW and SSL solar roller shutters) that sleep heavily and sample RF carrier only once every ~350–400 ms.
-            * Fast retransmissions continue to use \`SHORT_PREAMBLE_BYTES = 40\` (~8.33 ms).
-          * ⚙️ **Configurable Radio Preamble via CLI, NVS & Preprocessor**:
-            * Added \`radioPreamble [long_bytes] [short_bytes]\` interactive command to serial and web terminals.
-            * Runtime changes are persistently stored in NVS (\`rf_pre_long\`, \`rf_pre_short\`).
-            * Wrapped preamble definitions with \`#ifndef\` for compile-time overrides (\`-DLONG_PREAMBLE_BYTES=...\`).
-            * Exposed live \`radioLongPreamble\` and \`radioShortPreamble\` byte metrics under the \`/api/info\` REST endpoint.
-          * 📖 **Troubleshooting & LPM Timing Documentation**:
-            * Added Section 7 to \`docs/TROUBLESHOOTING.md\` detailing io-homecontrol timing calculations for LPM motors and preamble configuration.
-          * 🛡️ **Repository Hygiene & Artifact Security**:
-            * Strengthened \`.gitignore\` and untracked legacy scratch scripts to prevent any internal test artifacts from leaking into public releases.
-
-          ---
-
-          ## 🌐 What's New in v3.1.4 (ESPHome Native API & Network Latency Hardening)
-
-          * 📶 **WiFi Modem Sleep Disabled**:
-            * Enforced \`WIFI_PS_NONE\` and \`WiFi.setSleep(false)\` across the entire connection lifecycle (\`initWifi()\`, \`handleWifiConnected()\`, and reconnect events).
-            * Eliminates 2.5-second DTIM sleep latency spikes, bringing ping latency down to ~6 ms and preventing cross-VLAN/subnet ARP drops and TCP connection failures (\`Errno 113 EHOSTUNREACH\`).
-          * 🔌 **ESPHome TCP Keepalive & Socket Timeout Hardening**:
-            * Relaxed TCP keepalive on client connections from 15s to 60s idle (\`TCP_KEEPIDLE = 60s\`), with 10s intervals (\`TCP_KEEPINTVL = 10s\`) and 5 probes (\`TCP_KEEPCNT = 5\`), providing 110s resilience against network jitter.
-            * Configured explicit 10s socket send/receive timeouts (\`SO_RCVTIMEO\` / \`SO_SNDTIMEO\`).
-          * 🔄 **Transient Socket Write Retries**:
-            * Added a 10-attempt retry loop with 10 ms delays in \`sendFrame()\` when sockets return non-blocking \`EAGAIN\`, \`EWOULDBLOCK\`, or \`EINTR\`.
-            * Prevents immediate false disconnects (\`disconnected (socket write error)\`) during momentary Wi-Fi airtime bursts.
-          * 🛡️ **Safe Diagnostic Notification Dispatch**:
-            * Decoupled ESPHome RSSI diagnostic notifications from the resource-constrained \`esp_timer\` task (3.5 KB stack) by dispatching via event flags to the dedicated \`WiFi_Worker\` task (8 KB stack).
+          * 🛡️ **Syslog Asynchronous Backoff & Non-Blocking Web Operations**:
+            * Introduced a 60-second backoff and rate limiter for remote Syslog transmission, preventing repetitive blocking DNS lookups (\`WiFi.hostByName\`) from freezing FreeRTOS execution threads when the configured syslog server is unreachable.
+            * Separated \`loadSyslogConfig()\` from network initialization so that web clients querying \`/api/syslog\` under Settings never block on synchronous host resolution.
+          * 📡 **Radio Engine Transmission Completion & Memory Safety**:
+            * Resolved a potential dynamic memory leak in \`iohcRadio::sent()\` by guaranteeing that allocated packet pointers are always freed, even when no transmit callback (\`txCB\`) is attached.
+            * Offloaded packet decode, string formatting, and MQTT log publishing out of the high-priority radio timer loop into the asynchronous \`callbackTaskLoop\`, eliminating microsecond-level timing jitter during RF transmission bursts.
+          * 📻 **SX1276 Hardware Initialization & State Machine Safeguards**:
+            * Refined the SX1276 power-on-reset routine to transition through \`RF_OPMODE_SLEEP\` before configuring FSK registers, strictly honoring Semtech hardware specifications for reliable LoRa-to-FSK modulation switching on cold boots.
+            * Augmented hardware polling loops (\`TxReady\` and \`RxReady\`) with 100 ms timeout bounds to prevent infinite CPU lockups if SPI communication is interrupted.
+          * 💾 **Thread-Safe LittleFS Device Persistence**:
+            * Enforced a FreeRTOS mutex (\`s_remoteSaveMutex\`) around \`iohcRemote1W::save()\` to serialize atomic configuration writes (\`/1W.json.tmp\` -> \`.bak\` -> \`.json\`), completely preventing file-locking race conditions during rapid device command updates or web interactions.
+          * 🔌 **Graceful WebSocket Termination on Device Reboot**:
+            * Replaced immediate restarts in OTA firmware and filesystem update endpoints with a phased shutdown sequence (\`ws.closeAll(1001, "restarting")\` followed by client cleanup and restart delay), preventing browser socket dangling and abrupt TCP reset errors.
+          * 🎨 **Production Version Alignment**:
+            * Synchronized all system subsystems (ESPHome API, MQTT, mDNS, Web Server API, and Web UI static assets) to \`v3.2.0\`.
 
           ---
 
-          ## 🛠️ What's New in v3.1.3 (Board Pinout & Initialization Hardening)
+          ## 🛡️ Key Highlights from v3.1.x Series
 
-          * 📟 **LilyGo LoRa32 v2.1 (T3 v1.6/v1.6.1) Hardware Pinout Fix**:
-            * Updated radio reset GPIO pin (`RADIO_RST_PIN`) to default to GPIO 23 for LilyGo LoRa32 v2.1 boards (#6).
-            * Added preprocessor guard to allow board-specific custom override while preserving backward compatibility.
-          * 🛡️ **Radio Calibration Timeout Guard**:
-            * Guarded low-frequency and high-frequency image calibration loops in `src/SX1276Helpers.cpp` with a 100 ms timeout to prevent indefinite boot hang (#7).
-            * Explicitly verifies `REG_VERSION` (0x42, expected 0x12) on the SPI bus with clear diagnostic logging during hardware initialization.
-          * 📦 **Clean Initial Configuration Files**:
-            * Cleaned bundled release filesystem data files (`1W.json`, `RemoteMap.json`, `Cozy2W.json`) in `extras/` to empty dictionaries to ensure fresh installations start without dummy devices (#9).
-          * 📖 **Pairing & Calibration Documentation**:
-            * Updated `docs/PAIRING_GUIDE.md` clarifying that Somfy Situo and similar motors require the key transfer frame `add` (`0x30`) rather than standard pairing frame `0x2E` (#10).
-            * Added documentation for calibrating asymmetric dual travel times.
-          * 🎨 **Web UI Layout Polish**:
-            * Fixed viewport scroll overflow on short screens so page footers dock gracefully at the bottom without unnecessary scrollbars (#13).
-
-          ---
-
-          ## 🚀 What's New in v3.1.2 (Radio Latency Optimization & Dual Travel Times)
-
-          * ⚡ **Radio Latency Optimization & Instant Responsiveness**:
-            * Fixed critical SX1276 FSK preamble configuration (\`REG_PREAMBLE\` takes bytes, not bits), reducing 1-Way transmission airtime from >2000 ms to ~200 ms (10x faster response time).
-            * Fixed preamble length for retransmissions in \`onTxTicker\`, eliminating unnecessary long preambles on repeated bursts.
-            * Hardened \`handle_payload_interrupt_fromisr()\` interrupt handler race condition by removing premature low-level state pin read in ISR.
-            * Eliminated blocking synchronous LittleFS flash writes (\`save()\`) during command dispatch; rolling code sequences are safely and atomically persisted in NVS.
-            * Enabled static asset HTTP caching (\`max-age=86400\`) on web server handlers, eliminating web UI interface sluggishness and SPI flash read contention.
-          * ⏱️ **Dual Asymmetric Travel Times (Open vs Close)**:
-            * Added individual \`openTravelTime\` and \`closeTravelTime\` calibration per screen across the entire stack.
-            * Full backward compatibility: legacy single \`travel_time\` remains supported as default fallback.
-            * Native ESPHome API: auto-exposes individual \`open_travel_time\` and \`close_travel_time\` number entities to Home Assistant alongside dynamic position simulation.
-            * MQTT: individual state and command topics for open and close timings (\`travel_time_open\`, \`travel_time_close\`).
-            * Web UI: dual timing inputs in device settings modal with dynamic directional curtain animation and multilingual localization (NL, EN, DE, FR).
-            * CLI: extended \`time1W\` command (\`time1W <desc> <openSec> [closeSec]\`) and \`list1W\` view.
-
-          ---
-
-          ## 🛡️ v3.1.1 Highlights (Stability & Radio Pipeline Hardening)
-
-          * 🛡️ **FreeRTOS Callback Task & Queue Hardening**:
-            * Doubled \`CallbackTask\` stack allocation from 4 KB to **8 KB** (\`8192 bytes\`), providing safe headroom for complex JSON serialization, dynamic string operations, and nested callbacks.
-            * Added defensive null-pointer checks in \`callbackTaskLoop\` and queue ingress validation in \`queueCallback()\` to prevent task execution panics.
-          * 📦 **RF Frame Buffer Bounds Checking**:
-            * Implemented strict \`buffer_length\` validation across incoming radio frame handlers (\`0x2B\`, \`0x38\`, \`0x3C\`, \`0x51\`, \`0xFE\`, \`0x30\`, \`0x39\`, and \`0x00\`) in both \`msgRcvd()\` and \`publishMsg()\`.
-            * Eliminates out-of-bounds reads and memory corruption from truncated, malformed, or noisy RF signals.
-          * ⚡ **Background WebSocket Optimization**:
-            * Added active client checks (\`ws.count() == 0\`) across all websocket broadcast routines (\`broadcastLog\`, \`broadcastTwoWStatus\`, \`broadcastDevicePosition\`, \`broadcastDeviceAction\`, \`broadcastLastAddress\`).
-            * Drastically reduces idle CPU, stack, and heap overhead by bypassing JSON serialization and cross-thread socket dispatches when no browser is viewing the web dashboard.
-            * Activated \`shouldBroadcastLog()\` filter before log dispatching to eliminate spam.
-          * 🔍 **Granular RTC Crash Diagnostics**:
-            * Introduced progressive execution markers across all RF packet processing stages (\`radio: callback dispatch\`, \`rx: msgRcvd enter\`, \`rx: msgRcvd parse\`, \`rx: msgRcvd dispatch cmd\`, \`rx: msgRcvd done\`, \`radio: callback done\`) for instant, pinpoint diagnosis of any future exceptions.
-
-          ---
-
-          ## 🌟 v3.1.0 Highlights (Production Ready Release)
-
-          * ⚡ **MQTT Disabled by Default on Clean Devices**:
-            * Out of the box, Omni-IO now defaults to the Native ESPHome API (Zero-Broker) for seamless, instant Home Assistant auto-discovery.
-            * Eliminates unnecessary background connection attempts to unconfigured MQTT brokers on fresh devices.
-            * MQTT remains fully supported and can be enabled with a single click in **Settings → Integrations**; existing device configurations in NVS are preserved.
-          * 🛠️ **Clean Flash Bootloop & Heap Corruption Fix**:
-            * Resolved hardware abort / heap panic on clean devices caused by buffer overflow when loading dictionary data files (\`RemoteMap.json\`, \`1W.json\`).
-            * Hardened hex string parsers with explicit bounds-checking, non-hex validation (\`isxdigit\`), and metadata key filtering (\`_\`).
-            * Added \`LittleFS.begin(true)\` auto-format fallback so devices with empty/unformatted partitions initialize safely without halting.
-          * 📡 **Interactive Live RF Sniffer**:
-            * Added real-time "Last Address" live sniffer with color-coded flash/glow feedback (green for 1W, cyan for 2W).
-            * Live timestamp and action decoding (Open, Close, Stop, etc.) with dedicated protocol badges.
-            * Interactive Web UI controls to pause/resume the feed and clear history, fully localized in NL, EN, DE, and FR.
-
-          ---
-
-          ## 💓 v3.0.1 & v3.0.2 Highlights (ESPHome Keepalive & Connection Stability)
-
-          * 💓 **ESPHome Native API Keepalive Heartbeat**:
-            * Implemented active server-side keepalive pinging (\`EspHomeMsg::PING_REQUEST = 7\`) every 20 seconds, fully compliant with the official ESPHome Native API standard (\`api_connection.cpp\`).
-            * Added native handling for client \`PING_RESPONSE = 8\`, refreshing session activity timestamps and keeping Home Assistant connections alive indefinitely.
-            * Permanently resolved the 90-second silent timeout disconnect/reconnect cycle (~40 reconnects per hour) that flooded device logs.
-            * Added proactive socket write error handling during ping transmission to clean up stalled or severed TCP sockets immediately.
-            * Enhanced session disconnect diagnostics in serial and web logs (\`keepalive timeout\`, \`socket write error\`, \`ping send error\`, \`requested by client\`).
-            * Removed log rate-limiting filters in favor of clean, transparent logging without suppressing legitimate connection events.
-
-          ---
-
-          ## ✨ Previous v3.0.0 Highlights
-
-          * 🚀 **Native ESPHome API Integration (Zero-Broker)**:
-            * Direct, ultra-low-latency Home Assistant integration via embedded ESPHome Native API server (TCP port \`6053\`).
-            * Standardized static TCP port \`6053\` with streamlined Web UI settings and zero risk of misconfiguration.
-            * Zero-broker requirement: no external Mosquitto MQTT broker needed.
-            * Automatic mDNS discovery (\`_esphomelib._tcp.local.\`) under **Settings → Devices & Services** in Home Assistant.
-            * Native \`cover\` entities with position slider, open, close, and stop controls (\`device_class: shutter\`).
-            * Interactive \`number\` slider entity for live motor travel time calibration.
-            * Button entities for motor Pairing (\`0x2E\`), Adding (\`0x30\`), and Removing (\`0x39\`), plus a dedicated gateway soft restart button.
-            * Diagnostic sensors for WiFi RSSI (dBm), Free Heap Memory (Bytes), and IP address.
-          * 🔄 **Dynamic Entity Discovery & Re-enumeration**:
-            * Instant synchronization: adding, editing, or deleting a device in Omni-IO automatically refreshes Home Assistant entities within 1.5 seconds without restarting Home Assistant or reloading integrations.
-            * Zero-latency travel time broadcast updates directly synchronized to active Home Assistant sessions.
-          * ⚡ **Independent Protocol Toggles & Multi-Protocol Coexistence**:
-            * Independent runtime enable/disable toggles for both **MQTT** and **ESPHome** in the Web UI and REST API.
-            * Persistent NVS storage for all protocol configurations.
-            * Clean migration path from MQTT to ESPHome with zero duplicate or orphan entities.
-          * 🖥️ **OLED Display Status Subsystem Enhancements**:
-            * Custom pixel-art ESPHome / Home Assistant status icon in the header bar with connected (solid house) and waiting (outline house) states.
-            * Dynamic multi-protocol status bar balancing CPU temperature, MQTT chain icon, ESPHome house icon, and WiFi signal bars without visual overlap.
-            * Hardware contrast multi-byte I2C transmission fix ensuring display properly dims in screensaver mode.
-            * Inactivity sleep timer protected against background WebSocket pong heartbeats and read-only REST requests.
-          * 🌐 **Modern Web UI Refinements & Live Status Pills**:
-            * Live connection badges for both **MQTT** and **ESPHome** in the web navigation bar showing real-time client states.
-            * One-click navigation from status badges directly to their corresponding settings panels.
-            * Streamlined responsive status grouping.
-          * 🛠️ **Developer Tools & Architecture Documentation**:
-            * Comprehensive architectural knowledge base in \`knowledge.md\` covering protocol specifications, protobuf framing, NVS keys, and board pinouts.
-            * Standalone CLI test utility \`tools/test_esphome_api.py\` for automated validation of the ESPHome API protocol.
-
-          ---
-
-          ## 🌟 Acknowledgments & Credits
-
-          Omni-IO is built with deep gratitude and respect for the pioneering work of the open-source community:
-
-          * **[Velocet](https://github.com/Velocet)** — Author of [Velocet/iown-homecontrol](https://github.com/Velocet/iown-homecontrol): Reverse engineering of the io-homecontrol protocol, CRC calculations, and AES cryptography implementations.
-          * **[cridp](https://github.com/cridp)** — Author of [cridp/iown-homecontrol-esp32sx1276](https://github.com/cridp/iown-homecontrol-esp32sx1276): ESP32 and Semtech SX1276 hardware adaptation.
-          * **[djbenbe](https://github.com/djbenbe)** — Author of [djbenbe/miopen.io](https://github.com/djbenbe/miopen.io/tree/Beta): Core firmware development, UI concept, graphics, and initial integration.
-          * **[rspaargaren](https://github.com/rspaargaren)** — Community documentation, guides, and [io-homecontrol Wiki](https://github.com/rspaargaren/iohomecontrol/wiki).
-          * **[CloudAXS](https://github.com/CloudAXS)** — Web interface architecture, modern responsive UI, and multi-language engine.
-
-          ---
-
-          ## 📚 Complete Guides & Documentation
-
-          Comprehensive documentation has been published in the repository:
-          * 🔌 **[Hardware Setup & Pinouts](docs/HARDWARE_SETUP.md)**: Board comparison, SPI pinouts, antenna specifications, and wiring diagrams.
-          * 🔄 **[Pairing & Calibration Guide](docs/PAIRING_GUIDE.md)**: Motor pairing sequence, travel time calibration, and wall remote mapping.
-          * 🏠 **[Home Assistant Integration](docs/HOME_ASSISTANT.md)**: Zero-config MQTT discovery, dashboard cards, and automation examples.
-          * 🌐 **[REST API & MQTT Reference](docs/API_AND_MQTT_REFERENCE.md)**: Complete endpoint documentation and WebSocket event specifications.
-          * 🔧 **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)**: Solutions for WiFi, mDNS, RF range, and OLED screen issues.
-          * 💻 **[Terminal & Serial Commands](COMMANDS.md)**: Interactive command reference.
+          * 🔒 **Concurrency & Stability**: Mutex-protected multi-core log buffering, radio transmission queue serialization, and expanded FreeRTOS task stacks (8 KB).
+          * 📶 **Smart Wi-Fi Roaming Assistant**: Intelligent, non-blocking background AP scanning with configurable night-window and flap protection.
+          * 📡 **LPM Actuator Support**: Fully restored 1920-byte default FSK preamble for low-power battery and solar motors (Velux KSX/SSL).
+          * ⚡ **Zero-Broker Native ESPHome API**: Embedded ESPHome native server (TCP 6053) with active keepalive heartbeats, instant mDNS discovery, and dynamic Home Assistant entity synchronization.
+          * ⏱️ **Dual Asymmetric Travel Times**: Independent open and close motor travel time calibration per device with native Home Assistant slider entities.
 
           ---
 
@@ -284,10 +141,21 @@ jobs:
           ### 📦 Flashing Instructions
           * **First-time Flash**: Use [ESP Web Tools](https://esphome.github.io/esp-web-tools/) or \`esptool.py\` with the combined \`.bin\` file.
           * **Web OTA Update**: Upload the \`*_firmware.bin\` and \`*_filesystem.bin\` files directly in the Web UI under **Settings → Firmware Update**.
+
+          ---
+
+          ## 📚 Complete Guides & Documentation
+
+          * 🔌 **[Hardware Setup & Pinouts](docs/HARDWARE_SETUP.md)**: Board comparison, SPI pinouts, antenna specifications, and wiring diagrams.
+          * 🔄 **[Pairing & Calibration Guide](docs/PAIRING_GUIDE.md)**: Motor pairing sequence, travel time calibration, and wall remote mapping.
+          * 🏠 **[Home Assistant Integration](docs/HOME_ASSISTANT.md)**: Zero-config MQTT discovery, dashboard cards, and automation examples.
+          * 🌐 **[REST API & MQTT Reference](docs/API_AND_MQTT_REFERENCE.md)**: Complete endpoint documentation and WebSocket event specifications.
+          * 🔧 **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)**: Solutions for WiFi, mDNS, RF range, and OLED screen issues.
+          * 💻 **[Terminal & Serial Commands](COMMANDS.md)**: Interactive command reference.
           EOF
 
       - name: Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || steps.generate_release_tag.outputs.release_tag }}
           body_path: changelog.md
@@ -311,7 +179,7 @@ jobs:
             M5StackC6L_filesystem.bin
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-artifacts
           path: |
