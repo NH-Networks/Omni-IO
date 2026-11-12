@@ -22,6 +22,7 @@ These files were fully created by CloudAXS. They do not contain upstream code an
 * `scratch/upload_ota.py`
 * `tools/test_esphome_api.py`
 * `partitions_4MB_OTA.csv`
+* `partitions_16MB_OTA.csv`
 * `.github/ISSUE_TEMPLATE/bug_report.md`
 * `.github/ISSUE_TEMPLATE/feature_request.md`
 * `.github/pull_request_template.md`

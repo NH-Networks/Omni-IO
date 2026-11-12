@@ -44,10 +44,7 @@
 #endif
 
 #if defined(M5STACK_C6L)
-// OLED screen dimensions for M5Stack C6L (0.66" SSD1306 SPI)
-#define SCREEN_WIDTH  DISPLAY_WIDTH
-#define SCREEN_HEIGHT DISPLAY_HEIGHT
-
+// OLED screen dimensions for M5Stack C6L (0.66" SSD1306 SPI) come from oled_display.h
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &SPI, OLED_DC_PIN, OLED_RST_PIN, OLED_CS_PIN);
 #else
 // OLED screen dimensions for I2C boards
@@ -137,78 +134,78 @@ void setCpuTempEnabled(bool enabled) {
 
 const uint8_t PROGMEM omniIoLogo[] =
 {
-    B00000010, B00000000,
-    B00001101, B10000000,
-    B00110000, B01100000,
-    B11000000, B00011000,
-    B01001011, B10010000,
-    B01001010, B10010000,
-    B01001010, B10010000,
-    B01001011, B10010000,
-    B01000000, B00010000,
-    B01111111, B11110000,
+    0b00000010, 0b00000000,
+    0b00001101, 0b10000000,
+    0b00110000, 0b01100000,
+    0b11000000, 0b00011000,
+    0b01001011, 0b10010000,
+    0b01001010, 0b10010000,
+    0b01001010, 0b10010000,
+    0b01001011, 0b10010000,
+    0b01000000, 0b00010000,
+    0b01111111, 0b11110000,
 }; // House with IO in it
 
 const uint8_t PROGMEM wifiIcons[4][7] = {
     {
-        B00000000,
-        B00000000,
-        B00000000,
-        B00000000,
-        B00000000,
-        B00000000,
-        B11011011,
+        0b00000000,
+        0b00000000,
+        0b00000000,
+        0b00000000,
+        0b00000000,
+        0b00000000,
+        0b11011011,
     }, // 3 empty bars
     {
-        B00000000,
-        B00000000,
-        B00000000,
-        B00000000,
-        B11000000,
-        B11000000,
-        B11011011,
+        0b00000000,
+        0b00000000,
+        0b00000000,
+        0b00000000,
+        0b11000000,
+        0b11000000,
+        0b11011011,
     }, // first bar filled
     {
-        B00000000,
-        B00000000,
-        B00011000,
-        B00011000,
-        B11011000,
-        B11011000,
-        B11011011,
+        0b00000000,
+        0b00000000,
+        0b00011000,
+        0b00011000,
+        0b11011000,
+        0b11011000,
+        0b11011011,
     }, // first two filled
     {
-        B00000011,
-        B00000011,
-        B00011011,
-        B00011011,
-        B11011011,
-        B11011011,
-        B11011011,
+        0b00000011,
+        0b00000011,
+        0b00011011,
+        0b00011011,
+        0b11011011,
+        0b11011011,
+        0b11011011,
     }, // all three filled
 };
 
 const uint8_t PROGMEM mqttIcons[3][10] = {
     {
-        B00111000, B11100000,
-        B01100000, B00110000,
-        B11000000, B00011000,
-        B01100000, B00110000,
-        B00111000, B11100000,
+        0b00111000, 0b11100000,
+        0b01100000, 0b00110000,
+        0b11000000, 0b00011000,
+        0b01100000, 0b00110000,
+        0b00111000, 0b11100000,
     }, // empty / connecting chain ends
     {
-        B00111000, B11100000,
-        B01100000, B00110000,
-        B11001111, B10011000,
-        B01100000, B00110000,
-        B00111000, B11100000,
+        0b00111000, 0b11100000,
+        0b01100000, 0b00110000,
+        0b11001111, 0b10011000,
+        0b01100000, 0b00110000,
+        0b00111000, 0b11100000,
     }, // connected / filled chain ends
     {
-        B00011100, B00111000,
-        B01100011, B00001100,
-        B11000000, B00001100,
-        B11000011, B00011000,
-        B01110000, B11100000,
+        0b00011100, 0b00111000,
+        0b01100011, 0b00001100,
+        0b11000000, 0b00001100,
+        0b11000011, 0b00011000,
+        0b01110000, 0b11100000,
     }, // disconnected / broken chain ends
 };
 
@@ -218,22 +215,22 @@ const uint8_t PROGMEM mqttIcons[3][10] = {
 // Index 1: Connected (solid house with chimney & door)
 const uint8_t PROGMEM espHomeIcons[2][14] = {
     {
-        B00001100, B10000000, // ....##..#.. (chimney on right)
-        B00010010, B10000000, // ...#..#.#..
-        B00100001, B10000000, // ..#....##..
-        B01111111, B11000000, // .#########. (roof eave)
-        B00100000, B10000000, // ..#.....#.. (walls)
-        B00100000, B10000000, // ..#.....#..
-        B00111111, B10000000, // ..#######.. (base)
+        0b00001100, 0b10000000, // ....##..#.. (chimney on right)
+        0b00010010, 0b10000000, // ...#..#.#..
+        0b00100001, 0b10000000, // ..#....##..
+        0b01111111, 0b11000000, // .#########. (roof eave)
+        0b00100000, 0b10000000, // ..#.....#.. (walls)
+        0b00100000, 0b10000000, // ..#.....#..
+        0b00111111, 0b10000000, // ..#######.. (base)
     },
     {
-        B00001100, B10000000, // ....##..#.. (chimney on right)
-        B00011110, B10000000, // ...####.#..
-        B00111111, B10000000, // ..#######..
-        B01111111, B11000000, // .#########. (roof eave)
-        B00110001, B10000000, // ..##...##.. (walls + door opening)
-        B00110001, B10000000, // ..##...##..
-        B00111111, B10000000, // ..#######.. (base)
+        0b00001100, 0b10000000, // ....##..#.. (chimney on right)
+        0b00011110, 0b10000000, // ...####.#..
+        0b00111111, 0b10000000, // ..#######..
+        0b01111111, 0b11000000, // .#########. (roof eave)
+        0b00110001, 0b10000000, // ..##...##.. (walls + door opening)
+        0b00110001, 0b10000000, // ..##...##..
+        0b00111111, 0b10000000, // ..#######.. (base)
     },
 };
 #endif
@@ -296,9 +293,18 @@ bool initDisplay() {
 #if defined(M5STACK_C6L)
     pinMode(OLED_CS_PIN, OUTPUT);
     digitalWrite(OLED_CS_PIN, HIGH);
+    // The bus is shared with the SX1262: start it on the board pins, otherwise
+    // Adafruit_SSD1306 starts it on the default pins and later SPI.begin() calls are ignored.
+    SPI.begin(RADIO_SCLK_PIN, RADIO_MISO_PIN, RADIO_MOSI_PIN, -1);
     if (!display.begin(SSD1306_SWITCHCAPVCC)) {
         return false;
     }
+    // Adafruit_SSD1306 has no 64x48 profile and falls back to sequential COM pins, which
+    // drops/shifts rows on this panel. Use the alternative COM pin configuration instead.
+    display.ssd1306_command(SSD1306_SETCOMPINS);
+    display.ssd1306_command(0x12);
+    // The panel is mounted upside down relative to the case (Grove port on top)
+    display.setRotation(2);
 #else
     Wire.begin(OLED_SDA, OLED_SCL);
     if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDRESS)) {
@@ -428,10 +434,17 @@ void setDisplayEnabled(bool enabled) {
     notifyDisplayTask();
 }
 
+// 64 px wide panels (M5Stack C6L) cannot fit the 128x64 header/footer layout.
+static constexpr bool kNarrowDisplay = SCREEN_WIDTH <= 64;
+static constexpr int kContentTop = kNarrowDisplay ? 13 : 20;
+static constexpr int kFooterHeight = kNarrowDisplay ? 16 : 8;
+
 void drawLogo(int x, int y) {
     display.drawBitmap(x+1, y+1, omniIoLogo, 16, 10, SSD1306_WHITE);
-    display.setCursor(x+20, y+4);
-    display.print("Omni-IO");
+    if (!kNarrowDisplay) {
+        display.setCursor(x+20, y+4);
+        display.print("Omni-IO");
+    }
 }
 
 void drawHeader() {
@@ -465,11 +478,27 @@ void drawHeader() {
 
 void drawFooter() {
     if (wifiStatus.connectionStatus == ConnState::Connected) {
+        const bool showHostname = getSecondsSinceStart() / 10 % 2 == 0;
+        if (kNarrowDisplay) {
+            // 10 characters per line: print the IP as two halves, e.g. "192.168." / "10.50"
+            if (showHostname) {
+                display.setCursor(1, SCREEN_HEIGHT - 8);
+                display.print("omni-io");
+            } else {
+                const String ip = WiFi.localIP().toString();
+                const int split = ip.indexOf('.', ip.indexOf('.') + 1) + 1;
+                display.setCursor(1, SCREEN_HEIGHT - 16);
+                display.print(ip.substring(0, split).c_str());
+                display.setCursor(1, SCREEN_HEIGHT - 8);
+                display.print(ip.substring(split).c_str());
+            }
+            return;
+        }
         display.setCursor(1, SCREEN_HEIGHT - 8);
-        if (getSecondsSinceStart() / 10 % 2 == 0) {
-            display.println(SCREEN_WIDTH <= 64 ? "omni-io" : "http://omni-io.local");
+        if (showHostname) {
+            display.println("http://omni-io.local");
         } else {
-            display.printf(SCREEN_WIDTH <= 64 ? "%s\n" : "IP: %s\n", WiFi.localIP().toString().c_str());
+            display.printf("IP: %s\n", WiFi.localIP().toString().c_str());
         }
     }
 }
@@ -488,15 +517,22 @@ void drawData(const std::vector<std::string>& currentLines) {
     drawHeader();
 
     if (esp_timer_get_time() < discoveryEndMicros.load()) {
-        display.setCursor(10, 25);
-        display.setTextSize(2);
-        display.println("DISCOVERY");
-        display.setCursor(10, 45);
-        display.setTextSize(1);
-        display.println("Mode Active...");
+        if (kNarrowDisplay) {
+            display.setCursor(2, kContentTop + 2);
+            display.println("DISCOVERY");
+            display.setCursor(2, kContentTop + 12);
+            display.println("Mode on");
+        } else {
+            display.setCursor(10, 25);
+            display.setTextSize(2);
+            display.println("DISCOVERY");
+            display.setCursor(10, 45);
+            display.setTextSize(1);
+            display.println("Mode Active...");
+        }
         setTimerSpeed(fast);
     } else {
-        display.setCursor(0, 20);
+        display.setCursor(0, kContentTop);
         const bool hasData = drawContents(currentLines);
         if (!hasData) {
             setTimerSpeed(slow);
@@ -507,6 +543,36 @@ void drawData(const std::vector<std::string>& currentLines) {
 }
 
 void drawLogo() {
+    if (kNarrowDisplay) {
+        // Compact block (48 px wide) that always stays on screen: logo, name, CPU temp, IP in two halves
+        const bool showCpu = cpuTempEnabled.load();
+        const bool showIp = wifiStatus.connectionStatus == ConnState::Connected;
+        const int blockHeight = 12 + 8 + (showCpu ? 8 : 0) + (showIp ? 16 : 0);
+        const int x = (SCREEN_WIDTH - 48) * std::rand() / RAND_MAX;
+        const int y = (SCREEN_HEIGHT - blockHeight) * std::rand() / RAND_MAX;
+        display.setTextSize(1);
+        display.setTextColor(SSD1306_WHITE);
+        display.drawBitmap(x + 1, y + 1, omniIoLogo, 16, 10, SSD1306_WHITE);
+        int lineY = y + 12;
+        display.setCursor(x, lineY);
+        display.print("Omni-IO");
+        lineY += 8;
+        if (showCpu) {
+            display.setCursor(x, lineY);
+            display.printf("CPU %.0fC", temperatureRead());
+            lineY += 8;
+        }
+        if (showIp) {
+            const String ip = WiFi.localIP().toString();
+            const int split = ip.indexOf('.', ip.indexOf('.') + 1) + 1;
+            display.setCursor(x, lineY);
+            display.print(ip.substring(0, split).c_str());
+            display.setCursor(x, lineY + 8);
+            display.print(ip.substring(split).c_str());
+        }
+        return;
+    }
+
     const int x = 50.0 * std::rand() / RAND_MAX;
     const int y = 30.0 * std::rand() / RAND_MAX;
     drawLogo(x, y);
@@ -574,7 +640,7 @@ void displayTask(void *) {
 #endif
 
             int width = SCREEN_WIDTH / 6;
-            int height = (SCREEN_HEIGHT - 20 - 8) / 8;
+            int height = (SCREEN_HEIGHT - kContentTop - kFooterHeight) / 8;
             xSemaphoreTake(displayBufferMutex, portMAX_DELAY);
             currentLines = displayBuffer.getTextToDisplay(width, height);
             xSemaphoreGive(displayBufferMutex);

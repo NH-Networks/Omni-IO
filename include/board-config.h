@@ -92,6 +92,7 @@
 #define RADIO_CS_PIN        23   // SX1262 NSS
 #define RADIO_BUSY_PIN      19   // SX1262 BUSY
 #define RADIO_DIO1_PIN       7   // SX1262 DIO1 (IRQ)
+#define RADIO_TCXO_VOLTAGE  0x06 // TCXO supplied by SX1262 DIO3: 3.0 V (SX126X_TCXO_CTRL_3_0V)
 // RST is controlled via PI4IOE5V6408 I2C GPIO expander (E0.P7)
 // Use I2C_EXPANDER_SDA/SCL below to drive it before radio init
 #define RADIO_RST_PIN       -1   // Not directly on GPIO; use expander

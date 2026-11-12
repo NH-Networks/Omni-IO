@@ -150,6 +150,18 @@
 #define SX126X_REG_SYNC_WORD_0                0x06C0
 #define SX126X_REG_SYNC_WORD_1                0x06C1
 #define SX126X_REG_SYNC_WORD_2                0x06C2
+#define SX126X_REG_RX_GAIN                    0x08AC
+#define SX126X_RX_GAIN_BOOSTED                0x96
+
+// DIO3 TCXO supply voltage codes
+#define SX126X_TCXO_CTRL_1_6V                 0x00
+#define SX126X_TCXO_CTRL_1_7V                 0x01
+#define SX126X_TCXO_CTRL_1_8V                 0x02
+#define SX126X_TCXO_CTRL_2_2V                 0x03
+#define SX126X_TCXO_CTRL_2_4V                 0x04
+#define SX126X_TCXO_CTRL_2_7V                 0x05
+#define SX126X_TCXO_CTRL_3_0V                 0x06
+#define SX126X_TCXO_CTRL_3_3V                 0x07
 #define SX126X_REG_SYNC_WORD_3                0x06C3
 #define SX126X_REG_SYNC_WORD_4                0x06C4
 #define SX126X_REG_SYNC_WORD_5                0x06C5

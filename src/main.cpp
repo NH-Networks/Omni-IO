@@ -254,6 +254,14 @@ int log_to_buffer_and_serial(const char *format, va_list args) {
 void setup() {
 
     Serial.begin(115200);       //Start serial connection for debug and manual input
+#if defined(M5STACK_C6L)
+    // Warm up libstdc++'s lazy std::locale init here: its first use inside the radio task
+    // (stringstream in receive()) aborts with "free() target pointer is outside heap areas".
+    {
+        std::stringstream warmUp;
+        warmUp << std::hex << 255;
+    }
+#endif
     esp_log_set_vprintf(log_to_buffer_and_serial);
     esp_log_level_set("*", ESP_LOG_WARN);
     ESP_LOGW("SETUP", "START OF SETUP");
